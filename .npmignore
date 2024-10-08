@@ -20,3 +20,9 @@ coverage/**
 
 .npmrc
 
+.env
+.env.*
+
+/dist/
+build/
+temp/
