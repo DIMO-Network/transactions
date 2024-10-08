@@ -63,3 +63,10 @@ Using the SDK with a passkey signer:
         source: source,
       });
 ```
+
+### Contributing:
+
+To build the `.tgz` file, run the following:
+
+- npm run build
+- npm pack
