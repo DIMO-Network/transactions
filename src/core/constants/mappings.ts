@@ -93,7 +93,7 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
       },
       [ContractType.DIMO_FORWARDER]: {
         abi: abiForwarder,
-        address: AMOY_DIMO_TOKEN_ADDRESS,
+        address: AMOY_DIMO_FORWARDER,
       },
     },
   },

@@ -1,9 +1,9 @@
 import { SACD_PERMISSIONS } from ":core/types/args.js";
-import { AccountConfig, KernelConfig } from ":core/types/dimo.js";
+import { AccountConfig, KernelConfig, _accountConfig, _kernelConfig } from ":core/types/dimo.js";
 import { KERNEL_V3_1 } from "@zerodev/sdk/constants";
 import { entryPoint07Address } from "viem/account-abstraction";
 
-export const newKernelConfig = (args: KernelConfig): KernelConfig => {
+export const newKernelConfig = (args: KernelConfig): _kernelConfig => {
   if (args.rpcUrl == undefined) {
     throw new Error("rpcUrl is required");
   }
@@ -43,7 +43,7 @@ export const newKernelConfig = (args: KernelConfig): KernelConfig => {
   };
 };
 
-export const newAccountConfig = (args: AccountConfig): AccountConfig => {
+export const newAccountConfig = (args: AccountConfig): _accountConfig => {
   if (args.account === undefined) {
     throw new Error("Account is required");
   }

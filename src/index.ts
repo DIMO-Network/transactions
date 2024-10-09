@@ -17,12 +17,14 @@ export {
   transferVehicleAndAftermarketDeviceIDsTransaction,
   transferVehicleAndAftermarketDeviceIDs,
   transferVehicleAndAftermarketDeviceIDsFromAccount,
+  transferAllTypeHash,
 } from "./core/actions/transferVehicleAndADs.js";
 export {
   sendDIMOTokens,
   sendDIMOTokensCallData,
   sendDIMOTransaction,
   sendDIMOTokensFromAccount,
+  sendDIMOTokensTransactionForSignature,
 } from "./core/actions/sendDIMOTokens.js";
 export {
   claimAftermarketDeviceTransaction,

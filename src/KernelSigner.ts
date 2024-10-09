@@ -1,4 +1,4 @@
-import { ContractToMapping, ENVIRONMENT, KernelConfig } from ":core/types/dimo.js";
+import { ContractToMapping, ENVIRONMENT, KernelConfig, _kernelConfig } from ":core/types/dimo.js";
 import { Chain, PublicClient, Transport, createPublicClient, createWalletClient, http } from "viem";
 import {
   KernelAccountClient,
@@ -38,7 +38,7 @@ import { transferVehicleAndAftermarketDeviceIDs } from ":core/actions/transferVe
 import { unpairAftermarketDevice } from ":core/actions/unpairAftermarketDevice.js";
 
 export class KernelSigner {
-  config: KernelConfig;
+  config: _kernelConfig;
   publicClient: PublicClient;
   bundlerClient: BundlerClient<EntryPoint, Chain | undefined>;
   kernelClient: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>;
@@ -47,7 +47,7 @@ export class KernelSigner {
   kernelAddress: `0x${string}` | undefined;
 
   constructor(config: KernelConfig) {
-    this.config = config;
+    this.config = config as _kernelConfig;
     this.chain =
       ENV_NETWORK_MAPPING.get(ENV_MAPPING.get(this.config.environment ?? "prod") ?? ENVIRONMENT.PROD) ?? polygon;
     this.contractMapping =
@@ -64,17 +64,12 @@ export class KernelSigner {
     });
   }
 
-  public async passkeyInit(
-    subOrganizationId: string,
-    walletAddress: `0x${string}`,
-    turnkeyApiBaseUrl: string,
-    rpID: string
-  ) {
+  public async passkeyInit(subOrganizationId: string, walletAddress: `0x${string}`, rpID: string) {
     const passkeyStamper = new PasskeyStamper({
       rpId: rpID,
     });
 
-    const turnkeyClient = new TurnkeyClient({ baseUrl: turnkeyApiBaseUrl }, passkeyStamper);
+    const turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, passkeyStamper);
 
     const localAccount = await createAccount({
       // @ts-ignore

@@ -16,12 +16,12 @@ Using the SDK with an account signer:
     import { AccountSigner, newKernelConfig } from '@dimo-network/transactions';
     import {privateKeyToAccount} from 'viem/accounts';
 
-    const account = privateKeyToAccount(pk as `0x${string}`);
+    const account = privateKeyToAccount(your_private_key as `0x${string}`);
 
     const signer = new AccountSigner({
         rpcURL: RPC_URL,
         account: account,
-        environment: 'dev',
+        environment: 'dev', // omit this to default to prod
     });
 
     const txHash = signer.sendDIMOTokens({
@@ -36,18 +36,18 @@ Using the SDK with a passkey signer:
 ```js
     import { KernelSigner, newKernelConfig, sacdPermissionValue } from '@dimo-network/transactions';
 
-    const kernelSignerConfig = newKernelConfig(
-        RPC_URL,
-        BUNDLER_RPC,
-        PAYMASTER_RPC,
-    );
+    const kernelSignerConfig = newKernelConfig({
+        rpcUrl: RPC_URL,
+        bundlerUrl: BUNDLER_RPC,
+        paymasterUrl: PAYMASTER_RPC,
+        environment: 'dev', // omit this to default to prod
+    });
 
     const signer = new KernelSigner(kernelSignerConfig);
 
     await signer.passkeyInit(
         subOrganizationId,
         walletAddress as `0x${string}`,
-        'https://api.turnkey.com',
         RPID,
     );
 

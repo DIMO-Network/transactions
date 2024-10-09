@@ -1,4 +1,4 @@
-import { AccountConfig, ContractToMapping, ENVIRONMENT } from ":core/types/dimo.js";
+import { AccountConfig, ContractToMapping, ENVIRONMENT, _accountConfig } from ":core/types/dimo.js";
 import {
   Account,
   Address,
@@ -25,7 +25,7 @@ import { safeTransferVehicleID } from ":core/actions/safeTransferVehicles.js";
 import { mintVehicleWithDeviceDefinitionFromAccount } from ":core/actions/mintVehicleWithDeviceDefinition.js";
 
 export class AccountSigner {
-  config: AccountConfig;
+  config: _accountConfig;
   chain: Chain;
   contractMapping: ContractToMapping;
   address: `0x${string}`;
@@ -34,11 +34,9 @@ export class AccountSigner {
   walletClient: WalletClient<Transport, Chain, ParseAccount<Account | Address>, RpcSchema>;
 
   constructor(config: AccountConfig) {
-    this.config = config;
-    this.chain =
-      ENV_NETWORK_MAPPING.get(ENV_MAPPING.get(this.config.environment ?? "prod") ?? ENVIRONMENT.PROD) ?? polygon;
-    this.contractMapping =
-      CHAIN_ABI_MAPPING[ENV_MAPPING.get(this.config.environment ?? "prod") ?? ENVIRONMENT.PROD].contracts;
+    this.config = config as _accountConfig;
+    this.chain = ENV_NETWORK_MAPPING.get(ENV_MAPPING.get(this.config.environment) ?? ENVIRONMENT.PROD) ?? polygon;
+    this.contractMapping = CHAIN_ABI_MAPPING[ENV_MAPPING.get(this.config.environment) ?? ENVIRONMENT.PROD].contracts;
     this.publicClient = createPublicClient({
       transport: http(this.config.rpcUrl),
       chain: this.chain,

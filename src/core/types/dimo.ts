@@ -13,10 +13,26 @@ export type KernelConfig = {
   environment?: string;
 };
 
+export type _kernelConfig = {
+  rpcUrl: string;
+  bundlerUrl: string;
+  paymasterUrl: string;
+  turnkeyApiBaseUrl: string;
+  entryPoint: `0x${string}`;
+  kernelVersion: KERNEL_V3_VERSION_TYPE | KERNEL_V2_VERSION_TYPE;
+  environment: string;
+};
+
 export type AccountConfig = {
   rpcUrl: string;
   account: Account;
   environment?: string;
+};
+
+export type _accountConfig = {
+  rpcUrl: string;
+  account: Account;
+  environment: string;
 };
 
 export type PasskeySignerConfig = {
