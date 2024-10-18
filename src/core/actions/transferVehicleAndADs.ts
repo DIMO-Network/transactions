@@ -16,7 +16,6 @@ import { KernelAccountClient, KernelSmartAccount } from "@zerodev/sdk";
 import { EntryPoint } from "permissionless/types";
 import { TRANSFER_VEHICLE_AND_AFTERMARKET_DEVICE_IDS } from ":core/constants/methods.js";
 import { TransferVehicleAndAftermarketDeviceIDs } from ":core/types/args.js";
-import { PasskeyStamper } from "@turnkey/react-native-passkey-stamper";
 import { GetUserOperationReceiptReturnType } from "permissionless";
 import { KernelEncodeCallDataArgs } from "@zerodev/sdk/types";
 import { executeTransaction } from ":core/transactions/execute.js";
@@ -40,7 +39,7 @@ export const transferVehicleAndAftermarketDeviceIDsTransaction = async (
   args: TransferVehicleAndAftermarketDeviceIDs,
   subOrganizationId: string,
   walletAddress: string,
-  passkeyStamper: PasskeyStamper,
+  passkeyStamper: any,
   config: KernelConfig
 ): Promise<GetUserOperationReceiptReturnType> => {
   const env = ENV_MAPPING.get(config.environment ?? "prod") ?? ENVIRONMENT.PROD;

@@ -4,7 +4,6 @@ import { GetUserOperationReceiptReturnType, createBundlerClient } from "permissi
 import { ENV_MAPPING, ENV_NETWORK_MAPPING } from ":core/constants/mappings.js";
 import { TurnkeyClient } from "@turnkey/http";
 import { signerToEcdsaValidator } from "@zerodev/ecdsa-validator";
-import { PasskeyStamper } from "@turnkey/react-native-passkey-stamper";
 import { createKernelAccount, createKernelAccountClient, createZeroDevPaymasterClient } from "@zerodev/sdk";
 import { KernelEncodeCallDataArgs } from "@zerodev/sdk/types";
 import { walletClientToSmartAccountSigner } from "permissionless/utils";
@@ -16,7 +15,7 @@ export const executeTransaction = async (
   subOrganizationId: string,
   walletAddress: string,
   transactionData: KernelEncodeCallDataArgs,
-  passkeyStamper: PasskeyStamper,
+  passkeyStamper: any,
   config: KernelConfig
 ): Promise<GetUserOperationReceiptReturnType> => {
   const env = ENV_MAPPING.get(config.environment ?? "prod") ?? ENVIRONMENT.PROD;

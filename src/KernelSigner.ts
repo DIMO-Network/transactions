@@ -30,7 +30,6 @@ import { TurnkeyClient } from "@turnkey/http";
 import { polygon } from "viem/chains";
 import { burnVehicle } from ":core/actions/burnVehicle.js";
 import { createAccount } from "@turnkey/viem";
-import { PasskeyStamper } from "@turnkey/react-native-passkey-stamper";
 import { walletClientToSmartAccountSigner } from "permissionless/utils";
 import { signerToEcdsaValidator } from "@zerodev/ecdsa-validator";
 import { privateKeyToAccount } from "viem/accounts";
@@ -64,11 +63,7 @@ export class KernelSigner {
     });
   }
 
-  public async passkeyInit(subOrganizationId: string, walletAddress: `0x${string}`, rpID: string) {
-    const passkeyStamper = new PasskeyStamper({
-      rpId: rpID,
-    });
-
+  public async passkeyInit(subOrganizationId: string, walletAddress: `0x${string}`, passkeyStamper: any) {
     const turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, passkeyStamper);
 
     const localAccount = await createAccount({

@@ -17,7 +17,6 @@ import {
   DIMODomain,
   DIMODomainVersion,
 } from ":core/constants/dimo.js";
-import { PasskeyStamper } from "@turnkey/react-native-passkey-stamper";
 import { GetUserOperationReceiptReturnType } from "permissionless";
 import { KernelEncodeCallDataArgs } from "@zerodev/sdk/types";
 import { executeTransaction } from ":core/transactions/execute.js";
@@ -71,7 +70,7 @@ export const claimAftermarketDeviceTransaction = async (
   args: ClaimAftermarketdevice,
   subOrganizationId: string,
   walletAddress: string,
-  passkeyStamper: PasskeyStamper,
+  passkeyStamper: any,
   config: KernelConfig
 ): Promise<GetUserOperationReceiptReturnType> => {
   const env = ENV_MAPPING.get(config.environment ?? "prod") ?? ENVIRONMENT.PROD;

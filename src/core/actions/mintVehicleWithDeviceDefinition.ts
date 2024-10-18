@@ -15,7 +15,6 @@ import { KernelAccountClient, KernelSmartAccount } from "@zerodev/sdk";
 import { EntryPoint } from "permissionless/types";
 import { MINT_VEHICLE_WITH_DEVICE_DEFINITION } from ":core/constants/methods.js";
 import { MintVehicleWithDeviceDefinition } from ":core/types/args.js";
-import { PasskeyStamper } from "@turnkey/react-native-passkey-stamper";
 import { GetUserOperationReceiptReturnType } from "permissionless";
 import { KernelEncodeCallDataArgs } from "@zerodev/sdk/types";
 import { executeTransaction } from ":core/transactions/execute.js";
@@ -36,7 +35,7 @@ export const mintVehicleTransaction = async (
   args: MintVehicleWithDeviceDefinition,
   subOrganizationId: string,
   walletAddress: string,
-  passkeyStamper: PasskeyStamper,
+  passkeyStamper: any,
   config: KernelConfig
 ): Promise<GetUserOperationReceiptReturnType> => {
   const env = ENV_MAPPING.get(config.environment ?? "prod") ?? ENVIRONMENT.PROD;

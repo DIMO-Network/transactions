@@ -6,7 +6,6 @@ import { EntryPoint } from "permissionless/types";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
 import { BurnVehicle } from ":core/types/args.js";
 import { GetUserOperationReceiptReturnType } from "permissionless";
-import { PasskeyStamper } from "@turnkey/react-native-passkey-stamper";
 import { KernelEncodeCallDataArgs } from "@zerodev/sdk/types";
 import { executeTransaction } from ":core/transactions/execute.js";
 
@@ -23,7 +22,7 @@ export const burnVehicleTransaction = async (
   args: BurnVehicle,
   subOrganizationId: string,
   walletAddress: string,
-  passkeyStamper: PasskeyStamper,
+  passkeyStamper: any,
   config: KernelConfig
 ): Promise<GetUserOperationReceiptReturnType> => {
   const env = ENV_MAPPING.get(config.environment ?? "prod") ?? ENVIRONMENT.PROD;

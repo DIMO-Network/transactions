@@ -1,6 +1,6 @@
 {
   "name": "@dimo-network/transactions",
-  "version": "0.1.31",
+  "version": "0.1.32",
   "description": "DIMO Transactions SDK",
   "keywords": [
     "DIMO"
@@ -18,7 +18,6 @@
   },
   "dependencies": {
     "@turnkey/http": "^2.13.0",
-    "@turnkey/react-native-passkey-stamper": "^0.2.11",
     "@turnkey/viem": "^0.4.30",
     "@zerodev/ecdsa-validator": "^5.3.2",
     "@zerodev/sdk": "^5.3.13",

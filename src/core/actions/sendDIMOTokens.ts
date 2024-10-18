@@ -17,7 +17,6 @@ import { EntryPoint } from "permissionless/types";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING } from ":core/constants/mappings.js";
 import { SendDIMOTokens } from ":core/types/args.js";
 import { GetUserOperationReceiptReturnType } from "permissionless";
-import { PasskeyStamper } from "@turnkey/react-native-passkey-stamper";
 import { KernelEncodeCallDataArgs } from "@zerodev/sdk/types";
 import { executeTransaction } from ":core/transactions/execute.js";
 import { polygon } from "viem/chains";
@@ -35,7 +34,7 @@ export const sendDIMOTransaction = async (
   args: SendDIMOTokens,
   subOrganizationId: string,
   walletAddress: string,
-  passkeyStamper: PasskeyStamper,
+  passkeyStamper: any,
   config: KernelConfig
 ): Promise<GetUserOperationReceiptReturnType> => {
   const _config = config as _kernelConfig;
