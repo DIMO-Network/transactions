@@ -129,12 +129,11 @@ export class KernelSigner {
     if (!this.turnkeyClient) {
       throw new Error("Turnkey client not initialized");
     }
-    const key = generateP256KeyPair();
-
     const whoami = await this.turnkeyClient.getWhoami({
       organizationId: subOrganizationId,
     });
 
+    const key = generateP256KeyPair();
     const targetPubHex = key.publicKeyUncompressed;
     const sessionData = await this.turnkeyClient.createReadWriteSession({
       organizationId: subOrganizationId,
@@ -150,164 +149,14 @@ export class KernelSigner {
 
     const bundle = sessionData.activity.result.createReadWriteSessionResultV2?.credentialBundle;
     const decryptedBundle = decryptBundle(bundle!, key.privateKey);
-    const privKeyString = uint8ArrayToHexString(decryptedBundle);
-
-    const getPublicKeyFromPrivateKeyHex = (privateKey: string): string => {
-      return uint8ArrayToHexString(getPublicKey(uint8ArrayFromHexString(privateKey), true));
-    };
-
-    const pubKey = getPublicKeyFromPrivateKeyHex(privKeyString);
+    const privateKey = uint8ArrayToHexString(decryptedBundle);
 
     const apiStamper = new ApiKeyStamper({
-      apiPublicKey: pubKey,
-      apiPrivateKey: privKeyString,
+      apiPublicKey: uint8ArrayToHexString(getPublicKey(uint8ArrayFromHexString(privateKey), true)),
+      apiPrivateKey: privateKey,
     });
 
-    const turnkeyClientWithSession = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, apiStamper);
-    const localAccount = await createAccount({
-      // @ts-ignore
-      client: turnkeyClientWithSession,
-      organizationId: subOrganizationId,
-      signWith: walletAddress,
-      ethereumAddress: walletAddress,
-    });
-
-    const smartAccountClient = createWalletClient({
-      account: localAccount,
-      chain: this.chain,
-      transport: http(this.config.rpcUrl),
-    });
-
-    const smartAccountSigner = walletClientToSmartAccountSigner(smartAccountClient);
-    const ecdsaValidator = await signerToEcdsaValidator(this.publicClient, {
-      signer: smartAccountSigner,
-      entryPoint: this.config.entryPoint,
-      // @ts-ignore
-      kernelVersion: this.config.kernelVersion,
-    });
-
-    const account = await createKernelAccount(this.publicClient, {
-      plugins: {
-        sudo: ecdsaValidator,
-      },
-      entryPoint: this.config.entryPoint,
-      // @ts-ignore
-      kernelVersion: this.config.kernelVersion,
-    });
-
-    this.kernelClient = createKernelAccountClient({
-      account,
-      chain: this.chain,
-      entryPoint: this.config.entryPoint,
-      bundlerTransport: http(this.config.bundlerUrl),
-      middleware: {
-        // @ts-ignore
-        sponsorUserOperation: async ({ userOperation }) => {
-          const zerodevPaymaster = createZeroDevPaymasterClient({
-            chain: this.chain,
-            entryPoint: this.config.entryPoint,
-            transport: http(this.config.paymasterUrl),
-          });
-          return zerodevPaymaster.sponsorUserOperation({
-            userOperation,
-            entryPoint: this.config.entryPoint,
-          });
-        },
-      },
-    });
-
-    this.kernelAddress = account.address;
-  }
-
-  public async startWalletSession(subOrganizationId: string, walletAddress: `0x${string}`) {
-    try {
-      if (!this.turnkeyClient) {
-        throw new Error("Turnkey client not initialized");
-      }
-
-      const key = generateP256KeyPair();
-      const targetPubHex = key.publicKeyUncompressed;
-      const sessionData = await this.kernelClient.turnkeyClient.createReadWriteSession({
-        organizationId: subOrganizationId,
-        timestampMs: "900000", // 15 minutes
-        type: "ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2",
-        parameters: { targetPublicKey: targetPubHex },
-      });
-
-      const bundle = sessionData.activity.result.createReadWriteSessionResultV2?.credentialBundle;
-
-      const decryptedBundle = decryptBundle(bundle!, targetPubHex);
-
-      const privKeyString = uint8ArrayToHexString(decryptedBundle);
-
-      const getPublicKeyFromPrivateKeyHex = (privateKey: string): string => {
-        return uint8ArrayToHexString(getPublicKey(uint8ArrayFromHexString(privateKey), true));
-      };
-
-      const pubKey = getPublicKeyFromPrivateKeyHex(privKeyString);
-
-      const apiStamper = new ApiKeyStamper({
-        apiPublicKey: pubKey,
-        apiPrivateKey: privKeyString,
-      });
-
-      const turnkeyClientWithSession = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, apiStamper);
-      const localAccount = await createAccount({
-        // @ts-ignore
-        client: turnkeyClientWithSession,
-        organizationId: subOrganizationId,
-        signWith: walletAddress,
-        ethereumAddress: walletAddress,
-      });
-
-      const smartAccountClient = createWalletClient({
-        account: localAccount,
-        chain: this.chain,
-        transport: http(this.config.rpcUrl),
-      });
-
-      const smartAccountSigner = walletClientToSmartAccountSigner(smartAccountClient);
-      const ecdsaValidator = await signerToEcdsaValidator(this.publicClient, {
-        signer: smartAccountSigner,
-        entryPoint: this.config.entryPoint,
-        // @ts-ignore
-        kernelVersion: this.config.kernelVersion,
-      });
-
-      const account = await createKernelAccount(this.publicClient, {
-        plugins: {
-          sudo: ecdsaValidator,
-        },
-        entryPoint: this.config.entryPoint,
-        // @ts-ignore
-        kernelVersion: this.config.kernelVersion,
-      });
-
-      this.kernelClient = createKernelAccountClient({
-        account,
-        chain: this.chain,
-        entryPoint: this.config.entryPoint,
-        bundlerTransport: http(this.config.bundlerUrl),
-        middleware: {
-          // @ts-ignore
-          sponsorUserOperation: async ({ userOperation }) => {
-            const zerodevPaymaster = createZeroDevPaymasterClient({
-              chain: this.chain,
-              entryPoint: this.config.entryPoint,
-              transport: http(this.config.paymasterUrl),
-            });
-            return zerodevPaymaster.sponsorUserOperation({
-              userOperation,
-              entryPoint: this.config.entryPoint,
-            });
-          },
-        },
-      });
-
-      this.kernelAddress = account.address;
-    } catch (e) {
-      throw new Error("Error starting wallet session");
-    }
+    this.passkeyInit(subOrganizationId, walletAddress, apiStamper);
   }
 
   public async privateKeyInit(privateKey: `0x${string}`) {
