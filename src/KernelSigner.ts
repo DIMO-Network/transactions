@@ -129,9 +129,6 @@ export class KernelSigner {
     if (!this.turnkeyClient) {
       throw new Error("Turnkey client not initialized");
     }
-    const whoami = await this.turnkeyClient.getWhoami({
-      organizationId: subOrganizationId,
-    });
 
     const key = generateP256KeyPair();
     const targetPubHex = key.publicKeyUncompressed;
@@ -139,9 +136,7 @@ export class KernelSigner {
       organizationId: subOrganizationId,
       type: "ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2",
       timestampMs: Date.now().toString(),
-      // @ ts-ignore
       parameters: {
-        userId: whoami.userId,
         targetPublicKey: targetPubHex,
         expirationSeconds: expirationSeconds,
       },
