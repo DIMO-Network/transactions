@@ -34,6 +34,10 @@ Using the SDK with an account signer:
 Using the SDK with a passkey signer:
 
 ```js
+    import { PasskeyStamper } from "@turnkey/react-native-passkey-stamper";
+    // import { WebauthnStamper } from "@turnkey/webauthn-stamper";
+    // import { IframeStamper } from "@turnkey/iframe-stamper";
+    // import { ApiKeyStamper } from "@turnkey/api-key-stamper";
     import { KernelSigner, newKernelConfig, sacdPermissionValue } from '@dimo-network/transactions';
 
     const kernelSignerConfig = newKernelConfig({
@@ -43,19 +47,34 @@ Using the SDK with a passkey signer:
         environment: 'dev', // omit this to default to prod
     });
 
-    const signer = new KernelSigner(kernelSignerConfig);
+    // NOTE: use the correct stamper for your framework (native, browser, etc)
+    // check corresponding libraries above
+    const stamper = new PasskeyStamper({
+        rpId: RPID,
+    });
 
-    await signer.passkeyInit(
+    // const stamper = new IframeStamper({
+    //     iframeUrl: process.env.AUTH_IFRAME_URL!,
+    //     iframeContainer: document.getElementById(TurnkeyIframeContainerId),
+    //     iframeElementId: TurnkeyIframeElementId,
+    // });
+
+    // const stamper = new WebAuthnStamper({
+    // rpId: "example.com",
+    // });
+
+    const kernelSigner = new KernelSigner(kernelSignerConfig);
+    await kernelSigner.passkeyInit(
         subOrganizationId,
         walletAddress as `0x${string}`,
-        RPID,
+        stamper,
     );
 
     const perms = sacdPermissionValue({
         ALLTIME_LOCATION: true,
     });
 
-    const {success, reason, receipt} = await signer.setVehiclePermissions({
+    const {success, reason, receipt} = await kernelSigner.setVehiclePermissions({
         tokenId: tokenId,
         grantee: grantee,
         permissions: BigInt(perms),

@@ -17,6 +17,7 @@
     "lint": "eslint . --ext .ts,.tsx --fix"
   },
   "dependencies": {
+    "@turnkey/api-key-stamper": "^0.4.3",
     "@turnkey/http": "^2.13.0",
     "@turnkey/viem": "^0.4.30",
     "@zerodev/ecdsa-validator": "^5.3.2",
