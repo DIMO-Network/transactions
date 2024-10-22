@@ -48,6 +48,18 @@ export class KernelSigner {
   chain: Chain;
   kernelAddress: `0x${string}` | undefined;
   turnkeyClient: TurnkeyClient | undefined;
+  private _init: boolean = false;
+  private _stamper: any;
+  private _subOrganizationId: string = "";
+  private _walletAddress: `0x${string}` = "0x";
+  private _walletSession: {
+    active: boolean;
+    expires: number;
+  } = {
+    active: false,
+    expires: 0,
+  };
+  expire: number = 0;
 
   constructor(config: KernelConfig) {
     this.config = config as _kernelConfig;
@@ -68,8 +80,14 @@ export class KernelSigner {
   }
 
   public async passkeyInit(subOrganizationId: string, walletAddress: `0x${string}`, stamper: any) {
-    this.turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, stamper);
+    if (!this._init) {
+      this._init = true;
+      this._stamper = stamper;
+      this._subOrganizationId = subOrganizationId;
+      this._walletAddress = walletAddress;
+    }
 
+    this.turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, stamper);
     const localAccount = await createAccount({
       // @ts-ignore
       client: this.turnkeyClient,
@@ -125,17 +143,27 @@ export class KernelSigner {
     this.kernelAddress = account.address;
   }
 
-  public async sessionInit(subOrganizationId: string, walletAddress: `0x${string}`, expirationSeconds: string = "900") {
+  public async openSessionWithPasskey(
+    subOrganizationId: string,
+    walletAddress: `0x${string}`,
+    expirationSeconds: string = "900"
+  ): Promise<{
+    active: boolean;
+    expires: number;
+  }> {
     if (!this.turnkeyClient) {
       throw new Error("Turnkey client not initialized");
     }
+
+    const timestamp = Date.now();
+    const expiration = timestamp + parseInt(expirationSeconds) * 1000;
 
     const key = generateP256KeyPair();
     const targetPubHex = key.publicKeyUncompressed;
     const sessionData = await this.turnkeyClient.createReadWriteSession({
       organizationId: subOrganizationId,
       type: "ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2",
-      timestampMs: Date.now().toString(),
+      timestampMs: expiration.toString(),
       parameters: {
         targetPublicKey: targetPubHex,
         expirationSeconds: expirationSeconds,
@@ -152,6 +180,21 @@ export class KernelSigner {
     });
 
     this.passkeyInit(subOrganizationId, walletAddress, apiStamper);
+    this._walletSession = {
+      active: true,
+      expires: expiration,
+    };
+    this.expire = expiration;
+
+    return this._walletSession;
+  }
+
+  public walletSessionActive() {
+    return new Date(this.expire) < new Date(Date.now());
+  }
+
+  public sessionInfos() {
+    return this._walletSession;
   }
 
   public async privateKeyInit(privateKey: `0x${string}`) {
@@ -193,6 +236,110 @@ export class KernelSigner {
     });
 
     this.kernelAddress = account.address;
+  }
+
+  public async getsession() {
+    this.kernelClient;
+  }
+
+  public async sessionFallback(timeout: string = "900") {
+    if (new Date(this.expire) < new Date(Date.now())) {
+      console.log("wallet session expired. creating new session");
+      this.turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, this._stamper);
+      await this.passkeyFallback(true);
+
+      const timestamp = Date.now();
+      const expiration = timestamp + parseInt(timeout) * 1000;
+      const key = generateP256KeyPair();
+      const targetPubHex = key.publicKeyUncompressed;
+      const sessionData = await this.turnkeyClient.createReadWriteSession({
+        organizationId: this._subOrganizationId,
+        type: "ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2",
+        timestampMs: expiration.toString(),
+        parameters: {
+          targetPublicKey: targetPubHex,
+          expirationSeconds: timeout,
+        },
+      });
+
+      const bundle = sessionData.activity.result.createReadWriteSessionResultV2?.credentialBundle;
+      const decryptedBundle = decryptBundle(bundle!, key.privateKey);
+      const privateKey = uint8ArrayToHexString(decryptedBundle);
+
+      const apiStamper = new ApiKeyStamper({
+        apiPublicKey: uint8ArrayToHexString(getPublicKey(uint8ArrayFromHexString(privateKey), true)),
+        apiPrivateKey: privateKey,
+      });
+
+      const turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, apiStamper);
+      const localAccount = await createAccount({
+        // @ts-ignore
+        client: turnkeyClient,
+        organizationId: this._subOrganizationId,
+        signWith: this._walletAddress,
+        ethereumAddress: this._walletAddress,
+      });
+
+      const smartAccountClient = createWalletClient({
+        account: localAccount,
+        chain: this.chain,
+        transport: http(this.config.rpcUrl),
+      });
+
+      const smartAccountSigner = walletClientToSmartAccountSigner(smartAccountClient);
+      const ecdsaValidator = await signerToEcdsaValidator(this.publicClient, {
+        signer: smartAccountSigner,
+        entryPoint: this.config.entryPoint,
+        // @ts-ignore
+        kernelVersion: this.config.kernelVersion,
+      });
+
+      const account = await createKernelAccount(this.publicClient, {
+        plugins: {
+          sudo: ecdsaValidator,
+        },
+        entryPoint: this.config.entryPoint,
+        // @ts-ignore
+        kernelVersion: this.config.kernelVersion,
+      });
+
+      this.kernelClient = createKernelAccountClient({
+        account,
+        chain: this.chain,
+        entryPoint: this.config.entryPoint,
+        bundlerTransport: http(this.config.bundlerUrl),
+        middleware: {
+          // @ts-ignore
+          sponsorUserOperation: async ({ userOperation }) => {
+            const zerodevPaymaster = createZeroDevPaymasterClient({
+              chain: this.chain,
+              entryPoint: this.config.entryPoint,
+              transport: http(this.config.paymasterUrl),
+            });
+            return zerodevPaymaster.sponsorUserOperation({
+              userOperation,
+              entryPoint: this.config.entryPoint,
+            });
+          },
+        },
+      });
+
+      this.kernelAddress = account.address;
+      this._walletSession = {
+        active: true,
+        expires: expiration,
+      };
+      this.expire = expiration;
+
+      return;
+    }
+    console.log("wallet session is not expired, trying on chain interaction. expiration: ", this.expire);
+  }
+
+  public async passkeyFallback(force: boolean = false) {
+    if (new Date(this.expire) < new Date(Date.now()) || force) {
+      await this.passkeyInit(this._subOrganizationId, this._walletAddress, this._stamper);
+    }
   }
 
   public async mintVehicleWithDeviceDefinition(
