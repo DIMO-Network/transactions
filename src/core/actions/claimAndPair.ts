@@ -12,7 +12,7 @@ export const claimAndPairDevice = async (
   environment: string = "prod"
 ): Promise<`0x${string}`> => {
   const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.DEV].contracts;
-  return await client.account.encodeCallData(
+  return await client.account.encodeCallData([
     {
       to: contracts[ContractType.DIMO_REGISTRY].address,
       value: BigInt(0),
@@ -30,6 +30,6 @@ export const claimAndPairDevice = async (
         functionName: PAIR_AFTERMARKET_DEVICE,
         args: [args.aftermarketDeviceNode, args.vehicleNode],
       }),
-    }
-  );
+    },
+  ]);
 };
