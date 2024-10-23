@@ -11,7 +11,8 @@ export type KernelConfig = {
   entryPoint?: `0x${string}`;
   kernelVersion?: KERNEL_V3_VERSION_TYPE | KERNEL_V2_VERSION_TYPE;
   environment?: string;
-  useWalletSession: boolean;
+  useWalletSession?: boolean;
+  sessionTimeoutSeconds?: string; // seconds
 };
 
 export type _kernelConfig = {
@@ -23,6 +24,7 @@ export type _kernelConfig = {
   kernelVersion: KERNEL_V3_VERSION_TYPE | KERNEL_V2_VERSION_TYPE;
   environment: string;
   useWalletSession: boolean;
+  sessionTimeoutSeconds: string;
 };
 
 export type AccountConfig = {

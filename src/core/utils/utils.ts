@@ -36,6 +36,10 @@ export const newKernelConfig = (args: KernelConfig): _kernelConfig => {
     args.useWalletSession = false;
   }
 
+  if (args.sessionTimeoutSeconds == undefined) {
+    args.sessionTimeoutSeconds = "900";
+  }
+
   return {
     rpcUrl: args.rpcUrl,
     bundlerUrl: args.bundlerUrl,
@@ -45,6 +49,7 @@ export const newKernelConfig = (args: KernelConfig): _kernelConfig => {
     kernelVersion: args.kernelVersion,
     environment: args.environment,
     useWalletSession: args.useWalletSession,
+    sessionTimeoutSeconds: args.sessionTimeoutSeconds,
   };
 };
 
