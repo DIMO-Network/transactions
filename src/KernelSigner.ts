@@ -38,6 +38,7 @@ import { unpairAftermarketDevice } from ":core/actions/unpairAftermarketDevice.j
 import { ApiKeyStamper } from "@turnkey/api-key-stamper";
 import { generateP256KeyPair, decryptBundle, getPublicKey } from "@turnkey/crypto";
 import { uint8ArrayToHexString, uint8ArrayFromHexString } from "@turnkey/encoding";
+import { claimAndPairDevice } from ":core/actions/claimAndPair.js";
 
 export class KernelSigner {
   config: _kernelConfig;
@@ -244,7 +245,6 @@ export class KernelSigner {
     }
 
     if (new Date(this.expire) < new Date(Date.now())) {
-      console.log("wallet session expired. creating new session");
       this.turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, this._stamper);
       await this.passkeyFallback(true);
 
@@ -333,7 +333,6 @@ export class KernelSigner {
 
       return;
     }
-    console.log("wallet session is not expired, trying on chain interaction. expiration: ", this.expire);
   }
 
   public async passkeyFallback(force: boolean = false) {
@@ -406,26 +405,16 @@ export class KernelSigner {
   public async claimAndPairAftermarketDevice(
     args: ClaimAftermarketdevice & PairAftermarketDevice
   ): Promise<GetUserOperationReceiptReturnType> {
-    const claimADCallData = await claimAftermarketDevice(args, this.kernelClient, this.config.environment);
-    const claimADHash = await this.kernelClient.sendUserOperation({
+    const claimAndPairCallData = await claimAndPairDevice(args, this.kernelClient, this.config.environment);
+
+    const claimAndPairADHash = await this.kernelClient.sendUserOperation({
       userOperation: {
-        callData: claimADCallData as `0x${string}`,
+        callData: claimAndPairCallData as `0x${string}`,
       },
     });
-    const claimADResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: claimADHash });
 
-    if (!claimADResult.success) {
-      return claimADResult;
-    }
-
-    const pairADCallData = await pairAftermarketDevice(args, this.kernelClient, this.config.environment);
-    const pairADHash = await this.kernelClient.sendUserOperation({
-      userOperation: {
-        callData: pairADCallData as `0x${string}`,
-      },
-    });
-    const pairADResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: pairADHash });
-    return pairADResult;
+    const result = await this.bundlerClient.waitForUserOperationReceipt({ hash: claimAndPairADHash });
+    return result;
   }
 
   public async burnVehicle(args: BurnVehicle): Promise<GetUserOperationReceiptReturnType> {
