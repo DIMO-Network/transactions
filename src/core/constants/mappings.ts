@@ -19,6 +19,7 @@ import {
   POLYGON_DIMO_CREDIT_ADDRESS,
   POLYGON_DIMO_REGISTRY_ADDRESS,
   AMOY_DIMO_FORWARDER,
+  POLYGON_DIMO_FORWARDER,
 } from ":core/constants/contractAddrs.js";
 import { Abi } from "viem";
 
@@ -121,7 +122,7 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
       },
       [ContractType.DIMO_FORWARDER]: {
         abi: abiForwarder,
-        address: AMOY_DIMO_FORWARDER, //TODO-- update this once deployed on mainnet
+        address: POLYGON_DIMO_FORWARDER,
       },
     },
   },

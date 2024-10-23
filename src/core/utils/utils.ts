@@ -32,6 +32,10 @@ export const newKernelConfig = (args: KernelConfig): _kernelConfig => {
     args.environment = "prod";
   }
 
+  if (args.useWalletSession == undefined) {
+    args.useWalletSession = false;
+  }
+
   return {
     rpcUrl: args.rpcUrl,
     bundlerUrl: args.bundlerUrl,
@@ -40,6 +44,7 @@ export const newKernelConfig = (args: KernelConfig): _kernelConfig => {
     entryPoint: args.entryPoint,
     kernelVersion: args.kernelVersion,
     environment: args.environment,
+    useWalletSession: args.useWalletSession,
   };
 };
 

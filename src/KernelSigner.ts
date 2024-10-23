@@ -238,11 +238,11 @@ export class KernelSigner {
     this.kernelAddress = account.address;
   }
 
-  public async getsession() {
-    this.kernelClient;
-  }
-
   public async sessionFallback(timeout: string = "900") {
+    if (!this.config.useWalletSession) {
+      return;
+    }
+
     if (new Date(this.expire) < new Date(Date.now())) {
       console.log("wallet session expired. creating new session");
       this.turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, this._stamper);
@@ -255,7 +255,7 @@ export class KernelSigner {
       const sessionData = await this.turnkeyClient.createReadWriteSession({
         organizationId: this._subOrganizationId,
         type: "ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2",
-        timestampMs: expiration.toString(),
+        timestampMs: timestamp.toString(),
         parameters: {
           targetPublicKey: targetPubHex,
           expirationSeconds: timeout,
