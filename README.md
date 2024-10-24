@@ -76,6 +76,16 @@ Using the SDK with an account signer:
       });
 ```
 
+### Actions
+
+The Kernel Client can take the following actions:
+
+- Open a wallet session (wallet session must be specified in config; default timeout is 15 mintes)
+  `kernelClient.openSessionWithPasskey()`
+- Mint a vehicle with device definition
+  - This function can accept a single `MintVehicleWithDeviceDefinition` object or an array of objects
+    `kernelClient.mintVehicleWithDeviceDefinition(args)`
+
 ### Contributing:
 
 To build the `.tgz` file, run the following:

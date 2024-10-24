@@ -127,3 +127,12 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
     },
   },
 };
+
+// TODO parse error messages with abi to give specific message
+export const OnChainErrors = {
+  "UserOperation reverted during simulation with reason: 0x15bdaac1": "Aftermarket device not claimed",
+  "UserOperation reverted during simulation with reason: 0x762116ae": "Aftermarket device paired",
+  "UserOperation reverted during simulation with reason: 0xe3ca9639": "Invalid node",
+  "UserOperation reverted during simulation with reason: 0xc9134785": "Insufficient hex length",
+  "UserOperation reverted during simulation with reason: 0xc46a5168": "Cannot burn paired vehicle",
+};

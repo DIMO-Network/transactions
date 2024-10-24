@@ -18,7 +18,7 @@ import {
   setVehiclePermissionsBatch,
   setVehiclePermissionsBulk,
 } from ":core/actions/setPermissionsSACD.js";
-import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING } from ":core/constants/mappings.js";
+import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING, OnChainErrors } from ":core/constants/mappings.js";
 import {
   BurnVehicle,
   ClaimAftermarketdevice,
@@ -153,6 +153,10 @@ export class KernelSigner {
     });
 
     this.kernelAddress = account.address;
+
+    if (this.config.useWalletSession) {
+      await this.openSessionWithPasskey();
+    }
   }
 
   public async openSessionWithPasskey(): Promise<{
@@ -510,14 +514,26 @@ export class KernelSigner {
       burnVehicleCallData = await burnVehicleBatch(args, client, this.config.environment);
     }
 
-    const userOpHash = await client.sendUserOperation({
-      userOperation: {
-        callData: burnVehicleCallData as `0x${string}`,
-      },
-    });
-
-    const txResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
-    return txResult;
+    let userOpHash: `0x${string}`;
+    try {
+      userOpHash = await client.sendUserOperation({
+        userOperation: {
+          callData: burnVehicleCallData as `0x${string}`,
+        },
+      });
+      const txResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+      return txResult;
+    } catch (error: any) {
+      if (error) {
+        error = error.toString();
+      }
+      for (const [failReason, cleanError] of Object.entries(OnChainErrors)) {
+        if (error.includes(failReason)) {
+          throw new Error(cleanError);
+        }
+        throw new Error(error);
+      }
+    }
   }
 
   public async transferVehicleAndAftermarketDevices(
