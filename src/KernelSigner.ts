@@ -313,8 +313,9 @@ export class KernelSigner {
   }
 
   public async mintVehicleWithDeviceDefinition(
-    args: MintVehicleWithDeviceDefinition
-  ): Promise<GetUserOperationReceiptReturnType> {
+    args: MintVehicleWithDeviceDefinition,
+    waitForReceipt: boolean = true
+  ): Promise<GetUserOperationReceiptReturnType & { userOperationHash: string }> {
     let client = this.kernelClient;
     if (this.config.useWalletSession) {
       await this.openSessionWithPasskey();
@@ -330,6 +331,14 @@ export class KernelSigner {
         callData: mintVehicleCallData as `0x${string}`,
       },
     });
+
+    if (!waitForReceipt) {
+      return {
+        userOperationHash: userOpHash,
+        status: "pending",
+      };
+    }
+
     const txResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
     return txResult;
   }
