@@ -92,8 +92,10 @@ export class KernelSigner {
   }
 
   public async passkeyInit(subOrganizationId: string, walletAddress: `0x${string}`, stamper: any) {
+    let openSession = false;
     if (!this._init) {
       this._init = true;
+      openSession = true;
       this._subOrganizationId = subOrganizationId;
       this._walletAddress = walletAddress;
     }
@@ -154,7 +156,7 @@ export class KernelSigner {
 
     this.kernelAddress = account.address;
 
-    if (this.config.useWalletSession) {
+    if (openSession) {
       await this.openSessionWithPasskey();
     }
   }
