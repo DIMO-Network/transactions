@@ -72,6 +72,27 @@ export const mintVehicleWithDeviceDefinition = async (
   });
 };
 
+export const mintVehicleWithDeviceDefinitionBatch = async (
+  args: MintVehicleWithDeviceDefinition[],
+  client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>,
+  environment: string = "prod"
+): Promise<`0x${string}`> => {
+  const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.DEV].contracts;
+  const callData = args.map((arg) => {
+    return {
+      to: contracts[ContractType.DIMO_REGISTRY].address,
+      value: BigInt(0),
+      data: encodeFunctionData({
+        abi: contracts[ContractType.DIMO_REGISTRY].abi,
+        functionName: MINT_VEHICLE_WITH_DEVICE_DEFINITION,
+        args: [arg.manufacturerNode, arg.owner, arg.deviceDefinitionID, arg.attributeInfo, arg.sacdInput],
+      }),
+    };
+  });
+
+  return await client.account.encodeCallData(callData);
+};
+
 export const mintVehicleWithDeviceDefinitionFromAccount = async (
   args: MintVehicleWithDeviceDefinition,
   walletClient: WalletClient<Transport, Chain, ParseAccount<Account | Address>, RpcSchema>,

@@ -59,5 +59,26 @@ export async function burnVehicle(
   });
 }
 
+export async function burnVehicleBatch(
+  args: BurnVehicle[],
+  client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>,
+  environment: string = "prod"
+): Promise<`0x${string}`> {
+  const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
+  const callData = args.map((arg) => {
+    return {
+      to: contracts[ContractType.DIMO_VEHICLE_ID].address,
+      value: BigInt(0),
+      data: encodeFunctionData({
+        abi: contracts[ContractType.DIMO_VEHICLE_ID].abi,
+        functionName: BURN_VEHICLE,
+        args: [arg.tokenId],
+      }),
+    };
+  });
+
+  return await client.account.encodeCallData(callData);
+}
+
 // Burn Vehicle-- cant burn if you still have AD attached
 // 0xc46a516800000000000000000000000000000000000000000000000000000000000000f6

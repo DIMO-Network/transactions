@@ -31,13 +31,16 @@ Using the SDK with an account signer:
 
 ```
 
-Using the SDK with a passkey signer:
+## Using the SDK with a stamper
+
+#### This example demonstrates using a PasskeyStamer but you can use:
+
+- WebauthnStamper (@turnkey/webauthn-stamper)
+- IframeStamper (@turnkey/iframe-stamper)
+- ApiKeyStamper (@turnkey/api-key-stamper)
 
 ```js
     import { PasskeyStamper } from "@turnkey/react-native-passkey-stamper";
-    // import { WebauthnStamper } from "@turnkey/webauthn-stamper";
-    // import { IframeStamper } from "@turnkey/iframe-stamper";
-    // import { ApiKeyStamper } from "@turnkey/api-key-stamper";
     import { KernelSigner, newKernelConfig, sacdPermissionValue } from '@dimo-network/transactions';
 
     const kernelSignerConfig = newKernelConfig({
@@ -52,16 +55,6 @@ Using the SDK with a passkey signer:
     const stamper = new PasskeyStamper({
         rpId: RPID,
     });
-
-    // const stamper = new IframeStamper({
-    //     iframeUrl: process.env.AUTH_IFRAME_URL!,
-    //     iframeContainer: document.getElementById(TurnkeyIframeContainerId),
-    //     iframeElementId: TurnkeyIframeElementId,
-    // });
-
-    // const stamper = new WebAuthnStamper({
-    // rpId: "example.com",
-    // });
 
     const kernelSigner = new KernelSigner(kernelSignerConfig);
     await kernelSigner.passkeyInit(

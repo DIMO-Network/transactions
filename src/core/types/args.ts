@@ -14,6 +14,14 @@ export type SetVehiclePermissions = {
   source: string;
 };
 
+export type SetVehiclePermissionsBulk = {
+  tokenIds: BigInt[];
+  grantee: `0x${string}`;
+  permissions: BigInt;
+  expiration: BigInt;
+  source: string;
+};
+
 export type SetPermissionsSACD = {
   asset: `0x${string}`;
   tokenId: BigInt;

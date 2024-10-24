@@ -9,8 +9,15 @@ import {
 } from "@zerodev/sdk";
 import { EntryPoint } from "permissionless/types";
 import { BundlerClient, GetUserOperationReceiptReturnType, createBundlerClient } from "permissionless";
-import { mintVehicleWithDeviceDefinition } from ":core/actions/mintVehicleWithDeviceDefinition.js";
-import { setVehiclePermissions } from ":core/actions/setPermissionsSACD.js";
+import {
+  mintVehicleWithDeviceDefinition,
+  mintVehicleWithDeviceDefinitionBatch,
+} from ":core/actions/mintVehicleWithDeviceDefinition.js";
+import {
+  setVehiclePermissions,
+  setVehiclePermissionsBatch,
+  setVehiclePermissionsBulk,
+} from ":core/actions/setPermissionsSACD.js";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING } from ":core/constants/mappings.js";
 import {
   BurnVehicle,
@@ -19,6 +26,7 @@ import {
   PairAftermarketDevice,
   SendDIMOTokens,
   SetVehiclePermissions,
+  SetVehiclePermissionsBulk,
   TransferVehicleAndAftermarketDeviceIDs,
   UnPairAftermarketDevice,
 } from ":core/types/args.js";
@@ -28,7 +36,7 @@ import { sendDIMOTokens } from ":core/actions/sendDIMOTokens.js";
 import { pairAftermarketDevice } from ":core/actions/pairAftermarketDevice.js";
 import { TurnkeyClient } from "@turnkey/http";
 import { polygon } from "viem/chains";
-import { burnVehicle } from ":core/actions/burnVehicle.js";
+import { burnVehicle, burnVehicleBatch } from ":core/actions/burnVehicle.js";
 import { createAccount } from "@turnkey/viem";
 import { walletClientToSmartAccountSigner } from "permissionless/utils";
 import { signerToEcdsaValidator } from "@zerodev/ecdsa-validator";
@@ -313,7 +321,7 @@ export class KernelSigner {
   }
 
   public async mintVehicleWithDeviceDefinition(
-    args: MintVehicleWithDeviceDefinition,
+    args: MintVehicleWithDeviceDefinition | MintVehicleWithDeviceDefinition[],
     waitForReceipt: boolean = true
   ): Promise<GetUserOperationReceiptReturnType & { userOperationHash: string }> {
     let client = this.kernelClient;
@@ -325,7 +333,16 @@ export class KernelSigner {
       }
     }
 
-    const mintVehicleCallData = await mintVehicleWithDeviceDefinition(args, client, this.config.environment);
+    let mintVehicleCallData: `0x${string}`;
+    if (!Array.isArray(args)) {
+      mintVehicleCallData = await mintVehicleWithDeviceDefinition(args, client, this.config.environment);
+    } else {
+      if (args.length >= 25) {
+        throw Error("Batch minting limit: 25");
+      }
+      mintVehicleCallData = await mintVehicleWithDeviceDefinitionBatch(args, client, this.config.environment);
+    }
+
     const userOpHash = await client.sendUserOperation({
       userOperation: {
         callData: mintVehicleCallData as `0x${string}`,
@@ -343,7 +360,9 @@ export class KernelSigner {
     return txResult;
   }
 
-  public async setVehiclePermissions(args: SetVehiclePermissions): Promise<GetUserOperationReceiptReturnType> {
+  public async setVehiclePermissions(
+    args: SetVehiclePermissions | SetVehiclePermissions[]
+  ): Promise<GetUserOperationReceiptReturnType> {
     let client = this.kernelClient;
     if (this.config.useWalletSession) {
       await this.openSessionWithPasskey();
@@ -353,10 +372,40 @@ export class KernelSigner {
       }
     }
 
-    const setVehiclePermissionsCallData = await setVehiclePermissions(args, client, this.config.environment);
+    let setVehiclePermissionsCallData: `0x${string}`;
+    if (!Array.isArray(args)) {
+      setVehiclePermissionsCallData = await setVehiclePermissions(args, client, this.config.environment);
+    } else {
+      if (args.length >= 25) {
+        throw Error("Batch minting limit: 25");
+      }
+      setVehiclePermissionsCallData = await setVehiclePermissionsBatch(args, client, this.config.environment);
+    }
+
     const userOpHash = await client.sendUserOperation({
       userOperation: {
         callData: setVehiclePermissionsCallData as `0x${string}`,
+      },
+    });
+    const txResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+    return txResult;
+  }
+
+  public async setVehiclePermissionsBulk(args: SetVehiclePermissionsBulk): Promise<GetUserOperationReceiptReturnType> {
+    let client = this.kernelClient;
+    if (this.config.useWalletSession) {
+      await this.openSessionWithPasskey();
+
+      if (this.sessionClient) {
+        client = this.sessionClient!;
+      }
+    }
+
+    const setVehiclePermissionsBulkCallData = await setVehiclePermissionsBulk(args, client, this.config.environment);
+
+    const userOpHash = await client.sendUserOperation({
+      userOperation: {
+        callData: setVehiclePermissionsBulkCallData as `0x${string}`,
       },
     });
     const txResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
@@ -441,7 +490,7 @@ export class KernelSigner {
     return result;
   }
 
-  public async burnVehicle(args: BurnVehicle): Promise<GetUserOperationReceiptReturnType> {
+  public async burnVehicle(args: BurnVehicle | BurnVehicle[]): Promise<GetUserOperationReceiptReturnType> {
     let client = this.kernelClient;
     if (this.config.useWalletSession) {
       await this.openSessionWithPasskey();
@@ -451,7 +500,16 @@ export class KernelSigner {
       }
     }
 
-    const burnVehicleCallData = await burnVehicle(args, client, this.config.environment);
+    let burnVehicleCallData: `0x${string}`;
+    if (!Array.isArray(args)) {
+      burnVehicleCallData = await burnVehicle(args, client, this.config.environment);
+    } else {
+      if (args.length >= 25) {
+        throw Error("Batch minting limit: 25");
+      }
+      burnVehicleCallData = await burnVehicleBatch(args, client, this.config.environment);
+    }
+
     const userOpHash = await client.sendUserOperation({
       userOperation: {
         callData: burnVehicleCallData as `0x${string}`,
