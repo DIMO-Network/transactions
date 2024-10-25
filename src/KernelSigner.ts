@@ -48,7 +48,6 @@ import { ApiKeyStamper } from "@turnkey/api-key-stamper";
 import { generateP256KeyPair, decryptBundle, getPublicKey } from "@turnkey/crypto";
 import { uint8ArrayToHexString, uint8ArrayFromHexString } from "@turnkey/encoding";
 import { claimAndPairDevice } from ":core/actions/claimAndPair.js";
-import { SmartAccount } from "viem/account-abstraction";
 
 export class KernelSigner {
   config: _kernelConfig;
@@ -588,7 +587,12 @@ export class KernelSigner {
   }
 
   public async signTypedData(arg: any): Promise<any> {
-    let client = this.kernelClient as SmartAccount;
+    let client = this.kernelClient as KernelAccountClient<
+      EntryPoint,
+      Transport,
+      Chain,
+      KernelSmartAccount<EntryPoint, Transport, Chain>
+    >;
     if (this.config.useWalletSession) {
       await this.openSessionWithPasskey();
 
@@ -596,6 +600,7 @@ export class KernelSigner {
         client = this.sessionClient!;
       }
     }
+
     return client.signTypedData(arg);
   }
 }
