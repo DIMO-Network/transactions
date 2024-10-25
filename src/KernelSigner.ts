@@ -6,6 +6,7 @@ import {
   createKernelAccount,
   createKernelAccountClient,
   createZeroDevPaymasterClient,
+  getCustomNonceKeyFromString,
 } from "@zerodev/sdk";
 import { EntryPoint } from "permissionless/types";
 import { BundlerClient, GetUserOperationReceiptReturnType, createBundlerClient } from "permissionless";
@@ -47,6 +48,7 @@ import { ApiKeyStamper } from "@turnkey/api-key-stamper";
 import { generateP256KeyPair, decryptBundle, getPublicKey } from "@turnkey/crypto";
 import { uint8ArrayToHexString, uint8ArrayFromHexString } from "@turnkey/encoding";
 import { claimAndPairDevice } from ":core/actions/claimAndPair.js";
+import { SmartAccount } from "viem/account-abstraction";
 
 export class KernelSigner {
   config: _kernelConfig;
@@ -61,7 +63,7 @@ export class KernelSigner {
   kernelAddress: `0x${string}` | undefined;
   turnkeyClient: TurnkeyClient | undefined;
   turnkeyPasskeyClient: TurnkeyClient | undefined;
-  private _init: boolean = false;
+  _init: boolean = false;
   private _subOrganizationId: string | undefined;
   private _walletAddress: `0x${string}` | undefined;
   private _walletSession: {
@@ -92,10 +94,10 @@ export class KernelSigner {
   }
 
   public async passkeyInit(subOrganizationId: string, walletAddress: `0x${string}`, stamper: any) {
-    let openSession = false;
+    // let openSession = false;
     if (!this._init) {
       this._init = true;
-      openSession = true;
+      // openSession = true;
       this._subOrganizationId = subOrganizationId;
       this._walletAddress = walletAddress;
     }
@@ -156,9 +158,9 @@ export class KernelSigner {
 
     this.kernelAddress = account.address;
 
-    if (openSession) {
-      await this.openSessionWithPasskey();
-    }
+    // if (openSession) {
+    //   await this.openSessionWithPasskey();
+    // }
   }
 
   public async openSessionWithPasskey(): Promise<{
@@ -349,9 +351,13 @@ export class KernelSigner {
       mintVehicleCallData = await mintVehicleWithDeviceDefinitionBatch(args, client, this.config.environment);
     }
 
+    const nonceKey = getCustomNonceKeyFromString(Date.now().toString(), this.config.entryPoint);
+    const nonce = await this.kernelClient.account.getNonce(nonceKey);
+
     const userOpHash = await client.sendUserOperation({
       userOperation: {
         callData: mintVehicleCallData as `0x${string}`,
+        nonce: nonce,
       },
     });
 
@@ -363,6 +369,7 @@ export class KernelSigner {
     }
 
     const txResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+
     return txResult;
   }
 
@@ -570,7 +577,6 @@ export class KernelSigner {
         client = this.sessionClient!;
       }
     }
-
     const unpairADCallData = await unpairAftermarketDevice(args, client, this.config.environment);
     const userOpHash = await client.sendUserOperation({
       userOperation: {
@@ -579,5 +585,17 @@ export class KernelSigner {
     });
     const txResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
     return txResult;
+  }
+
+  public async signTypedData(arg: any): Promise<any> {
+    let client = this.kernelClient as SmartAccount;
+    if (this.config.useWalletSession) {
+      await this.openSessionWithPasskey();
+
+      if (this.sessionClient) {
+        client = this.sessionClient!;
+      }
+    }
+    return client.signTypedData(arg);
   }
 }
