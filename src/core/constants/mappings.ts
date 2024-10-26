@@ -20,6 +20,7 @@ import {
   POLYGON_DIMO_REGISTRY_ADDRESS,
   AMOY_DIMO_FORWARDER,
   POLYGON_DIMO_FORWARDER,
+  POLYGON_DIMO_SACD_ADDRESS,
 } from ":core/constants/contractAddrs.js";
 import { Abi } from "viem";
 
@@ -102,7 +103,7 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
     contracts: {
       [ContractType.DIMO_SACD]: {
         abi: abiSacd,
-        address: AMOY_DIMO_SACD_ADDRESS,
+        address: POLYGON_DIMO_SACD_ADDRESS,
       },
       [ContractType.DIMO_CREDIT]: {
         abi: abiCredits,
