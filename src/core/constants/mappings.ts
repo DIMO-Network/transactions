@@ -20,7 +20,7 @@ import {
   POLYGON_DIMO_REGISTRY_ADDRESS,
   AMOY_DIMO_FORWARDER,
   POLYGON_DIMO_FORWARDER,
-  POLYGON_DIMO_SACD_ADDRESS
+  POLYGON_DIMO_SACD_ADDRESS,
 } from ":core/constants/contractAddrs.js";
 import { Abi } from "viem";
 
