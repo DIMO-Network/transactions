@@ -1,6 +1,6 @@
 {
   "name": "@dimo-network/transactions",
-  "version": "0.1.47",
+  "version": "0.1.49",
   "description": "DIMO Transactions SDK",
   "keywords": [
     "DIMO"
