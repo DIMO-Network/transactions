@@ -1,5 +1,5 @@
 import { ContractToMapping, ENVIRONMENT, KernelConfig, _kernelConfig } from ":core/types/dimo.js";
-import { Chain, PublicClient, Transport, createPublicClient, createWalletClient, http } from "viem";
+import { Chain, PublicClient, Transport, WalletClient, createPublicClient, createWalletClient, http } from "viem";
 import {
   KernelAccountClient,
   KernelSmartAccount,
@@ -63,8 +63,9 @@ export class KernelSigner {
   turnkeyClient: TurnkeyClient | undefined;
   turnkeyPasskeyClient: TurnkeyClient | undefined;
   _init: boolean = false;
-  private _subOrganizationId: string | undefined;
-  private _walletAddress: `0x${string}` | undefined;
+  subOrganizationId: string | undefined;
+  walletAddress: `0x${string}` | undefined;
+  smartContractAddress: `0x${string}` | undefined;
   private _walletSession: {
     active: boolean;
     expires: number;
@@ -93,12 +94,10 @@ export class KernelSigner {
   }
 
   public async passkeyInit(subOrganizationId: string, walletAddress: `0x${string}`, stamper: any) {
-    // let openSession = false;
     if (!this._init) {
       this._init = true;
-      // openSession = true;
-      this._subOrganizationId = subOrganizationId;
-      this._walletAddress = walletAddress;
+      this.subOrganizationId = subOrganizationId;
+      this.walletAddress = walletAddress;
     }
 
     this.turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, stamper);
@@ -156,10 +155,7 @@ export class KernelSigner {
     });
 
     this.kernelAddress = account.address;
-
-    // if (openSession) {
-    //   await this.openSessionWithPasskey();
-    // }
+    this.smartContractAddress = account.address;
   }
 
   public async openSessionWithPasskey(): Promise<{
@@ -181,11 +177,11 @@ export class KernelSigner {
       throw new Error("Turnkey client not initialized");
     }
 
-    if (!this._subOrganizationId) {
+    if (!this.subOrganizationId) {
       throw new Error("Sub organization id not set");
     }
 
-    if (!this._walletAddress) {
+    if (!this.walletAddress) {
       throw new Error("Wallet address not set");
     }
 
@@ -199,7 +195,7 @@ export class KernelSigner {
     const key = generateP256KeyPair();
     const targetPubHex = key.publicKeyUncompressed;
     const sessionData = await this.turnkeyPasskeyClient!.createReadWriteSession({
-      organizationId: this._subOrganizationId,
+      organizationId: this.subOrganizationId,
       type: "ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2",
       timestampMs: timestamp.toString(),
       parameters: {
@@ -221,9 +217,9 @@ export class KernelSigner {
     const localAccount = await createAccount({
       // @ts-ignore
       client: turnkeyClient,
-      organizationId: this._subOrganizationId,
-      signWith: this._walletAddress,
-      ethereumAddress: this._walletAddress,
+      organizationId: this.subOrganizationId,
+      signWith: this.walletAddress,
+      ethereumAddress: this.walletAddress,
     });
 
     const smartAccountClient = createWalletClient({
@@ -602,5 +598,18 @@ export class KernelSigner {
     }
 
     return client.signTypedData(arg);
+  }
+
+  public async signMessage(arg: any): Promise<any> {
+    let client = this.kernelClient as WalletClient;
+    if (this.config.useWalletSession) {
+      await this.openSessionWithPasskey();
+
+      if (this.sessionClient) {
+        client = this.sessionClient!;
+      }
+    }
+
+    return client.signMessage(arg);
   }
 }

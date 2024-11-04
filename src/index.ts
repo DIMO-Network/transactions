@@ -1,5 +1,10 @@
 export { ENVIRONMENT } from "./core/types/dimo.js";
-export type { MintVehicleWithDeviceDefinition, SendDIMOTokens, SetVehiclePermissions } from "./core/types/args.js";
+export type {
+  MintVehicleWithDeviceDefinition,
+  SendDIMOTokens,
+  SetVehiclePermissions,
+  SetVehiclePermissionsBulk,
+} from "./core/types/args.js";
 export { ContractType } from "./core/types/dimo.js";
 export type { VehicleNodeMintedWithDeviceDefinition } from "./core/types/responses.js";
 export * from "./core/constants/mappings.js";
