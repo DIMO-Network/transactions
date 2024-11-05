@@ -1,4 +1,4 @@
-import { ContractToMapping, ENVIRONMENT, KernelConfig, _kernelConfig } from ":core/types/dimo.js";
+import { ContractToMapping, DIMO_APIs, ENVIRONMENT, KernelConfig, _kernelConfig } from ":core/types/dimo.js";
 import { Chain, PublicClient, Transport, WalletClient, createPublicClient, createWalletClient, http } from "viem";
 import {
   KernelAccountClient,
@@ -19,7 +19,13 @@ import {
   setVehiclePermissionsBatch,
   setVehiclePermissionsBulk,
 } from ":core/actions/setPermissionsSACD.js";
-import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING, OnChainErrors } from ":core/constants/mappings.js";
+import {
+  CHAIN_ABI_MAPPING,
+  ENV_MAPPING,
+  ENV_NETWORK_MAPPING,
+  ENV_TO_API_MAPPING,
+  OnChainErrors,
+} from ":core/constants/mappings.js";
 import {
   BurnVehicle,
   ClaimAftermarketdevice,
@@ -74,6 +80,7 @@ export class KernelSigner {
     expires: 0,
   };
   expire: number = 0;
+  authBaseUrl: string;
 
   constructor(config: KernelConfig) {
     this.config = config as _kernelConfig;
@@ -81,6 +88,8 @@ export class KernelSigner {
       ENV_NETWORK_MAPPING.get(ENV_MAPPING.get(this.config.environment ?? "prod") ?? ENVIRONMENT.PROD) ?? polygon;
     this.contractMapping =
       CHAIN_ABI_MAPPING[ENV_MAPPING.get(this.config.environment ?? "prod") ?? ENVIRONMENT.PROD].contracts;
+    this.authBaseUrl =
+      ENV_TO_API_MAPPING[ENV_MAPPING.get(this.config.environment ?? "prod") ?? ENVIRONMENT.PROD][DIMO_APIs.AUTH].url;
     this.publicClient = createPublicClient({
       transport: http(this.config.rpcUrl),
       chain: this.chain,
@@ -600,7 +609,7 @@ export class KernelSigner {
     return client.signTypedData(arg);
   }
 
-  public async signMessage(arg: any): Promise<any> {
+  public async signChallenge(challenge: string): Promise<`0x${string}`> {
     let client = this.kernelClient as WalletClient;
     if (this.config.useWalletSession) {
       await this.openSessionWithPasskey();
@@ -610,6 +619,81 @@ export class KernelSigner {
       }
     }
 
-    return client.signMessage(arg);
+    return client.signMessage({
+      account: client.account!,
+      message: challenge,
+    });
+  }
+
+  public async generateChallenge(
+    clientId: string,
+    domain: string,
+    address: string
+  ): Promise<{ success: boolean; error?: string; data?: any }> {
+    try {
+      const queryParams = new URLSearchParams({
+        client_id: clientId,
+        domain: domain,
+        scope: "openid email",
+        response_type: "code",
+        address: address,
+      }).toString();
+
+      const response = await fetch(`${this.authBaseUrl}/auth/web3/generate_challenge`, {
+        method: "POST",
+        body: queryParams,
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        return { success: false, error: errorData.message || "Failed to generate challenge" };
+      }
+
+      const data = await response.json();
+      return { success: true, data: data };
+    } catch (error) {
+      console.error("Error generating challenge:", error);
+      return { success: false, error: "An error occurred while generating challenge" };
+    }
+  }
+
+  public async submitWeb3Challenge(
+    clientId: string,
+    state: string,
+    domain: string,
+    signature: string
+  ): Promise<{ success: boolean; error?: string; data?: any }> {
+    try {
+      // Construct the body using URLSearchParams for form-urlencoded
+      const formBody = new URLSearchParams({
+        client_id: clientId,
+        state: state,
+        grant_type: "authorization_code", // Fixed value
+        domain: domain,
+        signature: signature, // The 0x-prefixed signature obtained from Step 2
+      }).toString();
+
+      const response = await fetch(`${this.authBaseUrl}/auth/web3/submit_challenge`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        },
+        body: formBody, // Send the form-encoded body
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        return { success: false, error: errorData.message || "Failed to submit challenge" };
+      }
+
+      const data = await response.json();
+      return { success: true, data };
+    } catch (error) {
+      console.error("Error submitting web3 challenge:", error);
+      return { success: false, error: "An error occurred while submitting challenge" };
+    }
   }
 }
