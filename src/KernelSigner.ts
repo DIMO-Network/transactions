@@ -66,7 +66,6 @@ export class KernelSigner {
   contractMapping: ContractToMapping;
   chain: Chain;
   kernelAddress: `0x${string}` | undefined;
-  turnkeyClient: TurnkeyClient | undefined;
   turnkeyPasskeyClient: TurnkeyClient | undefined;
   _init: boolean = false;
   subOrganizationId: string | undefined;
@@ -100,6 +99,10 @@ export class KernelSigner {
       transport: http(this.config.bundlerUrl),
       entryPoint: this.config.entryPoint,
     });
+
+    if (config.stamper) {
+      this.turnkeyPasskeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, config.stamper);
+    }
   }
 
   public async passkeyInit(subOrganizationId: string, walletAddress: `0x${string}`, stamper: any) {
@@ -109,11 +112,13 @@ export class KernelSigner {
       this.walletAddress = walletAddress;
     }
 
-    this.turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, stamper);
-    this.turnkeyPasskeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, stamper);
+    if (this.turnkeyPasskeyClient) {
+      this.turnkeyPasskeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, stamper);
+    }
+
     const localAccount = await createAccount({
       // @ts-ignore
-      client: this.turnkeyClient,
+      client: this.turnkeyPasskeyClient,
       organizationId: subOrganizationId,
       signWith: walletAddress,
       ethereumAddress: walletAddress,
@@ -182,8 +187,8 @@ export class KernelSigner {
       return this._walletSession;
     }
 
-    if (!this.turnkeyClient) {
-      throw new Error("Turnkey client not initialized");
+    if (!this.turnkeyPasskeyClient) {
+      throw new Error("Turnkey passkey client not initialized");
     }
 
     if (!this.subOrganizationId) {
@@ -192,10 +197,6 @@ export class KernelSigner {
 
     if (!this.walletAddress) {
       throw new Error("Wallet address not set");
-    }
-
-    if (!this.turnkeyPasskeyClient) {
-      throw new Error("Turnkey passkey client not initialized");
     }
 
     const timestamp = Date.now();

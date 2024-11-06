@@ -13,6 +13,7 @@ export type KernelConfig = {
   environment?: string;
   useWalletSession?: boolean;
   sessionTimeoutSeconds?: string; // seconds
+  stamper?: any | undefined;
 };
 
 export type _kernelConfig = {
@@ -25,6 +26,7 @@ export type _kernelConfig = {
   environment: string;
   useWalletSession: boolean;
   sessionTimeoutSeconds: string;
+  stamper?: any | undefined;
 };
 
 export type AccountConfig = {

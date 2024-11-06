@@ -50,6 +50,7 @@ export const newKernelConfig = (args: KernelConfig): _kernelConfig => {
     environment: args.environment,
     useWalletSession: args.useWalletSession,
     sessionTimeoutSeconds: args.sessionTimeoutSeconds,
+    stamper: args.stamper,
   };
 };
 
