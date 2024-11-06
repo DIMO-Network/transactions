@@ -117,3 +117,25 @@ export type AbiAddressPair = {
   abi: Abi;
   address: `0x${string}`;
 };
+
+export type SACDTemplate = {
+  specVersion: string;
+  id: string;
+  type: string;
+  datacontentype: string;
+  time: string;
+  "com.dimo.grantor.signature": string;
+  data: {
+    templateId: string;
+    version: string;
+    grantor: string;
+    grantee: string;
+    scope: {
+      permissions: string[];
+    };
+    effectiveAt: string;
+    expiresAt: string;
+    attachments: string[];
+    description: string;
+  };
+};

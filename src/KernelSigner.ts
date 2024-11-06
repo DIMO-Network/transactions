@@ -78,7 +78,6 @@ export class KernelSigner {
     active: false,
     expires: 0,
   };
-  expire: number = 0;
   authBaseUrl: string;
 
   constructor(config: KernelConfig) {
@@ -105,15 +104,20 @@ export class KernelSigner {
     }
   }
 
-  public async passkeyInit(subOrganizationId: string, walletAddress: `0x${string}`, stamper: any) {
+  public async passkeyInit(subOrganizationId: string, walletAddress: `0x${string}`) {
     if (!this._init) {
       this._init = true;
       this.subOrganizationId = subOrganizationId;
       this.walletAddress = walletAddress;
     }
 
-    if (this.turnkeyPasskeyClient) {
-      this.turnkeyPasskeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, stamper);
+    if (this.config.useWalletSession) {
+      this._walletSession.active = false;
+      this._walletSession.expires = Date.now() + parseInt(this.config.sessionTimeoutSeconds) * 1000;
+    }
+
+    if (!this.turnkeyPasskeyClient) {
+      throw new Error("Turnkey passkey client not initialized");
     }
 
     const localAccount = await createAccount({
@@ -183,7 +187,7 @@ export class KernelSigner {
       };
     }
 
-    if (new Date(this.expire) > new Date(Date.now())) {
+    if (new Date(this._walletSession.expires) > new Date(Date.now())) {
       return this._walletSession;
     }
 
@@ -279,13 +283,12 @@ export class KernelSigner {
       active: true,
       expires: expiration,
     };
-    this.expire = expiration;
 
     return this._walletSession;
   }
 
   public walletSessionActive() {
-    return new Date(this.expire) < new Date(Date.now());
+    return new Date(this._walletSession.expires) < new Date(Date.now());
   }
 
   public sessionInfos() {

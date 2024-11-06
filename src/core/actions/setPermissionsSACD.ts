@@ -1,13 +1,20 @@
 import { Chain, Transport, encodeFunctionData } from "viem";
-import { ContractToMapping, ContractType, ENVIRONMENT, KernelConfig } from ":core/types/dimo.js";
+import { ContractToMapping, ContractType, ENVIRONMENT, KernelConfig, SACDTemplate } from ":core/types/dimo.js";
 import { KernelAccountClient, KernelSmartAccount } from "@zerodev/sdk";
 import { EntryPoint } from "permissionless/types";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
 import { SET_PERMISSIONS_SACD } from ":core/constants/methods.js";
-import { SetPermissionsSACD, SetVehiclePermissions, SetVehiclePermissionsBulk } from ":core/types/args.js";
+import {
+  SACDTemplateInputs,
+  SetPermissionsSACD,
+  SetVehiclePermissions,
+  SetVehiclePermissionsBulk,
+} from ":core/types/args.js";
 import { GetUserOperationReceiptReturnType } from "permissionless";
 import { KernelEncodeCallDataArgs } from "@zerodev/sdk/types";
 import { executeTransaction } from ":core/transactions/execute.js";
+import { v4 as uuidv4 } from "uuid";
+import { sacdPermissionArray } from ":core/utils/utils.js";
 
 export async function setVehiclePermissions(
   args: SetVehiclePermissions,
@@ -133,4 +140,33 @@ export const setVehiclePermissionsTransaction = async (
   const resp = await executeTransaction(subOrganizationId, walletAddress, txData, passkeyStamper, config);
 
   return resp;
+};
+
+export const generateSACDTemplate = async (args: SACDTemplateInputs): Promise<SACDTemplate> => {
+  const templateId = uuidv4();
+  const permissionArray = sacdPermissionArray(args.permissions);
+
+  const template: SACDTemplate = {
+    specVersion: "1.0",
+    id: templateId,
+    type: "org.dimo.permission.grant.v1",
+    datacontentype: "application/json",
+    time: new Date().toISOString(),
+    "com.dimo.grantor.signature": args.signature,
+    data: {
+      templateId: templateId,
+      version: "1.0",
+      grantor: args.grantor,
+      grantee: args.grantee,
+      scope: {
+        permissions: permissionArray,
+      },
+      effectiveAt: new Date().toISOString(),
+      expiresAt: new Date(Number(args.expiration) * 1000).toISOString(),
+      attachments: [],
+      description: `This document grants token holder ${args.tokenId} at ${args.signature} specific permissions to the grantee (${args.grantee}) within a defined scope and time range. The payload includes a digital signature for authentication, timestamps for when permissions take effect, and optional attachments related to this permission grant.`,
+    },
+  };
+
+  return template;
 };

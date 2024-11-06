@@ -90,3 +90,12 @@ export type TransferVehicleAndAftermarketDeviceIDs = {
   aftermarketDeviceIds: BigInt[];
   to: `0x${string}`;
 };
+
+export type SACDTemplateInputs = {
+  grantee: `0x${string}`;
+  grantor: `0x${string}`;
+  permissions: BigInt;
+  tokenId: BigInt;
+  expiration: BigInt;
+  signature: `0x${string}`;
+};
