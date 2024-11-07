@@ -59,24 +59,42 @@ export class KernelSigner {
   config: _kernelConfig;
   publicClient: PublicClient;
   bundlerClient: BundlerClient<EntryPoint, Chain | undefined>;
-  kernelClient: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>;
-  sessionClient:
-    | KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>
-    | undefined;
   contractMapping: ContractToMapping;
   chain: Chain;
   kernelAddress: `0x${string}` | undefined;
-  turnkeyPasskeyClient: TurnkeyClient | undefined;
   _init: boolean = false;
   subOrganizationId: string | undefined;
   walletAddress: `0x${string}` | undefined;
   smartContractAddress: `0x${string}` | undefined;
-  private _walletSession: {
-    active: boolean;
+  apiSessionClient: {
     expires: number;
+    client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>;
   } = {
-    active: false,
+    client: undefined,
     expires: 0,
+  };
+  passkeyClient: {
+    turnkeyClient: TurnkeyClient | undefined;
+    valid: boolean;
+    client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>;
+  } = {
+    turnkeyClient: undefined,
+    valid: false,
+    client: undefined,
+  };
+  passkeySessionClient: {
+    expires: number;
+    client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>;
+  } = {
+    expires: 0,
+    client: undefined,
+  };
+  privateKeyClient: {
+    valid: boolean;
+    client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>;
+  } = {
+    valid: false,
+    client: undefined,
   };
   authBaseUrl: string;
 
@@ -98,27 +116,47 @@ export class KernelSigner {
       transport: http(this.config.bundlerUrl),
       entryPoint: this.config.entryPoint,
     });
-
-    if (config.stamper) {
-      this.turnkeyPasskeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, config.stamper);
-    }
   }
 
-  public async passkeyInit(subOrganizationId: string, walletAddress: `0x${string}`) {
+  public async getActiveClient(): Promise<
+    KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>
+  > {
+    if (this.config.usePrivateKey) {
+      return this.privateKeyClient.client;
+    }
+
+    if (new Date(this.apiSessionClient.expires) > new Date(Date.now())) {
+      return this.apiSessionClient.client;
+    }
+
+    if (new Date(this.passkeySessionClient.expires) > new Date(Date.now())) {
+      return this.passkeySessionClient.client;
+    } else {
+      try {
+        if (this.config.useWalletSession) {
+          await this.openSessionWithPasskey();
+          if (new Date(this.passkeySessionClient.expires) > new Date(Date.now())) {
+            return this.passkeySessionClient.client;
+          }
+        }
+      } catch {
+        if (this.passkeyClient.valid) {
+          return this.passkeyClient.client;
+        }
+      }
+    }
+
+    throw new Error("No active client");
+  }
+
+  public async passkeyInit(subOrganizationId: string, walletAddress: `0x${string}`, stamper: any) {
     if (!this._init) {
       this._init = true;
       this.subOrganizationId = subOrganizationId;
       this.walletAddress = walletAddress;
     }
 
-    if (this.config.useWalletSession) {
-      this._walletSession.active = false;
-      this._walletSession.expires = Date.now() + parseInt(this.config.sessionTimeoutSeconds) * 1000;
-    }
-
-    if (!this.turnkeyPasskeyClient) {
-      throw new Error("Turnkey passkey client not initialized");
-    }
+    this.passkeyClient.turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, stamper);
 
     const localAccount = await createAccount({
       // @ts-ignore
@@ -151,7 +189,7 @@ export class KernelSigner {
       kernelVersion: this.config.kernelVersion,
     });
 
-    this.kernelClient = createKernelAccountClient({
+    this.passkeyClient.client = createKernelAccountClient({
       account,
       chain: this.chain,
       entryPoint: this.config.entryPoint,
@@ -172,43 +210,31 @@ export class KernelSigner {
       },
     });
 
+    this.passkeyClient.valid = true;
     this.kernelAddress = account.address;
     this.smartContractAddress = account.address;
+    return;
   }
 
-  public async openSessionWithPasskey(): Promise<{
-    active: boolean;
-    expires: number;
-  }> {
+  public async openSessionWithPasskey() {
     if (!this.config.useWalletSession) {
-      return {
-        active: false,
-        expires: 0,
-      };
+      throw new Error("Wallet session not enabled");
     }
-
-    if (new Date(this._walletSession.expires) > new Date(Date.now())) {
-      return this._walletSession;
+    if (!this.passkeyClient.valid) {
+      throw new Error("Passkey client not initialized");
     }
-
-    if (!this.turnkeyPasskeyClient) {
-      throw new Error("Turnkey passkey client not initialized");
-    }
-
     if (!this.subOrganizationId) {
       throw new Error("Sub organization id not set");
     }
-
     if (!this.walletAddress) {
       throw new Error("Wallet address not set");
     }
 
     const timestamp = Date.now();
-    const expiration = timestamp + parseInt(this.config.sessionTimeoutSeconds) * 1000;
-
+    const expiration = timestamp + parseInt(this.config.sessionTimeoutSeconds) * 0.75 * 1000;
     const key = generateP256KeyPair();
     const targetPubHex = key.publicKeyUncompressed;
-    const sessionData = await this.turnkeyPasskeyClient!.createReadWriteSession({
+    const sessionData = await this.passkeyClient.turnkeyClient!.createReadWriteSession({
       organizationId: this.subOrganizationId,
       type: "ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2",
       timestampMs: timestamp.toString(),
@@ -221,7 +247,6 @@ export class KernelSigner {
     const bundle = sessionData.activity.result.createReadWriteSessionResultV2?.credentialBundle;
     const decryptedBundle = decryptBundle(bundle!, key.privateKey);
     const privateKey = uint8ArrayToHexString(decryptedBundle);
-
     const apiStamper = new ApiKeyStamper({
       apiPublicKey: uint8ArrayToHexString(getPublicKey(uint8ArrayFromHexString(privateKey), true)),
       apiPrivateKey: privateKey,
@@ -259,7 +284,7 @@ export class KernelSigner {
       kernelVersion: this.config.kernelVersion,
     });
 
-    this.sessionClient = createKernelAccountClient({
+    this.passkeySessionClient.client = createKernelAccountClient({
       account,
       chain: this.chain,
       entryPoint: this.config.entryPoint,
@@ -279,20 +304,77 @@ export class KernelSigner {
         },
       },
     });
-    this._walletSession = {
-      active: true,
-      expires: expiration,
-    };
 
-    return this._walletSession;
+    this.passkeySessionClient.expires = expiration;
+    return;
   }
 
-  public walletSessionActive() {
-    return new Date(this._walletSession.expires) < new Date(Date.now());
-  }
+  public async openSessionWithApiStamper(subOrganizationId: string, apiStamper: any) {
+    const timestamp = Date.now();
+    const expiration = timestamp + parseInt(this.config.sessionTimeoutSeconds) * 0.75 * 1000;
 
-  public sessionInfos() {
-    return this._walletSession;
+    const client = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, apiStamper);
+
+    const wallets = await client.getWallets({ organizationId: subOrganizationId });
+    const walletAddr = await client.getWalletAccounts({
+      organizationId: subOrganizationId,
+      walletId: wallets.wallets[0].walletId,
+    });
+
+    this.walletAddress = walletAddr.accounts[0].address as `0x${string}`;
+    this.subOrganizationId = subOrganizationId;
+
+    const localAccount = await createAccount({
+      // @ts-ignore
+      client: client,
+      organizationId: this.subOrganizationId!,
+      signWith: this.walletAddress!,
+      ethereumAddress: this.walletAddress,
+    });
+    const smartAccountClient = createWalletClient({
+      account: localAccount,
+      chain: this.chain,
+      transport: http(this.config.rpcUrl),
+    });
+    const smartAccountSigner = walletClientToSmartAccountSigner(smartAccountClient);
+    const ecdsaValidator = await signerToEcdsaValidator(this.publicClient, {
+      signer: smartAccountSigner,
+      entryPoint: this.config.entryPoint,
+      // @ts-ignore
+      kernelVersion: this.config.kernelVersion,
+    });
+
+    const account = await createKernelAccount(this.publicClient, {
+      plugins: {
+        sudo: ecdsaValidator,
+      },
+      entryPoint: this.config.entryPoint,
+      // @ts-ignore
+      kernelVersion: this.config.kernelVersion,
+    });
+
+    this.apiSessionClient.client = createKernelAccountClient({
+      account,
+      chain: this.chain,
+      entryPoint: this.config.entryPoint,
+      bundlerTransport: http(this.config.bundlerUrl),
+      middleware: {
+        // @ts-ignore
+        sponsorUserOperation: async ({ userOperation }) => {
+          const zerodevPaymaster = createZeroDevPaymasterClient({
+            chain: this.chain,
+            entryPoint: this.config.entryPoint,
+            transport: http(this.config.paymasterUrl),
+          });
+          return zerodevPaymaster.sponsorUserOperation({
+            userOperation,
+            entryPoint: this.config.entryPoint,
+          });
+        },
+      },
+    });
+    this.apiSessionClient.expires = expiration;
+    return;
   }
 
   public async privateKeyInit(privateKey: `0x${string}`) {
@@ -312,7 +394,8 @@ export class KernelSigner {
       kernelVersion: this.config.kernelVersion,
     });
 
-    this.kernelClient = createKernelAccountClient({
+    this.privateKeyClient.valid = true;
+    this.privateKeyClient.client = createKernelAccountClient({
       account,
       chain: this.chain,
       entryPoint: this.config.entryPoint,
@@ -340,15 +423,7 @@ export class KernelSigner {
     args: MintVehicleWithDeviceDefinition | MintVehicleWithDeviceDefinition[],
     waitForReceipt: boolean = true
   ): Promise<GetUserOperationReceiptReturnType & { userOperationHash: string }> {
-    let client = this.kernelClient;
-    if (this.config.useWalletSession) {
-      await this.openSessionWithPasskey();
-
-      if (this.sessionClient) {
-        client = this.sessionClient!;
-      }
-    }
-
+    const client = await this.getActiveClient();
     let mintVehicleCallData: `0x${string}`;
     if (!Array.isArray(args)) {
       mintVehicleCallData = await mintVehicleWithDeviceDefinition(args, client, this.config.environment);
@@ -360,7 +435,7 @@ export class KernelSigner {
     }
 
     const nonceKey = getCustomNonceKeyFromString(Date.now().toString(), this.config.entryPoint);
-    const nonce = await this.kernelClient.account.getNonce(nonceKey);
+    const nonce = await client.account.getNonce(nonceKey);
 
     const userOpHash = await client.sendUserOperation({
       userOperation: {
@@ -384,15 +459,7 @@ export class KernelSigner {
   public async setVehiclePermissions(
     args: SetVehiclePermissions | SetVehiclePermissions[]
   ): Promise<GetUserOperationReceiptReturnType> {
-    let client = this.kernelClient;
-    if (this.config.useWalletSession) {
-      await this.openSessionWithPasskey();
-
-      if (this.sessionClient) {
-        client = this.sessionClient!;
-      }
-    }
-
+    const client = await this.getActiveClient();
     let setVehiclePermissionsCallData: `0x${string}`;
     if (!Array.isArray(args)) {
       setVehiclePermissionsCallData = await setVehiclePermissions(args, client, this.config.environment);
@@ -413,15 +480,7 @@ export class KernelSigner {
   }
 
   public async setVehiclePermissionsBulk(args: SetVehiclePermissionsBulk): Promise<GetUserOperationReceiptReturnType> {
-    let client = this.kernelClient;
-    if (this.config.useWalletSession) {
-      await this.openSessionWithPasskey();
-
-      if (this.sessionClient) {
-        client = this.sessionClient!;
-      }
-    }
-
+    const client = await this.getActiveClient();
     const setVehiclePermissionsBulkCallData = await setVehiclePermissionsBulk(args, client, this.config.environment);
 
     const userOpHash = await client.sendUserOperation({
@@ -434,10 +493,14 @@ export class KernelSigner {
   }
 
   public async sendDIMOTokens(args: SendDIMOTokens): Promise<GetUserOperationReceiptReturnType> {
-    const setVehiclePermissionsCallData = await sendDIMOTokens(args, this.kernelClient, this.config.environment);
-    const userOpHash = await this.kernelClient.sendUserOperation({
+    if (!this.passkeyClient.valid) {
+      throw new Error("Tokens must be sent with passkey client");
+    }
+
+    const sendDIMOTokensCallData = await sendDIMOTokens(args, this.passkeyClient.client, this.config.environment);
+    const userOpHash = await this.passkeyClient.client.sendUserOperation({
       userOperation: {
-        callData: setVehiclePermissionsCallData as `0x${string}`,
+        callData: sendDIMOTokensCallData as `0x${string}`,
       },
     });
     const txResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
@@ -449,14 +512,7 @@ export class KernelSigner {
   }
 
   public async claimAftermarketDevice(args: ClaimAftermarketdevice): Promise<GetUserOperationReceiptReturnType> {
-    let client = this.kernelClient;
-    if (this.config.useWalletSession) {
-      await this.openSessionWithPasskey();
-
-      if (this.sessionClient) {
-        client = this.sessionClient!;
-      }
-    }
+    const client = await this.getActiveClient();
 
     const claimADCallData = await claimAftermarketDevice(args, client, this.config.environment);
     const userOpHash = await client.sendUserOperation({
@@ -469,14 +525,7 @@ export class KernelSigner {
   }
 
   public async pairAftermarketDevice(args: PairAftermarketDevice): Promise<GetUserOperationReceiptReturnType> {
-    let client = this.kernelClient;
-    if (this.config.useWalletSession) {
-      await this.openSessionWithPasskey();
-
-      if (this.sessionClient) {
-        client = this.sessionClient!;
-      }
-    }
+    const client = await this.getActiveClient();
 
     const pairADCallData = await pairAftermarketDevice(args, client, this.config.environment);
     const userOpHash = await client.sendUserOperation({
@@ -491,14 +540,7 @@ export class KernelSigner {
   public async claimAndPairAftermarketDevice(
     args: ClaimAftermarketdevice & PairAftermarketDevice
   ): Promise<GetUserOperationReceiptReturnType> {
-    let client = this.kernelClient;
-    if (this.config.useWalletSession) {
-      await this.openSessionWithPasskey();
-
-      if (this.sessionClient) {
-        client = this.sessionClient!;
-      }
-    }
+    const client = await this.getActiveClient();
 
     const claimAndPairCallData = await claimAndPairDevice(args, client, this.config.environment);
     const claimAndPairADHash = await client.sendUserOperation({
@@ -512,14 +554,7 @@ export class KernelSigner {
   }
 
   public async burnVehicle(args: BurnVehicle | BurnVehicle[]): Promise<GetUserOperationReceiptReturnType> {
-    let client = this.kernelClient;
-    if (this.config.useWalletSession) {
-      await this.openSessionWithPasskey();
-
-      if (this.sessionClient) {
-        client = this.sessionClient!;
-      }
-    }
+    const client = await this.getActiveClient();
 
     let burnVehicleCallData: `0x${string}`;
     if (!Array.isArray(args)) {
@@ -556,14 +591,7 @@ export class KernelSigner {
   public async transferVehicleAndAftermarketDevices(
     args: TransferVehicleAndAftermarketDeviceIDs
   ): Promise<GetUserOperationReceiptReturnType> {
-    let client = this.kernelClient;
-    if (this.config.useWalletSession) {
-      await this.openSessionWithPasskey();
-
-      if (this.sessionClient) {
-        client = this.sessionClient!;
-      }
-    }
+    const client = await this.getActiveClient();
 
     const burnVehicleCallData = await transferVehicleAndAftermarketDeviceIDs(args, client, this.config.environment);
     const userOpHash = await client.sendUserOperation({
@@ -577,14 +605,7 @@ export class KernelSigner {
   }
 
   public async unpairAftermarketDevice(args: UnPairAftermarketDevice): Promise<GetUserOperationReceiptReturnType> {
-    let client = this.kernelClient;
-    if (this.config.useWalletSession) {
-      await this.openSessionWithPasskey();
-
-      if (this.sessionClient) {
-        client = this.sessionClient!;
-      }
-    }
+    const client = await this.getActiveClient();
     const unpairADCallData = await unpairAftermarketDevice(args, client, this.config.environment);
     const userOpHash = await client.sendUserOperation({
       userOperation: {
@@ -596,32 +617,18 @@ export class KernelSigner {
   }
 
   public async signTypedData(arg: any): Promise<any> {
-    let client = this.kernelClient as KernelAccountClient<
+    const client = (await this.getActiveClient()) as KernelAccountClient<
       EntryPoint,
       Transport,
       Chain,
       KernelSmartAccount<EntryPoint, Transport, Chain>
     >;
-    if (this.config.useWalletSession) {
-      await this.openSessionWithPasskey();
-
-      if (this.sessionClient) {
-        client = this.sessionClient!;
-      }
-    }
 
     return client.signTypedData(arg);
   }
 
   public async signChallenge(challenge: string): Promise<`0x${string}`> {
-    let client = this.kernelClient as WalletClient;
-    if (this.config.useWalletSession) {
-      await this.openSessionWithPasskey();
-
-      if (this.sessionClient) {
-        client = this.sessionClient!;
-      }
-    }
+    let client = (await this.getActiveClient()) as WalletClient;
 
     return client.signMessage({
       account: client.account!,

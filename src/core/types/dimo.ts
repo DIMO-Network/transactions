@@ -13,7 +13,9 @@ export type KernelConfig = {
   environment?: string;
   useWalletSession?: boolean;
   sessionTimeoutSeconds?: string; // seconds
-  stamper?: any | undefined;
+  walletAddress?: `0x${string}`;
+  subOrganizationId?: string;
+  usePrivateKey?: boolean;
 };
 
 export type _kernelConfig = {
@@ -26,7 +28,9 @@ export type _kernelConfig = {
   environment: string;
   useWalletSession: boolean;
   sessionTimeoutSeconds: string;
-  stamper?: any | undefined;
+  walletAddress?: `0x${string}`;
+  subOrganizationId?: string;
+  usePrivateKey: boolean;
 };
 
 export type AccountConfig = {
