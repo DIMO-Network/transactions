@@ -118,11 +118,45 @@ export const sacdPermissionValue = (sacdPerms: SACD_PERMISSIONS): bigint => {
   return BigInt(`0b${permissionString}`);
 };
 
-export const sacdPermissionArray = (permValue: BigInt): string[] => {
-  const permArray: string[] = [];
-  const binaryRepresentation = permValue.toString(2);
+export const sacdPermissionArray = (permissionValue: bigint): string[] => {
+  const sacdPermArray: string[] = [];
 
-  for (let i = 0; i < binaryRepresentation.length; i += 2) {}
+  // Convert the bigint to a binary string
+  const binaryString = permissionValue.toString(2).padStart(14, "0");
 
-  return permArray;
+  // Extract each field by slicing the binary string from right to left
+  // Skip zero bits, not used in permissions object: binaryString.slice(-2);
+  const alltimeNonlocation = binaryString.slice(-4, -2);
+  const commands = binaryString.slice(-6, -4);
+  const currentLocation = binaryString.slice(-8, -6);
+  const alltimeLocation = binaryString.slice(-10, -8);
+  const verifiableCredentials = binaryString.slice(-12, -10);
+  const streams = binaryString.slice(-14, -12);
+
+  // Map binary values to boolean fields in the permissions object
+  if (alltimeLocation.includes("1")) {
+    sacdPermArray.push("ALLTIME_LOCATION");
+  }
+
+  if (alltimeNonlocation.includes("1")) {
+    sacdPermArray.push("ALLTIME_NONLOCATION");
+  }
+
+  if (commands.includes("1")) {
+    sacdPermArray.push("COMMANDS");
+  }
+
+  if (currentLocation.includes("1")) {
+    sacdPermArray.push("CURRENT_LOCATION");
+  }
+
+  if (verifiableCredentials.includes("1")) {
+    sacdPermArray.push("VERIFIABLE_CREDENTIALS");
+  }
+
+  if (streams.includes("1")) {
+    sacdPermArray.push("STREAMS");
+  }
+
+  return sacdPermArray;
 };
