@@ -125,10 +125,6 @@ export class KernelSigner {
       return this.privateKeyClient.client;
     }
 
-    if (new Date(this.apiSessionClient.expires) > new Date(Date.now())) {
-      return this.apiSessionClient.client;
-    }
-
     if (new Date(this.passkeySessionClient.expires) > new Date(Date.now())) {
       return this.passkeySessionClient.client;
     } else {
@@ -146,7 +142,21 @@ export class KernelSigner {
       }
     }
 
+    if (this.passkeyClient.valid) {
+      return this.passkeyClient.client;
+    }
+
     throw new Error("No active client");
+  }
+
+  public async getPasskeyClient(): Promise<
+    KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>
+  > {
+    if (this.passkeyClient.valid) {
+      return this.passkeyClient.client;
+    }
+
+    throw new Error("Passkey client not initialized");
   }
 
   public async passkeyInit(subOrganizationId: string, walletAddress: `0x${string}`, stamper: any) {
@@ -160,7 +170,7 @@ export class KernelSigner {
 
     const localAccount = await createAccount({
       // @ts-ignore
-      client: this.turnkeyPasskeyClient,
+      client: this.passkeyClient.turnkeyClient,
       organizationId: subOrganizationId,
       signWith: walletAddress,
       ethereumAddress: walletAddress,
@@ -195,7 +205,6 @@ export class KernelSigner {
       entryPoint: this.config.entryPoint,
       bundlerTransport: http(this.config.bundlerUrl),
       middleware: {
-        // @ts-ignore
         sponsorUserOperation: async ({ userOperation }) => {
           const zerodevPaymaster = createZeroDevPaymasterClient({
             chain: this.chain,
@@ -290,7 +299,6 @@ export class KernelSigner {
       entryPoint: this.config.entryPoint,
       bundlerTransport: http(this.config.bundlerUrl),
       middleware: {
-        // @ts-ignore
         sponsorUserOperation: async ({ userOperation }) => {
           const zerodevPaymaster = createZeroDevPaymasterClient({
             chain: this.chain,
