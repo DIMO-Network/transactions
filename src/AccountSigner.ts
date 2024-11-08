@@ -60,7 +60,7 @@ export class AccountSigner {
   public async transferVehicleAndAftermarketDevices(
     args: TransferVehicleAndAftermarketDeviceIDs
   ): Promise<`0x${string}`> {
-    const txResult = transferVehicleAndAftermarketDeviceIDsFromAccount(
+    const txResult = await transferVehicleAndAftermarketDeviceIDsFromAccount(
       args,
       this.walletClient,
       this.publicClient,

@@ -1,5 +1,5 @@
 import { ContractToMapping, DIMO_APIs, ENVIRONMENT, KernelConfig, _kernelConfig } from ":core/types/dimo.js";
-import { Chain, PublicClient, Transport, WalletClient, createPublicClient, createWalletClient, http } from "viem";
+import { Chain, PublicClient, Transport, createPublicClient, createWalletClient, http } from "viem";
 import {
   KernelAccountClient,
   KernelSmartAccount,
@@ -125,25 +125,22 @@ export class KernelSigner {
       return this.privateKeyClient.client;
     }
 
-    if (new Date(this.passkeySessionClient.expires) > new Date(Date.now())) {
-      return this.passkeySessionClient.client;
-    } else {
+    if (new Date(this.apiSessionClient.expires) > new Date(Date.now())) {
+      return this.apiSessionClient.client;
+    } else if (this.config.useWalletSession) {
+      if (new Date(this.passkeySessionClient.expires) > new Date(Date.now())) {
+        return this.passkeySessionClient.client;
+      }
       try {
-        if (this.config.useWalletSession) {
-          await this.openSessionWithPasskey();
-          if (new Date(this.passkeySessionClient.expires) > new Date(Date.now())) {
-            return this.passkeySessionClient.client;
-          }
+        await this.openSessionWithPasskey();
+        if (new Date(this.passkeySessionClient.expires) > new Date(Date.now())) {
+          return this.passkeySessionClient.client;
         }
       } catch {
         if (this.passkeyClient.valid) {
           return this.passkeyClient.client;
         }
       }
-    }
-
-    if (this.passkeyClient.valid) {
-      return this.passkeyClient.client;
     }
 
     throw new Error("No active client");
@@ -159,7 +156,17 @@ export class KernelSigner {
     throw new Error("Passkey client not initialized");
   }
 
-  public async passkeyInit(subOrganizationId: string, walletAddress: `0x${string}`, stamper: any) {
+  public async passkeyInit(
+    subOrganizationId: string,
+    walletAddress: `0x${string}`,
+    stamper: any,
+    apiSession: boolean = false
+  ) {
+    if (apiSession) {
+      this.openSessionWithApiStamper(subOrganizationId, stamper);
+      return;
+    }
+
     if (!this._init) {
       this._init = true;
       this.subOrganizationId = subOrganizationId;
@@ -636,10 +643,15 @@ export class KernelSigner {
   }
 
   public async signChallenge(challenge: string): Promise<`0x${string}`> {
-    let client = (await this.getActiveClient()) as WalletClient;
+    let client = (await this.getActiveClient()) as KernelAccountClient<
+      EntryPoint,
+      Transport,
+      Chain,
+      KernelSmartAccount<EntryPoint, Transport, Chain>
+    >;
 
     return client.signMessage({
-      account: client.account!,
+      account: client.account,
       message: challenge,
     });
   }
