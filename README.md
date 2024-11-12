@@ -12,36 +12,6 @@ npm install @dimo-network/transactions
 
 ## How to Use the SDK
 
-There are two types of client signers that a developer can use:
-
-| Functionality       | Account Client                 | Kernel Client                                       |
-| ------------------- | ------------------------------ | --------------------------------------------------- |
-| Initializing signer | Initialized with a private key | Initialized with private key or stamper             |
-| Signing as          | Wallet owned by private key    | Account Abstracted wallet controlled by private key |
-
-If you're a developer interested in using the DIMO Transactions SDK for personal use, such as sending on-chain transactions with a wallet that you hold the private key for, the **Account Client** is for you. The Account Client has fewer features because it is intended for individual use. Some actions you might take with this client include sending DIMO tokens from your wallet, minting a vehicle, or transferring vehicles. See below for an example:
-
-#### Sending DIMO Tokens with an Account Signer
-
-```js
-    import { AccountSigner, newKernelConfig } from '@dimo-network/transactions';
-    import {privateKeyToAccount} from 'viem/accounts';
-
-    const account = privateKeyToAccount(your_private_key as `0x${string}`);
-
-    const signer = new AccountSigner({
-        rpcURL: RPC_URL,
-        account: account,
-        environment: 'dev', // omit to default to prod
-    });
-
-    const txHash = signer.sendDIMOTokens({
-        recipient: '0x_recipient_addr_here',
-        amount: BigInt(10),
-    });
-
-```
-
 If you're a developer interested in using the DIMO Transactions SDK for **multi-user** or **corporate** purposes, where you will want to prompt **DIMO users** to take actions on their own accounts, the **Kernel Client** is for you. Kernel Clients are intended to work with **DIMOs Global Accounts**, security-improved wallets that reduce fees for users, enable account recorvery options, and create a more flexible ecosystem for developers to build on DIMO. See below for an example:
 
 #### Setting Vehicle Permissions with a Kernel Signer
@@ -75,32 +45,63 @@ If you're a developer interested in using the DIMO Transactions SDK for **multi-
         stamper,
     );
 
-    const perms = sacdPermissionValue({
+    const permissions = sacdPermissionValue({
         ALLTIME_LOCATION: true,
     });
 
-    const {success, reason, receipt} = await kernelSigner.setVehiclePermissions({
+      const ipfsRes = await kernelSigner.signAndUploadSACDAgreement({
+        driverID: grantee,
+        appID: DIMO_APP_ID,
+        appName: APP_NAME,
+        expiration: expiration,
+        permissions: permissions,
         tokenId: tokenId,
         grantee: grantee,
-        permissions: BigInt(perms),
-        expiration: expiration,
-        source: source,
+        attachments: [],
+        grantor: kernelSigner.smartContractAddress!,
       });
+
+      if (!ipfsRes.success) {
+        throw new Error(
+          `Unable to sign and upload SACD agreement: ${ipfsRes.error}`,
+        );
+      }
+
+      const result = await kernelSigner.setVehiclePermissions({
+        tokenId,
+        grantee,
+        permissions,
+        expiration,
+        source: `ipfs://${ipfsRes.data?.cid}`,
+      });
+
 ```
 
 ### Actions
 
-The Kernel Client can take the following actions:
-
-- Open a wallet session (wallet session must be specified in config; default timeout is 15 mintes)
-  `kernelClient.openSessionWithPasskey()`
-- Mint a vehicle with device definition
-  - This function can accept a single `MintVehicleWithDeviceDefinition` object or an array of objects
-    `kernelClient.mintVehicleWithDeviceDefinition(args)`
-
-### Contributing:
-
-To build the `.tgz` file, run the following:
-
-- npm run build
-- npm pack
+| Notes                                                                                                       | Method                                 |
+| ----------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| Initialize signer with user account infos                                                                   | passkeyInit()                          |
+| Prompt the user for their signature to open a wallet session, length of wallet session can be set in config | openSessionWithPasskey()               |
+| Use credentials returned from DIMO Accounts api to open a wallet session for user                           | openSessionWithApiStamper()            |
+| Get passkey client (this will require user to sign for all transactions)                                    | getPasskeyClient()                     |
+| Return active API or wallet session client, if applicable, otherwise, return passkey client                 | getActiveClient()                      |
+|                                                                                                             | mintVehicleWithDeviceDefinition()      |
+|                                                                                                             | setVehiclePermissions()                |
+|                                                                                                             | setVehiclePermissionsBulk()            |
+|                                                                                                             | sendDIMOTokens()                       |
+|                                                                                                             | claimAftermarketDevice()               |
+|                                                                                                             | pairAftermarketDevice()                |
+|                                                                                                             | claimAndPairAftermarketDevice()        |
+|                                                                                                             | burnVehicle()                          |
+|                                                                                                             | transferVehicleAndAftermarketDevices() |
+|                                                                                                             | unpairAftermarketDevice()              |
+|                                                                                                             | signTypedData()                        |
+|                                                                                                             | signChallenge()                        |
+|                                                                                                             | generateChallenge()                    |
+|                                                                                                             | submitWeb3Challenge()                  |
+|                                                                                                             | uploadSACDAgreement()                  |
+|                                                                                                             | signSACDPermissionTemplate()           |
+|                                                                                                             | signAndUploadSACDAgreement()           |
+|                                                                                                             | getUserOperationReceipt()              |
+|                                                                                                             | resetClient()                          |
