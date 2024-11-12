@@ -27,7 +27,7 @@ export type SetVehiclePermissionsBulk = {
   grantee: `0x${string}`;
   permissions: BigInt;
   expiration: BigInt;
-  source: string[];
+  sources: string[];
 };
 
 export type SetPermissionsSACD = {

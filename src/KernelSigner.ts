@@ -71,39 +71,46 @@ export class KernelSigner {
   contractMapping: ContractToMapping;
   chain: Chain;
   kernelAddress: `0x${string}` | undefined;
-  _init: boolean = false;
   subOrganizationId: string | undefined;
   walletAddress: `0x${string}` | undefined;
   smartContractAddress: `0x${string}` | undefined;
   apiSessionClient: {
     expires: number;
     client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>;
+    initialized: boolean;
   } = {
     client: undefined,
     expires: 0,
+    initialized: false,
   };
   passkeyClient: {
     turnkeyClient: TurnkeyClient | undefined;
     valid: boolean;
     client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>;
+    initialized: boolean;
   } = {
     turnkeyClient: undefined,
     valid: false,
     client: undefined,
+    initialized: false,
   };
   passkeySessionClient: {
     expires: number;
     client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>;
+    initialized: boolean;
   } = {
     expires: 0,
     client: undefined,
+    initialized: false,
   };
   privateKeyClient: {
     valid: boolean;
     client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>;
+    initialized: boolean;
   } = {
     valid: false,
     client: undefined,
+    initialized: false,
   };
   authBaseUrl: string;
   ifpsUrl: string;
@@ -128,6 +135,37 @@ export class KernelSigner {
       transport: http(this.config.bundlerUrl),
       entryPoint: this.config.entryPoint,
     });
+  }
+
+  public resetClient(): boolean {
+    this.kernelAddress = undefined;
+    this.subOrganizationId = undefined;
+    this.walletAddress = undefined;
+    this.smartContractAddress = undefined;
+    this.apiSessionClient = {
+      client: undefined,
+      expires: 0,
+      initialized: false,
+    };
+
+    this.passkeyClient = {
+      turnkeyClient: undefined,
+      valid: false,
+      client: undefined,
+      initialized: false,
+    };
+    this.passkeySessionClient = {
+      expires: 0,
+      client: undefined,
+      initialized: false,
+    };
+    this.privateKeyClient = {
+      valid: false,
+      client: undefined,
+      initialized: false,
+    };
+
+    return true;
   }
 
   public async getActiveClient(): Promise<
@@ -179,12 +217,8 @@ export class KernelSigner {
       return;
     }
 
-    if (!this._init) {
-      this._init = true;
-      this.subOrganizationId = subOrganizationId;
-      this.walletAddress = walletAddress;
-    }
-
+    this.subOrganizationId = subOrganizationId;
+    this.walletAddress = walletAddress;
     this.passkeyClient.turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, stamper);
 
     const localAccount = await createAccount({

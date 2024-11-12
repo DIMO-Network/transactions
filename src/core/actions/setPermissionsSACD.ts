@@ -41,7 +41,7 @@ export async function setVehiclePermissionsBulk(
   client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>,
   environment: string = "prod"
 ): Promise<`0x${string}`> {
-  if (arg.tokenIds.length != arg.source.length) {
+  if (arg.tokenIds.length != arg.sources.length) {
     throw new Error("Unique signed source must be passed for each token id.");
   }
 
@@ -59,7 +59,7 @@ export async function setVehiclePermissionsBulk(
           arg.grantee,
           arg.permissions,
           arg.expiration,
-          arg.source[idx],
+          arg.sources[idx],
         ],
       }),
     };
