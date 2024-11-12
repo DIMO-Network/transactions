@@ -6,6 +6,14 @@ export type MintVehicleWithDeviceDefinition = {
   sacdInput: { grantee: `0x${string}`; permissions: BigInt; expiration: BigInt; source: string };
 };
 
+export type VehcilePermissionDescription = {
+  driverID: string;
+  appID: string;
+  appName: string;
+  expiration: BigInt;
+  permissionArray: string[];
+};
+
 export type SetVehiclePermissions = {
   tokenId: BigInt;
   grantee: `0x${string}`;
@@ -92,10 +100,13 @@ export type TransferVehicleAndAftermarketDeviceIDs = {
 };
 
 export type SACDTemplateInputs = {
+  appName: string;
+  appID: string;
+  driverID: string;
   grantee: `0x${string}`;
   grantor: `0x${string}`;
   permissions: bigint;
   tokenId: bigint;
   expiration: BigInt;
-  signature: `0x${string}`;
+  attachments: string[];
 };

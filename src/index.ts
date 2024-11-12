@@ -49,7 +49,7 @@ export {
   unpairAftermarketDeviceCallData,
   unpairAftermarketDevice,
 } from "./core/actions/unpairAftermarketDevice.js";
-export { newAccountConfig, newKernelConfig, sacdPermissionValue } from "./core/utils/utils.js";
+export { newAccountConfig, newKernelConfig, sacdPermissionValue, sacdDescription } from "./core/utils/utils.js";
 export { KernelSigner } from "./KernelSigner.js";
 export { AccountSigner } from "./AccountSigner.js";
 export { executeTransaction } from "./core/transactions/execute.js";

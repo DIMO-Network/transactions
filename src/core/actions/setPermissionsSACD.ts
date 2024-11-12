@@ -14,7 +14,7 @@ import { GetUserOperationReceiptReturnType } from "permissionless";
 import { KernelEncodeCallDataArgs } from "@zerodev/sdk/types";
 import { executeTransaction } from ":core/transactions/execute.js";
 import { v4 as uuidv4 } from "uuid";
-import { sacdPermissionArray } from ":core/utils/utils.js";
+import { sacdDescription, sacdPermissionArray } from ":core/utils/utils.js";
 
 export async function setVehiclePermissions(
   args: SetVehiclePermissions,
@@ -145,6 +145,13 @@ export const setVehiclePermissionsTransaction = async (
 export const generateSACDTemplate = async (args: SACDTemplateInputs): Promise<SACDTemplate> => {
   const templateId = uuidv4();
   const permissionArray = sacdPermissionArray(args.permissions);
+  const description = sacdDescription({
+    driverID: args.driverID,
+    appID: args.appID,
+    appName: args.appName,
+    expiration: args.expiration,
+    permissionArray: permissionArray,
+  });
 
   const template: SACDTemplate = {
     specVersion: "1.0",
@@ -152,7 +159,6 @@ export const generateSACDTemplate = async (args: SACDTemplateInputs): Promise<SA
     type: "org.dimo.permission.grant.v1",
     datacontentype: "application/json",
     time: new Date().toISOString(),
-    "com.dimo.grantor.signature": args.signature,
     data: {
       templateId: templateId,
       version: "1.0",
@@ -163,8 +169,8 @@ export const generateSACDTemplate = async (args: SACDTemplateInputs): Promise<SA
       },
       effectiveAt: new Date().toISOString(),
       expiresAt: new Date(Number(args.expiration) * 1000).toISOString(),
-      attachments: [],
-      description: `This document grants token holder ${args.tokenId} at ${args.signature} specific permissions to the grantee (${args.grantee}) within a defined scope and time range. The payload includes a digital signature for authentication, timestamps for when permissions take effect, and optional attachments related to this permission grant.`,
+      attachments: args.attachments,
+      description: description,
     },
   };
 

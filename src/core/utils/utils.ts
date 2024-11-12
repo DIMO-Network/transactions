@@ -1,4 +1,4 @@
-import { SACD_PERMISSIONS } from ":core/types/args.js";
+import { SACD_PERMISSIONS, VehcilePermissionDescription } from ":core/types/args.js";
 import { AccountConfig, KernelConfig, _accountConfig, _kernelConfig } from ":core/types/dimo.js";
 import { KERNEL_V3_1 } from "@zerodev/sdk/constants";
 import { entryPoint07Address } from "viem/account-abstraction";
@@ -135,28 +135,46 @@ export const sacdPermissionArray = (permissionValue: bigint): string[] => {
 
   // Map binary values to boolean fields in the permissions object
   if (alltimeLocation.includes("1")) {
-    sacdPermArray.push("ALLTIME_LOCATION");
+    sacdPermArray.push("ALLTIME_LOCATION: access to the vehicle’s full location history.");
   }
 
   if (alltimeNonlocation.includes("1")) {
-    sacdPermArray.push("ALLTIME_NONLOCATION");
+    sacdPermArray.push("NONLOCATION_TELEMETRY: non-location vehicle data such as fuel levels and odometer.");
   }
 
   if (commands.includes("1")) {
-    sacdPermArray.push("COMMANDS");
+    sacdPermArray.push("COMMANDS: ability to send commands to the vehicle such as lock and unlock.");
   }
 
   if (currentLocation.includes("1")) {
-    sacdPermArray.push("CURRENT_LOCATION");
+    sacdPermArray.push("CURRENT_LOCATION: access to the vehicle’s current location.");
   }
 
   if (verifiableCredentials.includes("1")) {
-    sacdPermArray.push("VERIFIABLE_CREDENTIALS");
+    sacdPermArray.push(
+      "CREDENTIALS: access to any stored credentials and attestations such as insurance and service records."
+    );
   }
 
   if (streams.includes("1")) {
-    sacdPermArray.push("STREAMS");
+    sacdPermArray.push("STREAMS: Access to real-time data streams.");
   }
 
   return sacdPermArray;
+};
+
+export const sacdDescription = (args: VehcilePermissionDescription): string => {
+  const description = `
+  By proceeding, you will grant data access and control functions to ${args.appName} 
+  effective as of ${Date.now()} until ${new Date(Number(args.expiration))}. 
+  Permissions being granted: 
+  ${args.permissionArray.join("; ")}
+  
+  Driver ID: ${args.driverID} 
+  App ID: ${args.appID}
+  
+  DIMO Platform, version 1.0.
+  `;
+
+  return description;
 };

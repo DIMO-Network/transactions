@@ -91,6 +91,7 @@ export enum DIMO_APIs {
   USER,
   VALUATIONS,
   VEHICLE_SIGNAL_DECODING,
+  IPFS,
 }
 
 export type API_BY_ENV = {
@@ -123,6 +124,27 @@ export type AbiAddressPair = {
 };
 
 export type SACDTemplate = {
+  specVersion: string;
+  id: string;
+  type: string;
+  datacontentype: string;
+  time: string;
+  data: {
+    templateId: string;
+    version: string;
+    grantor: string;
+    grantee: string;
+    scope: {
+      permissions: string[];
+    };
+    effectiveAt: string;
+    expiresAt: string;
+    attachments: string[];
+    description: string;
+  };
+};
+
+export type SACDTemplateSigned = {
   specVersion: string;
   id: string;
   type: string;

@@ -1,4 +1,11 @@
-import { ContractToMapping, DIMO_APIs, ENVIRONMENT, KernelConfig, _kernelConfig } from ":core/types/dimo.js";
+import {
+  ContractToMapping,
+  DIMO_APIs,
+  ENVIRONMENT,
+  KernelConfig,
+  SACDTemplateSigned,
+  _kernelConfig,
+} from ":core/types/dimo.js";
 import { Chain, PublicClient, Transport, createPublicClient, createWalletClient, http } from "viem";
 import {
   KernelAccountClient,
@@ -15,6 +22,7 @@ import {
   mintVehicleWithDeviceDefinitionBatch,
 } from ":core/actions/mintVehicleWithDeviceDefinition.js";
 import {
+  generateSACDTemplate,
   setVehiclePermissions,
   setVehiclePermissionsBatch,
   setVehiclePermissionsBulk,
@@ -31,6 +39,7 @@ import {
   ClaimAftermarketdevice,
   MintVehicleWithDeviceDefinition,
   PairAftermarketDevice,
+  SACDTemplateInputs,
   SendDIMOTokens,
   SetVehiclePermissions,
   SetVehiclePermissionsBulk,
@@ -97,6 +106,7 @@ export class KernelSigner {
     client: undefined,
   };
   authBaseUrl: string;
+  ifpsUrl: string;
 
   constructor(config: KernelConfig) {
     this.config = config as _kernelConfig;
@@ -106,6 +116,8 @@ export class KernelSigner {
       CHAIN_ABI_MAPPING[ENV_MAPPING.get(this.config.environment ?? "prod") ?? ENVIRONMENT.PROD].contracts;
     this.authBaseUrl =
       ENV_TO_API_MAPPING[ENV_MAPPING.get(this.config.environment ?? "prod") ?? ENVIRONMENT.PROD][DIMO_APIs.AUTH].url;
+    this.ifpsUrl =
+      ENV_TO_API_MAPPING[ENV_MAPPING.get(this.config.environment ?? "prod") ?? ENVIRONMENT.PROD][DIMO_APIs.IPFS].url;
     this.publicClient = createPublicClient({
       transport: http(this.config.rpcUrl),
       chain: this.chain,
@@ -725,6 +737,67 @@ export class KernelSigner {
     } catch (error) {
       console.error("Error submitting web3 challenge:", error);
       return { success: false, error: "An error occurred while submitting challenge" };
+    }
+  }
+
+  public async uploadSACDAgreement(signedAgreement: string): Promise<{ success: boolean; error?: string; data?: any }> {
+    try {
+      const response = await fetch(this.ifpsUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(signedAgreement),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error("Error posting data:", error);
+      throw error;
+    }
+  }
+
+  public async signSACDPermissionTemplate(args: SACDTemplateInputs): Promise<SACDTemplateSigned> {
+    const template = await generateSACDTemplate(args);
+    const templateStr = JSON.stringify(template);
+    const signature = await this.signChallenge(templateStr);
+
+    const signedTemplate: SACDTemplateSigned = {
+      ...template,
+      "com.dimo.grantor.signature": signature,
+    };
+
+    return signedTemplate;
+  }
+
+  public async signAndUploadSACDAgreement(
+    args: SACDTemplateInputs
+  ): Promise<{ success: boolean; error?: string; data?: any }> {
+    const signedSACD = await this.signSACDPermissionTemplate(args);
+
+    try {
+      const response = await fetch(this.ifpsUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(signedSACD),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error("Error posting data:", error);
+      throw error;
     }
   }
 }
