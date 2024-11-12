@@ -505,20 +505,19 @@ export class KernelSigner {
       },
     });
 
-    if (!waitForReceipt) {
-      return {
-        userOperationHash: userOpHash,
-        status: "pending",
-      };
+    if (waitForReceipt) {
+      return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
     }
 
-    const txResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
-
-    return txResult;
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    };
   }
 
   public async setVehiclePermissions(
-    args: SetVehiclePermissions | SetVehiclePermissions[]
+    args: SetVehiclePermissions | SetVehiclePermissions[],
+    waitForReceipt: boolean = true
   ): Promise<GetUserOperationReceiptReturnType> {
     const client = await this.getActiveClient();
     let setVehiclePermissionsCallData: `0x${string}`;
@@ -536,11 +535,21 @@ export class KernelSigner {
         callData: setVehiclePermissionsCallData as `0x${string}`,
       },
     });
-    const txResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
-    return txResult;
+
+    if (waitForReceipt) {
+      return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    };
   }
 
-  public async setVehiclePermissionsBulk(args: SetVehiclePermissionsBulk): Promise<GetUserOperationReceiptReturnType> {
+  public async setVehiclePermissionsBulk(
+    args: SetVehiclePermissionsBulk,
+    waitForReceipt: boolean = true
+  ): Promise<GetUserOperationReceiptReturnType> {
     const client = await this.getActiveClient();
     const setVehiclePermissionsBulkCallData = await setVehiclePermissionsBulk(args, client, this.config.environment);
 
@@ -549,11 +558,21 @@ export class KernelSigner {
         callData: setVehiclePermissionsBulkCallData as `0x${string}`,
       },
     });
-    const txResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
-    return txResult;
+
+    if (waitForReceipt) {
+      return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    };
   }
 
-  public async sendDIMOTokens(args: SendDIMOTokens): Promise<GetUserOperationReceiptReturnType> {
+  public async sendDIMOTokens(
+    args: SendDIMOTokens,
+    waitForReceipt: boolean = true
+  ): Promise<GetUserOperationReceiptReturnType> {
     if (!this.passkeyClient.valid) {
       throw new Error("Tokens must be sent with passkey client");
     }
@@ -564,15 +583,25 @@ export class KernelSigner {
         callData: sendDIMOTokensCallData as `0x${string}`,
       },
     });
-    const txResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
-    return txResult;
+
+    if (waitForReceipt) {
+      return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    };
   }
 
   public claimAftermarketDeviceTypeHash(aftermarketDeviceNode: bigint, owner: `0x${string}`): TypeHashResponse {
     return claimAftermarketDeviceTypeHash(aftermarketDeviceNode, owner, this.config.environment);
   }
 
-  public async claimAftermarketDevice(args: ClaimAftermarketdevice): Promise<GetUserOperationReceiptReturnType> {
+  public async claimAftermarketDevice(
+    args: ClaimAftermarketdevice,
+    waitForReceipt: boolean = true
+  ): Promise<GetUserOperationReceiptReturnType> {
     const client = await this.getActiveClient();
 
     const claimADCallData = await claimAftermarketDevice(args, client, this.config.environment);
@@ -581,11 +610,21 @@ export class KernelSigner {
         callData: claimADCallData as `0x${string}`,
       },
     });
-    const txResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
-    return txResult;
+
+    if (waitForReceipt) {
+      return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    };
   }
 
-  public async pairAftermarketDevice(args: PairAftermarketDevice): Promise<GetUserOperationReceiptReturnType> {
+  public async pairAftermarketDevice(
+    args: PairAftermarketDevice,
+    waitForReceipt: boolean = true
+  ): Promise<GetUserOperationReceiptReturnType> {
     const client = await this.getActiveClient();
 
     const pairADCallData = await pairAftermarketDevice(args, client, this.config.environment);
@@ -594,27 +633,44 @@ export class KernelSigner {
         callData: pairADCallData as `0x${string}`,
       },
     });
-    const txResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
-    return txResult;
+
+    if (waitForReceipt) {
+      return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    };
   }
 
   public async claimAndPairAftermarketDevice(
-    args: ClaimAftermarketdevice & PairAftermarketDevice
+    args: ClaimAftermarketdevice & PairAftermarketDevice,
+    waitForReceipt: boolean = true
   ): Promise<GetUserOperationReceiptReturnType> {
     const client = await this.getActiveClient();
 
     const claimAndPairCallData = await claimAndPairDevice(args, client, this.config.environment);
-    const claimAndPairADHash = await client.sendUserOperation({
+    const userOpHash = await client.sendUserOperation({
       userOperation: {
         callData: claimAndPairCallData as `0x${string}`,
       },
     });
 
-    const result = await this.bundlerClient.waitForUserOperationReceipt({ hash: claimAndPairADHash });
-    return result;
+    if (waitForReceipt) {
+      return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    };
   }
 
-  public async burnVehicle(args: BurnVehicle | BurnVehicle[]): Promise<GetUserOperationReceiptReturnType> {
+  public async burnVehicle(
+    args: BurnVehicle | BurnVehicle[],
+    waitForReceipt: boolean = true
+  ): Promise<GetUserOperationReceiptReturnType> {
     const client = await this.getActiveClient();
 
     let burnVehicleCallData: `0x${string}`;
@@ -634,8 +690,15 @@ export class KernelSigner {
           callData: burnVehicleCallData as `0x${string}`,
         },
       });
-      const txResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
-      return txResult;
+
+      if (waitForReceipt) {
+        return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+      }
+
+      return {
+        userOperationHash: userOpHash,
+        status: "pending",
+      };
     } catch (error: any) {
       if (error) {
         error = error.toString();
@@ -650,7 +713,8 @@ export class KernelSigner {
   }
 
   public async transferVehicleAndAftermarketDevices(
-    args: TransferVehicleAndAftermarketDeviceIDs
+    args: TransferVehicleAndAftermarketDeviceIDs,
+    waitForReceipt: boolean = true
   ): Promise<GetUserOperationReceiptReturnType> {
     const client = await this.getActiveClient();
 
@@ -661,11 +725,20 @@ export class KernelSigner {
       },
     });
 
-    const txResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
-    return txResult;
+    if (waitForReceipt) {
+      return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    };
   }
 
-  public async unpairAftermarketDevice(args: UnPairAftermarketDevice): Promise<GetUserOperationReceiptReturnType> {
+  public async unpairAftermarketDevice(
+    args: UnPairAftermarketDevice,
+    waitForReceipt: boolean = true
+  ): Promise<GetUserOperationReceiptReturnType> {
     const client = await this.getActiveClient();
     const unpairADCallData = await unpairAftermarketDevice(args, client, this.config.environment);
     const userOpHash = await client.sendUserOperation({
@@ -673,8 +746,15 @@ export class KernelSigner {
         callData: unpairADCallData as `0x${string}`,
       },
     });
-    const txResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
-    return txResult;
+
+    if (waitForReceipt) {
+      return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    };
   }
 
   public async signTypedData(arg: any): Promise<any> {
@@ -833,5 +913,10 @@ export class KernelSigner {
       console.error("Error posting data:", error);
       throw error;
     }
+  }
+
+  public async getUserOperationReceipt(userOperationHash: `0x${string}`): Promise<GetUserOperationReceiptReturnType> {
+    const txResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: userOperationHash });
+    return txResult;
   }
 }
