@@ -1,5 +1,7 @@
 # DIMO Transactions SDK
 
+The DIMO transactions SDK was created to help developers build on DIMO.
+
 ## Installation
 
 Use [npm](https://www.npmjs.com/package/@dimo-network/transactions):
@@ -10,7 +12,16 @@ npm install @dimo-network/transactions
 
 ## How to Use the SDK
 
-Using the SDK with an account signer:
+There are two types of client signers that a developer can use:
+
+| Functionality       | Account Client                 | Kernel Client                                       |
+| ------------------- | ------------------------------ | --------------------------------------------------- |
+| Initializing signer | Initialized with a private key | Initialized with private key or stamper             |
+| Signing as          | Wallet owned by private key    | Account Abstracted wallet controlled by private key |
+
+If you're a developer interested in using the DIMO Transactions SDK for personal use, such as sending on-chain transactions with a wallet that you hold the private key for, the **Account Client** is for you. The Account Client has fewer features because it is intended for individual use. Some actions you might take with this client include sending DIMO tokens from your wallet, minting a vehicle, or transferring vehicles. See below for an example:
+
+#### Sending DIMO Tokens with an Account Signer
 
 ```js
     import { AccountSigner, newKernelConfig } from '@dimo-network/transactions';
@@ -21,7 +32,7 @@ Using the SDK with an account signer:
     const signer = new AccountSigner({
         rpcURL: RPC_URL,
         account: account,
-        environment: 'dev', // omit this to default to prod
+        environment: 'dev', // omit to default to prod
     });
 
     const txHash = signer.sendDIMOTokens({
@@ -31,9 +42,11 @@ Using the SDK with an account signer:
 
 ```
 
-## Using the SDK with a stamper
+If you're a developer interested in using the DIMO Transactions SDK for **multi-user** or **corporate** purposes, where you will want to prompt **DIMO users** to take actions on their own accounts, the **Kernel Client** is for you. Kernel Clients are intended to work with **DIMOs Global Accounts**, security-improved wallets that reduce fees for users, enable account recorvery options, and create a more flexible ecosystem for developers to build on DIMO. See below for an example:
 
-#### This example demonstrates using a PasskeyStamer but you can use:
+#### Setting Vehicle Permissions with a Kernel Signer
+
+##### This example demonstrates using a PasskeyStamer but you can use:
 
 - WebauthnStamper (@turnkey/webauthn-stamper)
 - IframeStamper (@turnkey/iframe-stamper)
@@ -47,11 +60,10 @@ Using the SDK with an account signer:
         rpcUrl: RPC_URL,
         bundlerUrl: BUNDLER_RPC,
         paymasterUrl: PAYMASTER_RPC,
-        environment: 'dev', // omit this to default to prod
+        environment: 'dev', // omit to default to prod
     });
 
-    // NOTE: use the correct stamper for your framework (native, browser, etc)
-    // check corresponding libraries above
+    // NOTE: use the correct stamper for your framework
     const stamper = new PasskeyStamper({
         rpId: RPID,
     });
