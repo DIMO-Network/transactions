@@ -164,6 +164,6 @@ export const sacdPermissionArray = (permissionValue: bigint): string[] => {
 };
 
 export const sacdDescription = (args: VehcilePermissionDescription): string => {
-  const description = `By proceeding, you will grant data access and control functions to ${args.appName} effective as of ${Date.now()} until ${new Date(Number(args.expiration))}. \nPermissions being granted: \n${args.permissionArray.join("; ")}\nDriver ID: ${args.driverID} \nApp ID: ${args.appID}\nDIMO Platform, version 1.0.`;
+  const description = `By proceeding, you will grant data access and control functions to ${args.appName} effective as of ${Date.now()} until ${new Date(Number(args.expiration))}. Permissions being granted: ${args.permissionArray.join("; ")}Driver ID: ${args.driverID} App ID: ${args.appID}DIMO Platform, version 1.0.`;
   return description;
 };

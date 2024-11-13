@@ -889,9 +889,7 @@ export class KernelSigner {
     return signedTemplate;
   }
 
-  public async signAndUploadSACDAgreement(
-    args: SACDTemplateInputs
-  ): Promise<{ success: boolean; error?: string; data?: any }> {
+  public async signAndUploadSACDAgreement(args: SACDTemplateInputs): Promise<{ success: boolean; cid: string }> {
     const signedSACD = await this.signSACDPermissionTemplate(args);
 
     try {
