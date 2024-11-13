@@ -37,6 +37,7 @@ import {
 import {
   BurnVehicle,
   ClaimAftermarketdevice,
+  DeriveKernelAddress,
   MintVehicleWithDeviceDefinition,
   PairAftermarketDevice,
   SACDTemplateInputs,
@@ -55,7 +56,7 @@ import { polygon } from "viem/chains";
 import { burnVehicle, burnVehicleBatch } from ":core/actions/burnVehicle.js";
 import { createAccount } from "@turnkey/viem";
 import { walletClientToSmartAccountSigner } from "permissionless/utils";
-import { signerToEcdsaValidator } from "@zerodev/ecdsa-validator";
+import { getKernelAddressFromECDSA, signerToEcdsaValidator } from "@zerodev/ecdsa-validator";
 import { privateKeyToAccount } from "viem/accounts";
 import { transferVehicleAndAftermarketDeviceIDs } from ":core/actions/transferVehicleAndADs.js";
 import { unpairAftermarketDevice } from ":core/actions/unpairAftermarketDevice.js";
@@ -916,5 +917,46 @@ export class KernelSigner {
   public async getUserOperationReceipt(userOperationHash: `0x${string}`): Promise<GetUserOperationReceiptReturnType> {
     const txResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: userOperationHash });
     return txResult;
+  }
+
+  public async isDeployed(args: DeriveKernelAddress): Promise<boolean> {
+    switch (true) {
+      case args.accountAddress != undefined:
+        console.log("using passed arg account address");
+        break;
+      case this.kernelAddress != undefined:
+        args.accountAddress = this.kernelAddress;
+        console.log("setting kernel address to account address");
+        break;
+      case args.walletAddress != undefined:
+        args.accountAddress = await this.deriveKernelAddress(args.walletAddress!);
+        console.log("deriving kernel address from wallet address");
+        break;
+      default:
+        throw new Error("No account address provided");
+    }
+
+    const contractCode = await this.publicClient.getCode({
+      address: args.accountAddress!,
+    });
+
+    if (contractCode) {
+      return contractCode !== "0x";
+    }
+
+    return false;
+  }
+
+  public async deriveKernelAddress(walletAddress: `0x${string}`, number: number = 0): Promise<`0x${string}`> {
+    const kernelAddress = await getKernelAddressFromECDSA({
+      entryPointAddress: this.config.entryPoint,
+      // @ts-ignore
+      kernelVersion: this.config.kernelVersion,
+      eoaAddress: walletAddress,
+      index: BigInt(number),
+      publicClient: this.publicClient,
+    });
+
+    return kernelAddress;
   }
 }

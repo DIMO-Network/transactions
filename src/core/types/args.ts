@@ -110,3 +110,9 @@ export type SACDTemplateInputs = {
   expiration: BigInt;
   attachments: string[];
 };
+
+export type DeriveKernelAddress = {
+  accountAddress?: `0x${string}`;
+  walletAddress?: `0x${string}`;
+  waitForReceipt?: boolean;
+};
