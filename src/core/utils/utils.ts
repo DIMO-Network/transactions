@@ -135,7 +135,7 @@ export const sacdPermissionArray = (permissionValue: bigint): string[] => {
 
   // Map binary values to boolean fields in the permissions object
   if (alltimeLocation.includes("1")) {
-    sacdPermArray.push("ALLTIME_LOCATION: access to the vehicle’s full location history.");
+    sacdPermArray.push("ALLTIME_LOCATION: access to the vehicle full location history.");
   }
 
   if (alltimeNonlocation.includes("1")) {
@@ -147,7 +147,7 @@ export const sacdPermissionArray = (permissionValue: bigint): string[] => {
   }
 
   if (currentLocation.includes("1")) {
-    sacdPermArray.push("CURRENT_LOCATION: access to the vehicle’s current location.");
+    sacdPermArray.push("CURRENT_LOCATION: access to the vehicle current location.");
   }
 
   if (verifiableCredentials.includes("1")) {
