@@ -212,64 +212,13 @@ export class KernelSigner {
     this.walletAddress = walletAddress;
     this.passkeyClient.turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, stamper);
 
-    const localAccount = await createAccount({
-      // @ts-ignore
-      client: this.passkeyClient.turnkeyClient,
-      organizationId: subOrganizationId,
-      signWith: walletAddress,
-      ethereumAddress: walletAddress,
-    });
-
-    const smartAccountClient = createWalletClient({
-      account: localAccount,
-      chain: this.chain,
-      transport: http(this.config.rpcUrl),
-    });
-
-    const smartAccountSigner = walletClientToSmartAccountSigner(smartAccountClient);
-    const ecdsaValidator = await signerToEcdsaValidator(this.publicClient, {
-      signer: smartAccountSigner,
-      entryPoint: this.config.entryPoint,
-      // @ts-ignore
-      kernelVersion: this.config.kernelVersion,
-    });
-
-    const account = await createKernelAccount(this.publicClient, {
-      plugins: {
-        sudo: ecdsaValidator,
-      },
-      entryPoint: this.config.entryPoint,
-      // @ts-ignore
-      kernelVersion: this.config.kernelVersion,
-    });
-
-    this.passkeyClient.client = createKernelAccountClient({
-      account,
-      chain: this.chain,
-      entryPoint: this.config.entryPoint,
-      bundlerTransport: http(this.config.bundlerUrl),
-      middleware: {
-        sponsorUserOperation: async ({ userOperation }) => {
-          const zerodevPaymaster = createZeroDevPaymasterClient({
-            chain: this.chain,
-            entryPoint: this.config.entryPoint,
-            transport: http(this.config.paymasterUrl),
-          });
-          return zerodevPaymaster.sponsorUserOperation({
-            userOperation,
-            entryPoint: this.config.entryPoint,
-          });
-        },
-      },
-    });
+    this.passkeyClient.client = await this._createKernelAccount(
+      this.passkeyClient.turnkeyClient,
+      subOrganizationId,
+      this.walletAddress!
+    );
 
     this.passkeyClient.valid = true;
-    this.kernelAddress = account.address;
-    this.smartContractAddress = account.address;
-
-    if (this.config.useWalletSession) {
-      await this.openSessionWithPasskey();
-    }
     return;
   }
 
@@ -278,12 +227,15 @@ export class KernelSigner {
       return;
     }
 
-    this.subOrganizationId = subOrganizationId;
-    this.passkeyClient.turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, stamper);
     const timestamp = Date.now();
-    const expiration = timestamp + parseInt(this.config.sessionTimeoutSeconds) * 0.75 * 1000;
     const key = generateP256KeyPair();
     const targetPubHex = key.publicKeyUncompressed;
+    const expiration = timestamp + parseInt(this.config.sessionTimeoutSeconds) * 0.75 * 1000;
+
+    this.subOrganizationId = subOrganizationId;
+    this.passkeyClient.turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, stamper);
+    this.passkeyClient.valid = true;
+    this.passkeyClient.initialized = true;
 
     const sessionData = await this.passkeyClient.turnkeyClient!.createReadWriteSession({
       organizationId: this.subOrganizationId,
@@ -305,6 +257,8 @@ export class KernelSigner {
 
     const turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, apiStamper);
 
+    this.passkeySessionClient.expires = expiration;
+    this.passkeySessionClient.initialized = true;
     const wallets = await turnkeyClient.getWallets({ organizationId: subOrganizationId });
     const walletAddr = await turnkeyClient.getWalletAccounts({
       organizationId: subOrganizationId,
@@ -313,58 +267,18 @@ export class KernelSigner {
 
     this.walletAddress = walletAddr.accounts[0].address as `0x${string}`;
 
-    const localAccount = await createAccount({
-      // @ts-ignore
-      client: turnkeyClient,
-      organizationId: this.subOrganizationId,
-      signWith: this.walletAddress,
-      ethereumAddress: this.walletAddress,
-    });
+    this.passkeySessionClient.client = await this._createKernelAccount(
+      turnkeyClient,
+      subOrganizationId,
+      this.walletAddress!
+    );
 
-    const smartAccountClient = createWalletClient({
-      account: localAccount,
-      chain: this.chain,
-      transport: http(this.config.rpcUrl),
-    });
+    this.passkeyClient.client = await this._createKernelAccount(
+      this.passkeyClient.turnkeyClient,
+      subOrganizationId,
+      this.walletAddress!
+    );
 
-    const smartAccountSigner = walletClientToSmartAccountSigner(smartAccountClient);
-    const ecdsaValidator = await signerToEcdsaValidator(this.publicClient, {
-      signer: smartAccountSigner,
-      entryPoint: this.config.entryPoint,
-      // @ts-ignore
-      kernelVersion: this.config.kernelVersion,
-    });
-
-    const account = await createKernelAccount(this.publicClient, {
-      plugins: {
-        sudo: ecdsaValidator,
-      },
-      entryPoint: this.config.entryPoint,
-      // @ts-ignore
-      kernelVersion: this.config.kernelVersion,
-    });
-
-    this.passkeySessionClient.client = createKernelAccountClient({
-      account,
-      chain: this.chain,
-      entryPoint: this.config.entryPoint,
-      bundlerTransport: http(this.config.bundlerUrl),
-      middleware: {
-        sponsorUserOperation: async ({ userOperation }) => {
-          const zerodevPaymaster = createZeroDevPaymasterClient({
-            chain: this.chain,
-            entryPoint: this.config.entryPoint,
-            transport: http(this.config.paymasterUrl),
-          });
-          return zerodevPaymaster.sponsorUserOperation({
-            userOperation,
-            entryPoint: this.config.entryPoint,
-          });
-        },
-      },
-    });
-
-    this.passkeySessionClient.expires = expiration;
     return;
   }
 
@@ -409,57 +323,11 @@ export class KernelSigner {
     });
 
     this.walletAddress = walletAddr.accounts[0].address as `0x${string}`;
-    const localAccount = await createAccount({
-      // @ts-ignore
-      client: turnkeyClient,
-      organizationId: this.subOrganizationId,
-      signWith: this.walletAddress,
-      ethereumAddress: this.walletAddress,
-    });
-
-    const smartAccountClient = createWalletClient({
-      account: localAccount,
-      chain: this.chain,
-      transport: http(this.config.rpcUrl),
-    });
-
-    const smartAccountSigner = walletClientToSmartAccountSigner(smartAccountClient);
-    const ecdsaValidator = await signerToEcdsaValidator(this.publicClient, {
-      signer: smartAccountSigner,
-      entryPoint: this.config.entryPoint,
-      // @ts-ignore
-      kernelVersion: this.config.kernelVersion,
-    });
-
-    const account = await createKernelAccount(this.publicClient, {
-      plugins: {
-        sudo: ecdsaValidator,
-      },
-      entryPoint: this.config.entryPoint,
-      // @ts-ignore
-      kernelVersion: this.config.kernelVersion,
-    });
-
-    this.passkeySessionClient.client = createKernelAccountClient({
-      account,
-      chain: this.chain,
-      entryPoint: this.config.entryPoint,
-      bundlerTransport: http(this.config.bundlerUrl),
-      middleware: {
-        sponsorUserOperation: async ({ userOperation }) => {
-          const zerodevPaymaster = createZeroDevPaymasterClient({
-            chain: this.chain,
-            entryPoint: this.config.entryPoint,
-            transport: http(this.config.paymasterUrl),
-          });
-          return zerodevPaymaster.sponsorUserOperation({
-            userOperation,
-            entryPoint: this.config.entryPoint,
-          });
-        },
-      },
-    });
-
+    this.passkeySessionClient.client = await this._createKernelAccount(
+      turnkeyClient,
+      this.subOrganizationId!,
+      this.walletAddress!
+    );
     this.passkeySessionClient.expires = expiration;
     return;
   }
@@ -468,10 +336,10 @@ export class KernelSigner {
     const timestamp = Date.now();
     const expiration = timestamp + parseInt(this.config.sessionTimeoutSeconds) * 0.75 * 1000;
 
-    const client = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, apiStamper);
+    const turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, apiStamper);
 
-    const wallets = await client.getWallets({ organizationId: subOrganizationId });
-    const walletAddr = await client.getWalletAccounts({
+    const wallets = await turnkeyClient.getWallets({ organizationId: subOrganizationId });
+    const walletAddr = await turnkeyClient.getWalletAccounts({
       organizationId: subOrganizationId,
       walletId: wallets.wallets[0].walletId,
     });
@@ -479,18 +347,35 @@ export class KernelSigner {
     this.walletAddress = walletAddr.accounts[0].address as `0x${string}`;
     this.subOrganizationId = subOrganizationId;
 
+    this.apiSessionClient.client = await this._createKernelAccount(
+      turnkeyClient,
+      subOrganizationId,
+      this.walletAddress!
+    );
+    this.apiSessionClient.expires = expiration;
+    this.apiSessionClient.initialized = true;
+    return;
+  }
+
+  async _createKernelAccount(
+    turnkeyClient: TurnkeyClient,
+    subOrganizationId: string,
+    walletAddress: `0x${string}`
+  ): Promise<KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>> {
     const localAccount = await createAccount({
       // @ts-ignore
-      client: client,
-      organizationId: this.subOrganizationId!,
-      signWith: this.walletAddress!,
-      ethereumAddress: this.walletAddress,
+      client: turnkeyClient as any,
+      organizationId: subOrganizationId,
+      signWith: walletAddress,
+      ethereumAddress: walletAddress,
     });
+
     const smartAccountClient = createWalletClient({
       account: localAccount,
       chain: this.chain,
       transport: http(this.config.rpcUrl),
     });
+
     const smartAccountSigner = walletClientToSmartAccountSigner(smartAccountClient);
     const ecdsaValidator = await signerToEcdsaValidator(this.publicClient, {
       signer: smartAccountSigner,
@@ -508,13 +393,16 @@ export class KernelSigner {
       kernelVersion: this.config.kernelVersion,
     });
 
-    this.apiSessionClient.client = createKernelAccountClient({
+    this.kernelAddress = account.address;
+    this.smartContractAddress = account.address;
+    this.walletAddress = walletAddress;
+
+    return createKernelAccountClient({
       account,
       chain: this.chain,
       entryPoint: this.config.entryPoint,
       bundlerTransport: http(this.config.bundlerUrl),
       middleware: {
-        // @ts-ignore
         sponsorUserOperation: async ({ userOperation }) => {
           const zerodevPaymaster = createZeroDevPaymasterClient({
             chain: this.chain,
@@ -528,8 +416,6 @@ export class KernelSigner {
         },
       },
     });
-    this.apiSessionClient.expires = expiration;
-    return;
   }
 
   public async privateKeyInit(privateKey: `0x${string}`) {
@@ -946,6 +832,20 @@ export class KernelSigner {
       console.error("Error submitting web3 challenge:", error);
       return { success: false, error: "An error occurred while submitting challenge" };
     }
+  }
+
+  public async getJWT(
+    clientId: string,
+    domain: string,
+    address: string,
+    redirectUri: string
+  ): Promise<{ success: boolean; error?: string; data?: any }> {
+    const challengeResponse = await this.generateChallenge(clientId, domain, address);
+    const challenge = challengeResponse.data.challenge;
+    const state = challengeResponse.data.state;
+
+    const signature = await this.signChallenge(challenge);
+    return await this.submitWeb3Challenge(clientId, state, redirectUri, signature);
   }
 
   public async uploadSACDAgreement(signedAgreement: string): Promise<{ success: boolean; error?: string; data?: any }> {
