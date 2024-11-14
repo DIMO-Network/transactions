@@ -922,15 +922,12 @@ export class KernelSigner {
   public async isDeployed(args: DeriveKernelAddress): Promise<boolean> {
     switch (true) {
       case args.accountAddress != undefined:
-        console.log("using passed arg account address");
         break;
       case this.kernelAddress != undefined:
         args.accountAddress = this.kernelAddress;
-        console.log("setting kernel address to account address");
         break;
       case args.walletAddress != undefined:
         args.accountAddress = await this.deriveKernelAddress(args.walletAddress!);
-        console.log("deriving kernel address from wallet address");
         break;
       default:
         throw new Error("No account address provided");
