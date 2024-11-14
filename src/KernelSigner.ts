@@ -226,7 +226,6 @@ export class KernelSigner {
     if (new Date(this.passkeySessionClient.expires) > new Date(Date.now())) {
       return;
     }
-
     const timestamp = Date.now();
     const key = generateP256KeyPair();
     const targetPubHex = key.publicKeyUncompressed;
@@ -256,7 +255,6 @@ export class KernelSigner {
     });
 
     const turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, apiStamper);
-
     this.passkeySessionClient.expires = expiration;
     this.passkeySessionClient.initialized = true;
     const wallets = await turnkeyClient.getWallets({ organizationId: subOrganizationId });
@@ -266,7 +264,6 @@ export class KernelSigner {
     });
 
     this.walletAddress = walletAddr.accounts[0].address as `0x${string}`;
-
     this.passkeySessionClient.client = await this._createKernelAccount(
       turnkeyClient,
       subOrganizationId,
@@ -834,18 +831,18 @@ export class KernelSigner {
     }
   }
 
-  public async getJWT(
-    clientId: string,
-    domain: string,
-    address: string,
-    redirectUri: string
-  ): Promise<{ success: boolean; error?: string; data?: any }> {
-    const challengeResponse = await this.generateChallenge(clientId, domain, address);
+  public async getJWT(address?: string): Promise<{ success: boolean; error?: string; data?: any }> {
+    if (!address) {
+      const client = await this.getActiveClient();
+      address = client.account.address as string;
+    }
+
+    const challengeResponse = await this.generateChallenge(this.config.clientId, this.config.domain, address!);
     const challenge = challengeResponse.data.challenge;
     const state = challengeResponse.data.state;
 
     const signature = await this.signChallenge(challenge);
-    return await this.submitWeb3Challenge(clientId, state, redirectUri, signature);
+    return await this.submitWeb3Challenge(this.config.clientId, state, this.config.redirectUri, signature);
   }
 
   public async uploadSACDAgreement(signedAgreement: string): Promise<{ success: boolean; error?: string; data?: any }> {

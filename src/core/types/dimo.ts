@@ -7,14 +7,15 @@ export type KernelConfig = {
   rpcUrl: string;
   bundlerUrl: string;
   paymasterUrl: string;
+  clientId: string;
+  domain: string;
+  redirectUri: string;
   turnkeyApiBaseUrl?: string;
   entryPoint?: `0x${string}`;
   kernelVersion?: KERNEL_V3_VERSION_TYPE | KERNEL_V2_VERSION_TYPE;
   environment?: string;
   useWalletSession?: boolean;
   sessionTimeoutSeconds?: string; // seconds
-  walletAddress?: `0x${string}`;
-  subOrganizationId?: string;
   usePrivateKey?: boolean;
 };
 
@@ -28,9 +29,10 @@ export type _kernelConfig = {
   environment: string;
   useWalletSession: boolean;
   sessionTimeoutSeconds: string;
-  walletAddress?: `0x${string}`;
-  subOrganizationId?: string;
   usePrivateKey: boolean;
+  clientId: string;
+  domain: string;
+  redirectUri: string;
 };
 
 export type AccountConfig = {
