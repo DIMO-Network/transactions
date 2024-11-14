@@ -106,7 +106,6 @@ export type SACDTemplateInputs = {
   grantee: `0x${string}`;
   grantor: `0x${string}`;
   permissions: bigint;
-  tokenId: bigint;
   expiration: BigInt;
   attachments: string[];
 };
