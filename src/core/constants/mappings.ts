@@ -52,7 +52,7 @@ export const ENV_TO_API_MAPPING: API_BY_ENV = {
     [DIMO_APIs.USER]: { url: "https://users-api.dimo.zone" },
     [DIMO_APIs.VALUATIONS]: { url: "https://valuations-api.dimo.zone" },
     [DIMO_APIs.VEHICLE_SIGNAL_DECODING]: { url: "https://vehicle-signal-decoding.dimo.zone" },
-    [DIMO_APIs.IPFS]: { url: "https://assets.dimo.xyz/ipfs" },
+    [DIMO_APIs.IPFS]: { url: "https://assets.dimo.org/ipfs" },
   },
   [ENVIRONMENT.DEV]: {
     [DIMO_APIs.ATTESTATION]: { url: "https://attestation-api.dev.dimo.zone" },
@@ -68,7 +68,7 @@ export const ENV_TO_API_MAPPING: API_BY_ENV = {
     [DIMO_APIs.USER]: { url: "https://users-api.dev.dimo.zone" },
     [DIMO_APIs.VALUATIONS]: { url: "https://valuations-api.dev.dimo.zone" },
     [DIMO_APIs.VEHICLE_SIGNAL_DECODING]: { url: "https://vehicle-signal-decoding.dev.dimo.zone" },
-    [DIMO_APIs.IPFS]: { url: "https://assets.dimo.xyz/ipfs" },
+    [DIMO_APIs.IPFS]: { url: "https://assets.dimo.org/ipfs" },
   },
 };
 

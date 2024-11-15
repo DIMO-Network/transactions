@@ -105,7 +105,7 @@ export type SACDTemplateInputs = {
   driverID: string;
   grantee: `0x${string}`;
   grantor: `0x${string}`;
-  permissions: bigint;
+  permissions: BigInt;
   expiration: BigInt;
   attachments: string[];
 };

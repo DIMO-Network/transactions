@@ -121,7 +121,7 @@ export const sacdPermissionValue = (sacdPerms: SACD_PERMISSIONS): bigint => {
   return BigInt(`0b${permissionString}`);
 };
 
-export const sacdPermissionArray = (permissionValue: bigint): string[] => {
+export const sacdPermissionArray = (permissionValue: BigInt): string[] => {
   const sacdPermArray: string[] = [];
 
   // Convert the bigint to a binary string
