@@ -41,12 +41,8 @@ export async function setVehiclePermissionsBulk(
   client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>,
   environment: string = "prod"
 ): Promise<`0x${string}`> {
-  if (arg.tokenIds.length != arg.sources.length) {
-    throw new Error("Unique signed source must be passed for each token id.");
-  }
-
   const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
-  const callData = arg.tokenIds.map((tokenId, idx) => {
+  const callData = arg.tokenIds.map((tokenId) => {
     return {
       to: contracts[ContractType.DIMO_SACD].address,
       value: BigInt(0),
@@ -59,7 +55,7 @@ export async function setVehiclePermissionsBulk(
           arg.grantee,
           arg.permissions,
           arg.expiration,
-          arg.sources[idx],
+          arg.source,
         ],
       }),
     };
