@@ -145,6 +145,8 @@ export const setVehiclePermissionsTransaction = async (
 export const generateSACDTemplate = async (args: SACDTemplateInputs): Promise<SACDTemplate> => {
   const templateId = uuidv4();
   const permissionArray = sacdPermissionArray(args.permissions);
+
+  const currentTime = new Date();
   const description = sacdDescription({
     driverID: args.driverID,
     appID: args.appID,
@@ -158,7 +160,7 @@ export const generateSACDTemplate = async (args: SACDTemplateInputs): Promise<SA
     id: templateId,
     type: "org.dimo.permission.grant.v1",
     datacontentype: "application/json",
-    time: new Date().toISOString(),
+    time: currentTime.toISOString(),
     data: {
       templateId: templateId,
       version: "1.0",
@@ -167,7 +169,7 @@ export const generateSACDTemplate = async (args: SACDTemplateInputs): Promise<SA
       scope: {
         permissions: permissionArray,
       },
-      effectiveAt: new Date().toISOString(),
+      effectiveAt: currentTime.toISOString(),
       expiresAt: new Date(Number(args.expiration) * 1000).toISOString(),
       attachments: args.attachments,
       description: description,
