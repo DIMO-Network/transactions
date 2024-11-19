@@ -12,6 +12,7 @@ export type VehcilePermissionDescription = {
   appName: string;
   expiration: BigInt;
   permissionArray: string[];
+  effectiveAt: string;
 };
 
 export type SetVehiclePermissions = {

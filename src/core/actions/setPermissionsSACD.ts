@@ -153,6 +153,7 @@ export const generateSACDTemplate = async (args: SACDTemplateInputs): Promise<SA
     appName: args.appName,
     expiration: args.expiration,
     permissionArray: permissionArray,
+    effectiveAt: currentTime.toISOString(),
   });
 
   const template: SACDTemplate = {
