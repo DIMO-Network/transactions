@@ -1,3 +1,5 @@
+import { Abi } from "viem";
+
 export type MintVehicleWithDeviceDefinition = {
   manufacturerNode: BigInt;
   owner: `0x${string}`;
@@ -115,4 +117,12 @@ export type DeriveKernelAddress = {
   accountAddress?: `0x${string}`;
   walletAddress?: `0x${string}`;
   waitForReceipt?: boolean;
+};
+
+export type TransactionData = {
+  address: `0x${string}`;
+  value: BigInt;
+  abi: Abi;
+  functionName: string;
+  args: any[];
 };

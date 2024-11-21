@@ -44,6 +44,7 @@ import {
   SendDIMOTokens,
   SetVehiclePermissions,
   SetVehiclePermissionsBulk,
+  TransactionData,
   TransferVehicleAndAftermarketDeviceIDs,
   UnPairAftermarketDevice,
 } from ":core/types/args.js";
@@ -64,6 +65,7 @@ import { ApiKeyStamper } from "@turnkey/api-key-stamper";
 import { generateP256KeyPair, decryptBundle, getPublicKey } from "@turnkey/crypto";
 import { uint8ArrayToHexString, uint8ArrayFromHexString } from "@turnkey/encoding";
 import { claimAndPairDevice } from ":core/actions/claimAndPair.js";
+import { executeTransaction, executeTransactionBatch } from ":core/actions/executeTransaction.js";
 
 export class KernelSigner {
   config: _kernelConfig;
@@ -115,6 +117,7 @@ export class KernelSigner {
   };
   authBaseUrl: string;
   ifpsUrl: string;
+  activeClient: boolean = false;
 
   constructor(config: KernelConfig) {
     this.config = config as _kernelConfig;
@@ -165,8 +168,27 @@ export class KernelSigner {
       client: undefined,
       initialized: false,
     };
-
+    this.activeClient = false;
     return true;
+  }
+
+  public hasActiveSession(): boolean {
+    if (this.config.usePrivateKey) {
+      return true;
+    }
+
+    if (new Date(this.apiSessionClient.expires) > new Date(Date.now())) {
+      return true;
+    } else if (this.config.useWalletSession) {
+      if (new Date(this.passkeySessionClient.expires) > new Date(Date.now())) {
+        return true;
+      }
+      if (this.passkeyClient.valid) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   public async getActiveClient(): Promise<
@@ -219,6 +241,7 @@ export class KernelSigner {
     );
 
     this.passkeyClient.valid = true;
+    this.activeClient = true;
     return;
   }
 
@@ -275,7 +298,7 @@ export class KernelSigner {
       subOrganizationId,
       this.walletAddress!
     );
-
+    this.activeClient = true;
     return;
   }
 
@@ -326,6 +349,7 @@ export class KernelSigner {
       this.walletAddress!
     );
     this.passkeySessionClient.expires = expiration;
+    this.activeClient = true;
     return;
   }
 
@@ -351,6 +375,7 @@ export class KernelSigner {
     );
     this.apiSessionClient.expires = expiration;
     this.apiSessionClient.initialized = true;
+    this.activeClient = true;
     return;
   }
 
@@ -455,6 +480,7 @@ export class KernelSigner {
     });
 
     this.kernelAddress = account.address;
+    this.activeClient = true;
   }
 
   public async mintVehicleWithDeviceDefinition(
@@ -502,7 +528,7 @@ export class KernelSigner {
       setVehiclePermissionsCallData = await setVehiclePermissions(args, client, this.config.environment);
     } else {
       if (args.length >= 25) {
-        throw Error("Batch minting limit: 25");
+        throw Error("Batch vehicle permission limit: 25");
       }
       setVehiclePermissionsCallData = await setVehiclePermissionsBatch(args, client, this.config.environment);
     }
@@ -655,7 +681,7 @@ export class KernelSigner {
       burnVehicleCallData = await burnVehicle(args, client, this.config.environment);
     } else {
       if (args.length >= 25) {
-        throw Error("Batch minting limit: 25");
+        throw Error("Batch vehicle burn limit: 25");
       }
       burnVehicleCallData = await burnVehicleBatch(args, client, this.config.environment);
     }
@@ -945,5 +971,39 @@ export class KernelSigner {
     });
 
     return kernelAddress;
+  }
+
+  public async executeTransaction(
+    args: TransactionData | TransactionData[],
+    waitForReceipt: boolean = true
+  ): Promise<GetUserOperationReceiptReturnType> {
+    const client = await this.getActiveClient();
+
+    let transactionCallData: `0x${string}`;
+    if (!Array.isArray(args)) {
+      transactionCallData = await executeTransaction(args, client);
+    } else {
+      if (args.length >= 25) {
+        throw Error("Batch transaction limit: 25");
+      }
+      transactionCallData = await executeTransactionBatch(args, client);
+    }
+
+    let userOpHash: `0x${string}`;
+
+    userOpHash = await client.sendUserOperation({
+      userOperation: {
+        callData: transactionCallData as `0x${string}`,
+      },
+    });
+
+    if (waitForReceipt) {
+      return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    };
   }
 }
