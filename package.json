@@ -1,6 +1,6 @@
 {
   "name": "@dimo-network/transactions",
-  "version": "0.1.70",
+  "version": "0.1.71",
   "description": "DIMO Transactions SDK",
   "keywords": [
     "DIMO"
@@ -22,11 +22,10 @@
     "@turnkey/http": "^2.13.0",
     "@turnkey/viem": "^0.4.30",
     "@zerodev/ecdsa-validator": "^5.3.2",
-    "@zerodev/sdk": "^5.3.13",
+    "@zerodev/sdk": "^5.4.0",
     "ethers": "^6.13.3",
-    "permissionless": "^0.1.45",
     "uuid": "^11.0.2",
-    "viem": "^2.21.6"
+    "viem": "^2.21.49"
   },
   "devDependencies": {
     "@babel/core": "^7.22.9",

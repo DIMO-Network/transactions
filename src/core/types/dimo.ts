@@ -1,5 +1,6 @@
-import { KERNEL_V2_VERSION_TYPE, KERNEL_V3_VERSION_TYPE } from "@zerodev/sdk/types";
+import { EntryPointType, KERNEL_V2_VERSION_TYPE, KERNEL_V3_VERSION_TYPE } from "@zerodev/sdk/types";
 import { Abi, Account } from "viem";
+import { EntryPointVersion, GetUserOperationReceiptReturnType } from "viem/account-abstraction";
 import { Chain, polygon, polygonAmoy } from "viem/chains";
 export const SUPPORTED_CHAINS: Chain[] = [polygonAmoy, polygon];
 
@@ -11,8 +12,8 @@ export type KernelConfig = {
   domain: string;
   redirectUri: string;
   turnkeyApiBaseUrl?: string;
-  entryPoint?: `0x${string}`;
-  kernelVersion?: KERNEL_V3_VERSION_TYPE | KERNEL_V2_VERSION_TYPE;
+  entryPoint?: EntryPointType<EntryPointVersion>;
+  kernelVersion?: KERNEL_V3_VERSION_TYPE;
   environment?: string;
   useWalletSession?: boolean;
   sessionTimeoutSeconds?: string; // seconds
@@ -24,8 +25,8 @@ export type _kernelConfig = {
   bundlerUrl: string;
   paymasterUrl: string;
   turnkeyApiBaseUrl: string;
-  entryPoint: `0x${string}`;
-  kernelVersion: KERNEL_V3_VERSION_TYPE | KERNEL_V2_VERSION_TYPE;
+  entryPoint: EntryPointType<EntryPointVersion>;
+  kernelVersion: KERNEL_V3_VERSION_TYPE;
   environment: string;
   useWalletSession: boolean;
   sessionTimeoutSeconds: string;
@@ -52,7 +53,7 @@ export type PasskeySignerConfig = {
   bundlerUrl: string;
   paymasterUrl: string;
   turnkeyApiBaseUrl: string;
-  entryPoint: `0x${string}`;
+  entryPoint: EntryPointType<EntryPointVersion>;
   kernelVersion: KERNEL_V3_VERSION_TYPE | KERNEL_V2_VERSION_TYPE;
   environment: string;
   subOrganizationId: string;
@@ -166,4 +167,9 @@ export type SACDTemplateSigned = {
     attachments: string[];
     description: string;
   };
+};
+
+export type TransactionReturnType = GetUserOperationReceiptReturnType & {
+  userOperationHash?: string;
+  status?: string;
 };

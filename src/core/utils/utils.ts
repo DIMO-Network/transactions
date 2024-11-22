@@ -1,7 +1,6 @@
 import { SACD_PERMISSIONS, VehcilePermissionDescription } from ":core/types/args.js";
 import { AccountConfig, KernelConfig, _accountConfig, _kernelConfig } from ":core/types/dimo.js";
-import { KERNEL_V3_1 } from "@zerodev/sdk/constants";
-import { entryPoint07Address } from "viem/account-abstraction";
+import { KERNEL_V3_1, getEntryPoint } from "@zerodev/sdk/constants";
 
 export const newKernelConfig = (args: KernelConfig): _kernelConfig => {
   if (args.rpcUrl == undefined) {
@@ -21,7 +20,7 @@ export const newKernelConfig = (args: KernelConfig): _kernelConfig => {
   }
 
   if (args.entryPoint == undefined) {
-    args.entryPoint = entryPoint07Address;
+    args.entryPoint = getEntryPoint("0.7");
   }
 
   if (args.kernelVersion == undefined) {

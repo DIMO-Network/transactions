@@ -4,19 +4,17 @@ import {
   ENVIRONMENT,
   KernelConfig,
   SACDTemplateSigned,
+  TransactionReturnType,
   _kernelConfig,
 } from ":core/types/dimo.js";
-import { Chain, PublicClient, Transport, createPublicClient, createWalletClient, http } from "viem";
+import { Chain, PublicClient, createPublicClient, createWalletClient, http } from "viem";
 import {
   KernelAccountClient,
-  KernelSmartAccount,
   createKernelAccount,
   createKernelAccountClient,
   createZeroDevPaymasterClient,
-  getCustomNonceKeyFromString,
 } from "@zerodev/sdk";
-import { EntryPoint } from "permissionless/types";
-import { BundlerClient, GetUserOperationReceiptReturnType, createBundlerClient } from "permissionless";
+import type { BundlerClient } from "viem/account-abstraction";
 import {
   mintVehicleWithDeviceDefinition,
   mintVehicleWithDeviceDefinitionBatch,
@@ -27,13 +25,7 @@ import {
   setVehiclePermissionsBatch,
   setVehiclePermissionsBulk,
 } from ":core/actions/setPermissionsSACD.js";
-import {
-  CHAIN_ABI_MAPPING,
-  ENV_MAPPING,
-  ENV_NETWORK_MAPPING,
-  ENV_TO_API_MAPPING,
-  OnChainErrors,
-} from ":core/constants/mappings.js";
+import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING, ENV_TO_API_MAPPING } from ":core/constants/mappings.js";
 import {
   BurnVehicle,
   ClaimAftermarketdevice,
@@ -56,7 +48,6 @@ import { TurnkeyClient } from "@turnkey/http";
 import { polygon } from "viem/chains";
 import { burnVehicle, burnVehicleBatch } from ":core/actions/burnVehicle.js";
 import { createAccount } from "@turnkey/viem";
-import { walletClientToSmartAccountSigner } from "permissionless/utils";
 import { getKernelAddressFromECDSA, signerToEcdsaValidator } from "@zerodev/ecdsa-validator";
 import { privateKeyToAccount } from "viem/accounts";
 import { transferVehicleAndAftermarketDeviceIDs } from ":core/actions/transferVehicleAndADs.js";
@@ -66,11 +57,12 @@ import { generateP256KeyPair, decryptBundle, getPublicKey } from "@turnkey/crypt
 import { uint8ArrayToHexString, uint8ArrayFromHexString } from "@turnkey/encoding";
 import { claimAndPairDevice } from ":core/actions/claimAndPair.js";
 import { executeTransaction, executeTransactionBatch } from ":core/actions/executeTransaction.js";
+import { createBundlerClient } from "viem/account-abstraction";
 
 export class KernelSigner {
   config: _kernelConfig;
   publicClient: PublicClient;
-  bundlerClient: BundlerClient<EntryPoint, Chain | undefined>;
+  bundlerClient: BundlerClient;
   contractMapping: ContractToMapping;
   chain: Chain;
   kernelAddress: `0x${string}` | undefined;
@@ -79,7 +71,7 @@ export class KernelSigner {
   smartContractAddress: `0x${string}` | undefined;
   apiSessionClient: {
     expires: number;
-    client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>;
+    client: KernelAccountClient | undefined;
     initialized: boolean;
   } = {
     client: undefined,
@@ -89,7 +81,7 @@ export class KernelSigner {
   passkeyClient: {
     turnkeyClient: TurnkeyClient | undefined;
     valid: boolean;
-    client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>;
+    client: KernelAccountClient | undefined;
     initialized: boolean;
   } = {
     turnkeyClient: undefined,
@@ -99,7 +91,7 @@ export class KernelSigner {
   };
   passkeySessionClient: {
     expires: number;
-    client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>;
+    client: KernelAccountClient | undefined;
     initialized: boolean;
   } = {
     expires: 0,
@@ -108,7 +100,7 @@ export class KernelSigner {
   };
   privateKeyClient: {
     valid: boolean;
-    client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>;
+    client: KernelAccountClient | undefined;
     initialized: boolean;
   } = {
     valid: false,
@@ -137,7 +129,6 @@ export class KernelSigner {
     this.bundlerClient = createBundlerClient({
       chain: this.chain,
       transport: http(this.config.bundlerUrl),
-      entryPoint: this.config.entryPoint,
     });
   }
 
@@ -191,27 +182,35 @@ export class KernelSigner {
     return false;
   }
 
-  public async getActiveClient(): Promise<
-    KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>
-  > {
+  public async getActiveClient(): Promise<KernelAccountClient> {
     if (this.config.usePrivateKey) {
-      return this.privateKeyClient.client;
+      if (this.privateKeyClient.client) {
+        return this.privateKeyClient.client;
+      }
     }
 
     if (new Date(this.apiSessionClient.expires) > new Date(Date.now())) {
-      return this.apiSessionClient.client;
+      if (this.apiSessionClient.client) {
+        return this.apiSessionClient.client;
+      }
     } else if (this.config.useWalletSession) {
       if (new Date(this.passkeySessionClient.expires) > new Date(Date.now())) {
-        return this.passkeySessionClient.client;
+        if (this.passkeySessionClient.client) {
+          return this.passkeySessionClient.client;
+        }
       }
       try {
         await this.openSessionWithPasskey();
         if (new Date(this.passkeySessionClient.expires) > new Date(Date.now())) {
-          return this.passkeySessionClient.client;
+          if (this.passkeySessionClient.client) {
+            return this.passkeySessionClient.client;
+          }
         }
       } catch {
         if (this.passkeyClient.valid) {
-          return this.passkeyClient.client;
+          if (this.passkeyClient.client) {
+            return this.passkeyClient.client;
+          }
         }
       }
     }
@@ -219,11 +218,11 @@ export class KernelSigner {
     throw new Error("No active client");
   }
 
-  public async getPasskeyClient(): Promise<
-    KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>
-  > {
+  public async getPasskeyClient(): Promise<KernelAccountClient> {
     if (this.passkeyClient.valid) {
-      return this.passkeyClient.client;
+      if (this.passkeyClient.client) {
+        return this.passkeyClient.client;
+      }
     }
 
     throw new Error("Passkey client not initialized");
@@ -389,10 +388,10 @@ export class KernelSigner {
     turnkeyClient: TurnkeyClient,
     subOrganizationId: string,
     walletAddress: `0x${string}`
-  ): Promise<KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>> {
+  ): Promise<KernelAccountClient> {
     const localAccount = await createAccount({
       // @ts-ignore
-      client: turnkeyClient as any,
+      client: turnkeyClient,
       organizationId: subOrganizationId,
       signWith: walletAddress,
       ethereumAddress: walletAddress,
@@ -404,11 +403,9 @@ export class KernelSigner {
       transport: http(this.config.rpcUrl),
     });
 
-    const smartAccountSigner = walletClientToSmartAccountSigner(smartAccountClient);
     const ecdsaValidator = await signerToEcdsaValidator(this.publicClient, {
-      signer: smartAccountSigner,
+      signer: smartAccountClient,
       entryPoint: this.config.entryPoint,
-      // @ts-ignore
       kernelVersion: this.config.kernelVersion,
     });
 
@@ -417,30 +414,25 @@ export class KernelSigner {
         sudo: ecdsaValidator,
       },
       entryPoint: this.config.entryPoint,
-      // @ts-ignore
       kernelVersion: this.config.kernelVersion,
     });
 
     this.kernelAddress = account.address;
     this.smartContractAddress = account.address;
     this.walletAddress = walletAddress;
-
+    const chain = this.chain;
+    const paymasterUrl = this.config.paymasterUrl;
     return createKernelAccountClient({
       account,
       chain: this.chain,
-      entryPoint: this.config.entryPoint,
       bundlerTransport: http(this.config.bundlerUrl),
-      middleware: {
-        sponsorUserOperation: async ({ userOperation }) => {
-          const zerodevPaymaster = createZeroDevPaymasterClient({
-            chain: this.chain,
-            entryPoint: this.config.entryPoint,
-            transport: http(this.config.paymasterUrl),
+      paymaster: {
+        getPaymasterData(userOperation) {
+          const paymasterClient = createZeroDevPaymasterClient({
+            chain: chain,
+            transport: http(paymasterUrl),
           });
-          return zerodevPaymaster.sponsorUserOperation({
-            userOperation,
-            entryPoint: this.config.entryPoint,
-          });
+          return paymasterClient.sponsorUserOperation({ userOperation });
         },
       },
     });
@@ -450,7 +442,6 @@ export class KernelSigner {
     const ecdsaValidator = await signerToEcdsaValidator(this.publicClient, {
       signer: privateKeyToAccount(privateKey),
       entryPoint: this.config.entryPoint,
-      // @ts-ignore
       kernelVersion: this.config.kernelVersion,
     });
 
@@ -459,28 +450,24 @@ export class KernelSigner {
         sudo: ecdsaValidator,
       },
       entryPoint: this.config.entryPoint,
-      // @ts-ignore
       kernelVersion: this.config.kernelVersion,
     });
 
     this.privateKeyClient.valid = true;
+
+    const chain = this.chain;
+    const paymasterUrl = this.config.paymasterUrl;
     this.privateKeyClient.client = createKernelAccountClient({
       account,
       chain: this.chain,
-      entryPoint: this.config.entryPoint,
       bundlerTransport: http(this.config.bundlerUrl),
-      middleware: {
-        // @ts-ignore
-        sponsorUserOperation: async ({ userOperation }) => {
-          const zerodevPaymaster = createZeroDevPaymasterClient({
-            chain: this.chain,
-            entryPoint: this.config.entryPoint,
-            transport: http(this.config.paymasterUrl),
+      paymaster: {
+        getPaymasterData(userOperation) {
+          const paymasterClient = createZeroDevPaymasterClient({
+            chain: chain,
+            transport: http(paymasterUrl),
           });
-          return zerodevPaymaster.sponsorUserOperation({
-            userOperation,
-            entryPoint: this.config.entryPoint,
-          });
+          return paymasterClient.sponsorUserOperation({ userOperation });
         },
       },
     });
@@ -492,7 +479,7 @@ export class KernelSigner {
   public async mintVehicleWithDeviceDefinition(
     args: MintVehicleWithDeviceDefinition | MintVehicleWithDeviceDefinition[],
     waitForReceipt: boolean = true
-  ): Promise<GetUserOperationReceiptReturnType & { userOperationHash: string }> {
+  ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     let mintVehicleCallData: `0x${string}`;
     if (!Array.isArray(args)) {
@@ -504,15 +491,8 @@ export class KernelSigner {
       mintVehicleCallData = await mintVehicleWithDeviceDefinitionBatch(args, client, this.config.environment);
     }
 
-    const nonceKey = getCustomNonceKeyFromString(Date.now().toString(), this.config.entryPoint);
-    const nonce = await client.account.getNonce(nonceKey);
-
-    const userOpHash = await client.sendUserOperation({
-      userOperation: {
-        callData: mintVehicleCallData as `0x${string}`,
-        nonce: nonce,
-      },
-    });
+    const nonce = await client.account!.getNonce();
+    const userOpHash = await client.sendUserOperation({ callData: mintVehicleCallData, nonce });
 
     if (waitForReceipt) {
       return await this.bundlerClient.waitForUserOperationReceipt({
@@ -523,13 +503,13 @@ export class KernelSigner {
     return {
       userOperationHash: userOpHash,
       status: "pending",
-    };
+    } as TransactionReturnType;
   }
 
   public async setVehiclePermissions(
     args: SetVehiclePermissions | SetVehiclePermissions[],
     waitForReceipt: boolean = true
-  ): Promise<GetUserOperationReceiptReturnType> {
+  ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     let setVehiclePermissionsCallData: `0x${string}`;
     if (!Array.isArray(args)) {
@@ -542,9 +522,7 @@ export class KernelSigner {
     }
 
     const userOpHash = await client.sendUserOperation({
-      userOperation: {
-        callData: setVehiclePermissionsCallData as `0x${string}`,
-      },
+      callData: setVehiclePermissionsCallData as `0x${string}`,
     });
 
     if (waitForReceipt) {
@@ -556,20 +534,18 @@ export class KernelSigner {
     return {
       userOperationHash: userOpHash,
       status: "pending",
-    };
+    } as TransactionReturnType;
   }
 
   public async setVehiclePermissionsBulk(
     args: SetVehiclePermissionsBulk,
     waitForReceipt: boolean = true
-  ): Promise<GetUserOperationReceiptReturnType> {
+  ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const setVehiclePermissionsBulkCallData = await setVehiclePermissionsBulk(args, client, this.config.environment);
 
     const userOpHash = await client.sendUserOperation({
-      userOperation: {
-        callData: setVehiclePermissionsBulkCallData as `0x${string}`,
-      },
+      callData: setVehiclePermissionsBulkCallData as `0x${string}`,
     });
 
     if (waitForReceipt) {
@@ -581,22 +557,15 @@ export class KernelSigner {
     return {
       userOperationHash: userOpHash,
       status: "pending",
-    };
+    } as TransactionReturnType;
   }
 
-  public async sendDIMOTokens(
-    args: SendDIMOTokens,
-    waitForReceipt: boolean = true
-  ): Promise<GetUserOperationReceiptReturnType> {
-    if (!this.passkeyClient.valid) {
-      throw new Error("Tokens must be sent with passkey client");
-    }
+  public async sendDIMOTokens(args: SendDIMOTokens, waitForReceipt: boolean = true): Promise<TransactionReturnType> {
+    const client = await this.getPasskeyClient();
 
-    const sendDIMOTokensCallData = await sendDIMOTokens(args, this.passkeyClient.client, this.config.environment);
-    const userOpHash = await this.passkeyClient.client.sendUserOperation({
-      userOperation: {
-        callData: sendDIMOTokensCallData as `0x${string}`,
-      },
+    const sendDIMOTokensCallData = await sendDIMOTokens(args, client, this.config.environment);
+    const userOpHash = await client.sendUserOperation({
+      callData: sendDIMOTokensCallData as `0x${string}`,
     });
 
     if (waitForReceipt) {
@@ -608,7 +577,7 @@ export class KernelSigner {
     return {
       userOperationHash: userOpHash,
       status: "pending",
-    };
+    } as TransactionReturnType;
   }
 
   public claimAftermarketDeviceTypeHash(aftermarketDeviceNode: bigint, owner: `0x${string}`): TypeHashResponse {
@@ -618,14 +587,12 @@ export class KernelSigner {
   public async claimAftermarketDevice(
     args: ClaimAftermarketdevice,
     waitForReceipt: boolean = true
-  ): Promise<GetUserOperationReceiptReturnType> {
+  ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
     const claimADCallData = await claimAftermarketDevice(args, client, this.config.environment);
     const userOpHash = await client.sendUserOperation({
-      userOperation: {
-        callData: claimADCallData as `0x${string}`,
-      },
+      callData: claimADCallData as `0x${string}`,
     });
 
     if (waitForReceipt) {
@@ -637,20 +604,18 @@ export class KernelSigner {
     return {
       userOperationHash: userOpHash,
       status: "pending",
-    };
+    } as TransactionReturnType;
   }
 
   public async pairAftermarketDevice(
     args: PairAftermarketDevice,
     waitForReceipt: boolean = true
-  ): Promise<GetUserOperationReceiptReturnType> {
+  ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
     const pairADCallData = await pairAftermarketDevice(args, client, this.config.environment);
     const userOpHash = await client.sendUserOperation({
-      userOperation: {
-        callData: pairADCallData as `0x${string}`,
-      },
+      callData: pairADCallData as `0x${string}`,
     });
 
     if (waitForReceipt) {
@@ -662,20 +627,18 @@ export class KernelSigner {
     return {
       userOperationHash: userOpHash,
       status: "pending",
-    };
+    } as TransactionReturnType;
   }
 
   public async claimAndPairAftermarketDevice(
     args: ClaimAftermarketdevice & PairAftermarketDevice,
     waitForReceipt: boolean = true
-  ): Promise<GetUserOperationReceiptReturnType> {
+  ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
     const claimAndPairCallData = await claimAndPairDevice(args, client, this.config.environment);
     const userOpHash = await client.sendUserOperation({
-      userOperation: {
-        callData: claimAndPairCallData as `0x${string}`,
-      },
+      callData: claimAndPairCallData as `0x${string}`,
     });
 
     if (waitForReceipt) {
@@ -687,13 +650,13 @@ export class KernelSigner {
     return {
       userOperationHash: userOpHash,
       status: "pending",
-    };
+    } as TransactionReturnType;
   }
 
   public async burnVehicle(
     args: BurnVehicle | BurnVehicle[],
     waitForReceipt: boolean = true
-  ): Promise<GetUserOperationReceiptReturnType> {
+  ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
     let burnVehicleCallData: `0x${string}`;
@@ -706,48 +669,31 @@ export class KernelSigner {
       burnVehicleCallData = await burnVehicleBatch(args, client, this.config.environment);
     }
 
-    let userOpHash: `0x${string}`;
-    try {
-      userOpHash = await client.sendUserOperation({
-        userOperation: {
-          callData: burnVehicleCallData as `0x${string}`,
-        },
+    const userOpHash = await client.sendUserOperation({
+      callData: burnVehicleCallData as `0x${string}`,
+    });
+
+    if (waitForReceipt) {
+      return await this.bundlerClient.waitForUserOperationReceipt({
+        hash: userOpHash,
       });
-
-      if (waitForReceipt) {
-        return await this.bundlerClient.waitForUserOperationReceipt({
-          hash: userOpHash,
-        });
-      }
-
-      return {
-        userOperationHash: userOpHash,
-        status: "pending",
-      };
-    } catch (error: any) {
-      if (error) {
-        error = error.toString();
-      }
-      for (const [failReason, cleanError] of Object.entries(OnChainErrors)) {
-        if (error.includes(failReason)) {
-          throw new Error(cleanError);
-        }
-        throw new Error(error);
-      }
     }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    } as TransactionReturnType;
   }
 
   public async transferVehicleAndAftermarketDevices(
     args: TransferVehicleAndAftermarketDeviceIDs,
     waitForReceipt: boolean = true
-  ): Promise<GetUserOperationReceiptReturnType> {
+  ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
     const burnVehicleCallData = await transferVehicleAndAftermarketDeviceIDs(args, client, this.config.environment);
     const userOpHash = await client.sendUserOperation({
-      userOperation: {
-        callData: burnVehicleCallData as `0x${string}`,
-      },
+      callData: burnVehicleCallData as `0x${string}`,
     });
 
     if (waitForReceipt) {
@@ -759,19 +705,17 @@ export class KernelSigner {
     return {
       userOperationHash: userOpHash,
       status: "pending",
-    };
+    } as TransactionReturnType;
   }
 
   public async unpairAftermarketDevice(
     args: UnPairAftermarketDevice,
     waitForReceipt: boolean = true
-  ): Promise<GetUserOperationReceiptReturnType> {
+  ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const unpairADCallData = await unpairAftermarketDevice(args, client, this.config.environment);
     const userOpHash = await client.sendUserOperation({
-      userOperation: {
-        callData: unpairADCallData as `0x${string}`,
-      },
+      callData: unpairADCallData as `0x${string}`,
     });
 
     if (waitForReceipt) {
@@ -783,30 +727,18 @@ export class KernelSigner {
     return {
       userOperationHash: userOpHash,
       status: "pending",
-    };
+    } as TransactionReturnType;
   }
 
   public async signTypedData(arg: any): Promise<any> {
-    const client = (await this.getActiveClient()) as KernelAccountClient<
-      EntryPoint,
-      Transport,
-      Chain,
-      KernelSmartAccount<EntryPoint, Transport, Chain>
-    >;
-
+    const client = await this.getActiveClient();
     return client.signTypedData(arg);
   }
 
   public async signChallenge(challenge: string): Promise<`0x${string}`> {
-    let client = (await this.getActiveClient()) as KernelAccountClient<
-      EntryPoint,
-      Transport,
-      Chain,
-      KernelSmartAccount<EntryPoint, Transport, Chain>
-    >;
-
+    const client = await this.getActiveClient();
     return client.signMessage({
-      account: client.account,
+      account: client.account!.address,
       message: challenge,
     });
   }
@@ -898,7 +830,7 @@ export class KernelSigner {
   public async getJWT(address?: string): Promise<{ success: boolean; error?: string; data?: any }> {
     if (!address) {
       const client = await this.getActiveClient();
-      address = client.account.address as string;
+      address = client.account!.address as string;
     }
 
     const challengeResponse = await this.generateChallenge(this.config.clientId, this.config.domain, address!);
@@ -968,7 +900,7 @@ export class KernelSigner {
     }
   }
 
-  public async getUserOperationReceipt(userOperationHash: `0x${string}`): Promise<GetUserOperationReceiptReturnType> {
+  public async getUserOperationReceipt(userOperationHash: `0x${string}`): Promise<TransactionReturnType> {
     const txResult = await this.bundlerClient.waitForUserOperationReceipt({
       hash: userOperationHash,
     });
@@ -1003,7 +935,6 @@ export class KernelSigner {
   public async deriveKernelAddress(walletAddress: `0x${string}`, number: number = 0): Promise<`0x${string}`> {
     const kernelAddress = await getKernelAddressFromECDSA({
       entryPointAddress: this.config.entryPoint,
-      // @ts-ignore
       kernelVersion: this.config.kernelVersion,
       eoaAddress: walletAddress,
       index: BigInt(number),
@@ -1016,7 +947,7 @@ export class KernelSigner {
   public async executeTransaction(
     args: TransactionInput,
     waitForReceipt: boolean = true
-  ): Promise<GetUserOperationReceiptReturnType> {
+  ): Promise<TransactionReturnType> {
     let client = await this.getActiveClient();
     if (args.requireSignature) {
       client = await this.getPasskeyClient();
@@ -1033,9 +964,7 @@ export class KernelSigner {
     }
 
     const userOpHash = await client.sendUserOperation({
-      userOperation: {
-        callData: transactionCallData as `0x${string}`,
-      },
+      callData: transactionCallData as `0x${string}`,
     });
 
     if (waitForReceipt) {
@@ -1047,6 +976,6 @@ export class KernelSigner {
     return {
       userOperationHash: userOpHash,
       status: "pending",
-    };
+    } as TransactionReturnType;
   }
 }

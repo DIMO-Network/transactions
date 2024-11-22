@@ -1,7 +1,6 @@
-import { Chain, Transport, encodeFunctionData } from "viem";
-import { ContractToMapping, ContractType, ENVIRONMENT, KernelConfig, SACDTemplate } from ":core/types/dimo.js";
-import { KernelAccountClient, KernelSmartAccount } from "@zerodev/sdk";
-import { EntryPoint } from "permissionless/types";
+import { encodeFunctionData } from "viem";
+import { ContractToMapping, ContractType, ENVIRONMENT, SACDTemplate } from ":core/types/dimo.js";
+import { KernelAccountClient } from "@zerodev/sdk";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
 import { SET_PERMISSIONS_SACD } from ":core/constants/methods.js";
 import {
@@ -10,15 +9,12 @@ import {
   SetVehiclePermissions,
   SetVehiclePermissionsBulk,
 } from ":core/types/args.js";
-import { GetUserOperationReceiptReturnType } from "permissionless";
-import { KernelEncodeCallDataArgs } from "@zerodev/sdk/types";
-import { executeTransaction } from ":core/transactions/execute.js";
 import { v4 as uuidv4 } from "uuid";
 import { sacdDescription, sacdPermissionArray } from ":core/utils/utils.js";
 
 export async function setVehiclePermissions(
   args: SetVehiclePermissions,
-  client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>,
+  client: KernelAccountClient,
   environment: string = "prod"
 ): Promise<`0x${string}`> {
   const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
@@ -38,7 +34,7 @@ export async function setVehiclePermissions(
 
 export async function setVehiclePermissionsBulk(
   arg: SetVehiclePermissionsBulk,
-  client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>,
+  client: KernelAccountClient,
   environment: string = "prod"
 ): Promise<`0x${string}`> {
   const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
@@ -61,12 +57,12 @@ export async function setVehiclePermissionsBulk(
     };
   });
 
-  return await client.account.encodeCallData(callData);
+  return await client.account!.encodeCalls(callData);
 }
 
 export async function setVehiclePermissionsBatch(
   args: SetVehiclePermissions[],
-  client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>,
+  client: KernelAccountClient,
   environment: string = "prod"
 ): Promise<`0x${string}`> {
   const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
@@ -89,23 +85,25 @@ export async function setVehiclePermissionsBatch(
     };
   });
 
-  return await client.account.encodeCallData(callData);
+  return await client.account!.encodeCalls(callData);
 }
 
 export async function setPermissionsSACD(
   args: SetPermissionsSACD,
-  client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>,
+  client: KernelAccountClient,
   contracts: ContractToMapping
 ): Promise<`0x${string}`> {
-  return await client.account.encodeCallData({
-    to: contracts[ContractType.DIMO_SACD].address,
-    value: BigInt(0),
-    data: encodeFunctionData({
-      abi: contracts[ContractType.DIMO_SACD].abi,
-      functionName: SET_PERMISSIONS_SACD,
-      args: [args.asset, args.tokenId, args.grantee, args.permissions, args.expiration, args.source],
-    }),
-  });
+  return await client.account!.encodeCalls([
+    {
+      to: contracts[ContractType.DIMO_SACD].address,
+      value: BigInt(0),
+      data: encodeFunctionData({
+        abi: contracts[ContractType.DIMO_SACD].abi,
+        functionName: SET_PERMISSIONS_SACD,
+        args: [args.asset, args.tokenId, args.grantee, args.permissions, args.expiration, args.source],
+      }),
+    },
+  ]);
 }
 
 export function sacdCallData(args: SetPermissionsSACD, environment: string = "prod"): `0x${string}` {
@@ -116,31 +114,6 @@ export function sacdCallData(args: SetPermissionsSACD, environment: string = "pr
     args: [args.asset, args.tokenId, args.grantee, args.permissions, args.expiration, args.source],
   });
 }
-
-export const setVehiclePermissionsTransaction = async (
-  args: SetVehiclePermissions,
-  subOrganizationId: string,
-  walletAddress: string,
-  passkeyStamper: any,
-  config: KernelConfig
-): Promise<GetUserOperationReceiptReturnType> => {
-  const env = ENV_MAPPING.get(config.environment ?? "prod") ?? ENVIRONMENT.PROD;
-  const contracts = CHAIN_ABI_MAPPING[env].contracts;
-
-  const sacdArgs = args as SetPermissionsSACD;
-  sacdArgs.asset = contracts[ContractType.DIMO_VEHICLE_ID].address;
-
-  const txData: KernelEncodeCallDataArgs = {
-    callType: "call",
-    to: contracts[ContractType.DIMO_SACD].address,
-    value: BigInt("0"),
-    data: sacdCallData(sacdArgs, config.environment),
-  };
-
-  const resp = await executeTransaction(subOrganizationId, walletAddress, txData, passkeyStamper, config);
-
-  return resp;
-};
 
 export const generateSACDTemplate = async (args: SACDTemplateInputs): Promise<SACDTemplate> => {
   const templateId = uuidv4();

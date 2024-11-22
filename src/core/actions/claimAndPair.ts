@@ -1,18 +1,17 @@
-import { Chain, Transport, encodeFunctionData } from "viem";
+import { encodeFunctionData } from "viem";
 import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
-import { KernelAccountClient, KernelSmartAccount } from "@zerodev/sdk";
-import { EntryPoint } from "permissionless/types";
+import { KernelAccountClient } from "@zerodev/sdk";
 import { CLAIM_AFTERMARKET_DEVICE, PAIR_AFTERMARKET_DEVICE } from ":core/constants/methods.js";
 import { ClaimAftermarketdevice, PairAftermarketDevice } from ":core/types/args.js";
 
 export const claimAndPairDevice = async (
   args: ClaimAftermarketdevice & PairAftermarketDevice,
-  client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>,
+  client: KernelAccountClient,
   environment: string = "prod"
 ): Promise<`0x${string}`> => {
   const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.DEV].contracts;
-  return await client.account.encodeCallData([
+  return await client.account!.encodeCalls([
     {
       to: contracts[ContractType.DIMO_REGISTRY].address,
       value: BigInt(0),

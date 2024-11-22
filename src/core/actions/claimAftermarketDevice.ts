@@ -1,8 +1,7 @@
-import { Chain, Transport, encodeFunctionData } from "viem";
-import { ContractType, ENVIRONMENT, KernelConfig } from ":core/types/dimo.js";
+import { encodeFunctionData } from "viem";
+import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING } from ":core/constants/mappings.js";
-import { KernelAccountClient, KernelSmartAccount } from "@zerodev/sdk";
-import { EntryPoint } from "permissionless/types";
+import { KernelAccountClient } from "@zerodev/sdk";
 import { CLAIM_AFTERMARKET_DEVICE } from ":core/constants/methods.js";
 import { ClaimAftermarketdevice } from ":core/types/args.js";
 import { polygon } from "viem/chains";
@@ -17,9 +16,6 @@ import {
   DIMODomain,
   DIMODomainVersion,
 } from ":core/constants/dimo.js";
-import { GetUserOperationReceiptReturnType } from "permissionless";
-import { KernelEncodeCallDataArgs } from "@zerodev/sdk/types";
-import { executeTransaction } from ":core/transactions/execute.js";
 
 export const claimAftermarketDeviceTypeHash = (
   aftermarketDeviceNode: bigint,
@@ -66,41 +62,21 @@ export function claimAftermarketDeviceCallData(
   });
 }
 
-export const claimAftermarketDeviceTransaction = async (
-  args: ClaimAftermarketdevice,
-  subOrganizationId: string,
-  walletAddress: string,
-  passkeyStamper: any,
-  config: KernelConfig
-): Promise<GetUserOperationReceiptReturnType> => {
-  const env = ENV_MAPPING.get(config.environment ?? "prod") ?? ENVIRONMENT.PROD;
-  const contracts = CHAIN_ABI_MAPPING[env].contracts;
-
-  const txData: KernelEncodeCallDataArgs = {
-    callType: "call",
-    to: contracts[ContractType.DIMO_REGISTRY].address,
-    value: BigInt("0"),
-    data: claimAftermarketDeviceCallData(args, config.environment),
-  };
-
-  const resp = await executeTransaction(subOrganizationId, walletAddress, txData, passkeyStamper, config);
-
-  return resp;
-};
-
 export const claimAftermarketDevice = async (
   args: ClaimAftermarketdevice,
-  client: KernelAccountClient<EntryPoint, Transport, Chain, KernelSmartAccount<EntryPoint, Transport, Chain>>,
+  client: KernelAccountClient,
   environment: string = "prod"
 ): Promise<`0x${string}`> => {
   const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.DEV].contracts;
-  return await client.account.encodeCallData({
-    to: contracts[ContractType.DIMO_REGISTRY].address,
-    value: BigInt(0),
-    data: encodeFunctionData({
-      abi: contracts[ContractType.DIMO_REGISTRY].abi,
-      functionName: CLAIM_AFTERMARKET_DEVICE,
-      args: [args.aftermarketDeviceNode, args.aftermarketDeviceSig],
-    }),
-  });
+  return await client.account!.encodeCalls([
+    {
+      to: contracts[ContractType.DIMO_REGISTRY].address,
+      value: BigInt(0),
+      data: encodeFunctionData({
+        abi: contracts[ContractType.DIMO_REGISTRY].abi,
+        functionName: CLAIM_AFTERMARKET_DEVICE,
+        args: [args.aftermarketDeviceNode, args.aftermarketDeviceSig],
+      }),
+    },
+  ]);
 };
