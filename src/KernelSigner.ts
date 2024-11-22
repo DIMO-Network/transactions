@@ -280,7 +280,9 @@ export class KernelSigner {
     const turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, apiStamper);
     this.passkeySessionClient.expires = expiration;
     this.passkeySessionClient.initialized = true;
-    const wallets = await turnkeyClient.getWallets({ organizationId: subOrganizationId });
+    const wallets = await turnkeyClient.getWallets({
+      organizationId: subOrganizationId,
+    });
     const walletAddr = await turnkeyClient.getWalletAccounts({
       organizationId: subOrganizationId,
       walletId: wallets.wallets[0].walletId,
@@ -336,7 +338,9 @@ export class KernelSigner {
     });
 
     const turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, apiStamper);
-    const wallets = await turnkeyClient.getWallets({ organizationId: this.subOrganizationId! });
+    const wallets = await turnkeyClient.getWallets({
+      organizationId: this.subOrganizationId!,
+    });
     const walletAddr = await turnkeyClient.getWalletAccounts({
       organizationId: this.subOrganizationId!,
       walletId: wallets.wallets[0].walletId,
@@ -359,7 +363,9 @@ export class KernelSigner {
 
     const turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, apiStamper);
 
-    const wallets = await turnkeyClient.getWallets({ organizationId: subOrganizationId });
+    const wallets = await turnkeyClient.getWallets({
+      organizationId: subOrganizationId,
+    });
     const walletAddr = await turnkeyClient.getWalletAccounts({
       organizationId: subOrganizationId,
       walletId: wallets.wallets[0].walletId,
@@ -509,7 +515,9 @@ export class KernelSigner {
     });
 
     if (waitForReceipt) {
-      return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+      return await this.bundlerClient.waitForUserOperationReceipt({
+        hash: userOpHash,
+      });
     }
 
     return {
@@ -540,7 +548,9 @@ export class KernelSigner {
     });
 
     if (waitForReceipt) {
-      return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+      return await this.bundlerClient.waitForUserOperationReceipt({
+        hash: userOpHash,
+      });
     }
 
     return {
@@ -563,7 +573,9 @@ export class KernelSigner {
     });
 
     if (waitForReceipt) {
-      return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+      return await this.bundlerClient.waitForUserOperationReceipt({
+        hash: userOpHash,
+      });
     }
 
     return {
@@ -588,7 +600,9 @@ export class KernelSigner {
     });
 
     if (waitForReceipt) {
-      return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+      return await this.bundlerClient.waitForUserOperationReceipt({
+        hash: userOpHash,
+      });
     }
 
     return {
@@ -615,7 +629,9 @@ export class KernelSigner {
     });
 
     if (waitForReceipt) {
-      return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+      return await this.bundlerClient.waitForUserOperationReceipt({
+        hash: userOpHash,
+      });
     }
 
     return {
@@ -638,7 +654,9 @@ export class KernelSigner {
     });
 
     if (waitForReceipt) {
-      return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+      return await this.bundlerClient.waitForUserOperationReceipt({
+        hash: userOpHash,
+      });
     }
 
     return {
@@ -661,7 +679,9 @@ export class KernelSigner {
     });
 
     if (waitForReceipt) {
-      return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+      return await this.bundlerClient.waitForUserOperationReceipt({
+        hash: userOpHash,
+      });
     }
 
     return {
@@ -695,7 +715,9 @@ export class KernelSigner {
       });
 
       if (waitForReceipt) {
-        return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+        return await this.bundlerClient.waitForUserOperationReceipt({
+          hash: userOpHash,
+        });
       }
 
       return {
@@ -729,7 +751,9 @@ export class KernelSigner {
     });
 
     if (waitForReceipt) {
-      return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+      return await this.bundlerClient.waitForUserOperationReceipt({
+        hash: userOpHash,
+      });
     }
 
     return {
@@ -751,7 +775,9 @@ export class KernelSigner {
     });
 
     if (waitForReceipt) {
-      return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+      return await this.bundlerClient.waitForUserOperationReceipt({
+        hash: userOpHash,
+      });
     }
 
     return {
@@ -809,14 +835,20 @@ export class KernelSigner {
 
       if (!response.ok) {
         const errorData = await response.json();
-        return { success: false, error: errorData.message || "Failed to generate challenge" };
+        return {
+          success: false,
+          error: errorData.message || "Failed to generate challenge",
+        };
       }
 
       const data = await response.json();
       return { success: true, data: data };
     } catch (error) {
       console.error("Error generating challenge:", error);
-      return { success: false, error: "An error occurred while generating challenge" };
+      return {
+        success: false,
+        error: "An error occurred while generating challenge",
+      };
     }
   }
 
@@ -846,14 +878,20 @@ export class KernelSigner {
 
       if (!response.ok) {
         const errorData = await response.json();
-        return { success: false, error: errorData.message || "Failed to submit challenge" };
+        return {
+          success: false,
+          error: errorData.message || "Failed to submit challenge",
+        };
       }
 
       const data = await response.json();
       return { success: true, data };
     } catch (error) {
       console.error("Error submitting web3 challenge:", error);
-      return { success: false, error: "An error occurred while submitting challenge" };
+      return {
+        success: false,
+        error: "An error occurred while submitting challenge",
+      };
     }
   }
 
@@ -931,7 +969,9 @@ export class KernelSigner {
   }
 
   public async getUserOperationReceipt(userOperationHash: `0x${string}`): Promise<GetUserOperationReceiptReturnType> {
-    const txResult = await this.bundlerClient.waitForUserOperationReceipt({ hash: userOperationHash });
+    const txResult = await this.bundlerClient.waitForUserOperationReceipt({
+      hash: userOperationHash,
+    });
     return txResult;
   }
 
@@ -999,7 +1039,9 @@ export class KernelSigner {
     });
 
     if (waitForReceipt) {
-      return await this.bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+      return await this.bundlerClient.waitForUserOperationReceipt({
+        hash: userOpHash,
+      });
     }
 
     return {

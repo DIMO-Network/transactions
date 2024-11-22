@@ -10,6 +10,7 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
+    "format": "prettier --write .",
     "prebuild": "rm -rf ./dist && node -p \"'export const LIB_VERSION = \\'' + require('./package.json').version + '\\';'\" > src/version.ts",
     "build": "tsc -p ./tsconfig.build.json && tsc-alias",
     "dev": "tsc --watch & nodemon --watch dist --delay 1 --exec tsc-alias",

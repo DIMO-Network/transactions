@@ -1,6 +1,6 @@
 module.exports = {
   root: true,
-  extends: ['preact'],
+  extends: ["preact"],
   settings: {
     react: {
       pragma: "h",
@@ -12,17 +12,8 @@ module.exports = {
     node: true,
     commonjs: true,
   },
-  plugins: [
-    "@typescript-eslint",
-    "simple-import-sort",
-    "unused-imports",
-    "prettier",
-  ],
-  extends: [
-    "eslint:recommended",
-    "plugin:@typescript-eslint/recommended",
-    "plugin:prettier/recommended",
-  ],
+  plugins: ["@typescript-eslint", "simple-import-sort", "unused-imports", "prettier"],
+  extends: ["eslint:recommended", "plugin:@typescript-eslint/recommended", "plugin:prettier/recommended"],
   parser: "@typescript-eslint/parser",
   parserOptions: {
     ecmaVersion: "latest",
@@ -77,8 +68,8 @@ module.exports = {
     {
       files: ["**/*.test.*"],
       rules: {
-        "@typescript-eslint/no-explicit-any": "off"
-      }
-    }
-  ]
+        "@typescript-eslint/no-explicit-any": "off",
+      },
+    },
+  ],
 };

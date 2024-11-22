@@ -4,7 +4,7 @@
     "allowJs": false,
     "declaration": true,
     "noEmitOnError": false,
-    "sourceMap": true,
+    "sourceMap": true
   },
   "include": ["src"],
   "exclude": ["dist", "build", "**/*.test.*", "mocks", "node_modules"]
