@@ -5,6 +5,7 @@ export type {
   SetVehiclePermissions,
   SetVehiclePermissionsBulk,
   TransactionData,
+  TransactionInput,
 } from "./core/types/args.js";
 export { ContractType } from "./core/types/dimo.js";
 export type { VehicleNodeMintedWithDeviceDefinition } from "./core/types/responses.js";

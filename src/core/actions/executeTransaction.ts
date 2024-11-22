@@ -9,7 +9,7 @@ export const executeTransaction = async (
 ): Promise<`0x${string}`> => {
   return await client.account.encodeCallData({
     to: args.address,
-    value: BigInt(0),
+    value: args.value,
     data: encodeFunctionData({
       abi: args.abi,
       functionName: args.functionName,

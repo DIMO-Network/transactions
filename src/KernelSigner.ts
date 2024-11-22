@@ -44,7 +44,7 @@ import {
   SendDIMOTokens,
   SetVehiclePermissions,
   SetVehiclePermissionsBulk,
-  TransactionData,
+  TransactionInput,
   TransferVehicleAndAftermarketDeviceIDs,
   UnPairAftermarketDevice,
 } from ":core/types/args.js";
@@ -974,24 +974,25 @@ export class KernelSigner {
   }
 
   public async executeTransaction(
-    args: TransactionData | TransactionData[],
+    args: TransactionInput,
     waitForReceipt: boolean = true
   ): Promise<GetUserOperationReceiptReturnType> {
-    const client = await this.getActiveClient();
-
-    let transactionCallData: `0x${string}`;
-    if (!Array.isArray(args)) {
-      transactionCallData = await executeTransaction(args, client);
-    } else {
-      if (args.length >= 25) {
-        throw Error("Batch transaction limit: 25");
-      }
-      transactionCallData = await executeTransactionBatch(args, client);
+    let client = await this.getActiveClient();
+    if (args.requireSignature) {
+      client = await this.getPasskeyClient();
     }
 
-    let userOpHash: `0x${string}`;
+    let transactionCallData: `0x${string}`;
+    if (!Array.isArray(args.data)) {
+      transactionCallData = await executeTransaction(args.data, client);
+    } else {
+      if (args.data.length >= 25) {
+        throw Error("Batch transaction limit: 25");
+      }
+      transactionCallData = await executeTransactionBatch(args.data, client);
+    }
 
-    userOpHash = await client.sendUserOperation({
+    const userOpHash = await client.sendUserOperation({
       userOperation: {
         callData: transactionCallData as `0x${string}`,
       },

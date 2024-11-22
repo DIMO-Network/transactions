@@ -126,3 +126,8 @@ export type TransactionData = {
   functionName: string;
   args: any[];
 };
+
+export type TransactionInput = {
+  data: TransactionData | TransactionData[];
+  requireSignature?: boolean;
+};
