@@ -93,6 +93,8 @@ export type SACD_PERMISSIONS = {
   CURRENT_LOCATION?: boolean;
   ALLTIME_LOCATION?: boolean;
   VIN_CREDENTIALS?: boolean;
+  RAW_DATA?: boolean;
+  APPROXIMATE_LOCATION?: boolean;
   STREAMS?: boolean;
 };
 

@@ -90,6 +90,8 @@ export const sacdPermissionValue = (sacdPerms: SACD_PERMISSIONS): bigint => {
   let alltimeLocation = "00";
   let vinCredentials = "00";
   let streams = "00";
+  let rawData = "00";
+  let approximateLocation = "00";
 
   if (sacdPerms.ALLTIME_NONLOCATION) {
     alltimeNonlocation = "11";
@@ -115,8 +117,24 @@ export const sacdPermissionValue = (sacdPerms: SACD_PERMISSIONS): bigint => {
     streams = "11";
   }
 
+  if (sacdPerms.RAW_DATA) {
+    rawData = "11";
+  }
+
+  if (sacdPerms.APPROXIMATE_LOCATION) {
+    approximateLocation = "11";
+  }
+
   const permissionString =
-    streams + vinCredentials + alltimeLocation + currentLocation + commands + alltimeNonlocation + skipZero;
+    approximateLocation +
+    rawData +
+    streams +
+    vinCredentials +
+    alltimeLocation +
+    currentLocation +
+    commands +
+    alltimeNonlocation +
+    skipZero;
 
   return BigInt(`0b${permissionString}`);
 };
@@ -135,6 +153,8 @@ export const sacdPermissionArray = (permissionValue: BigInt): string[] => {
   const alltimeLocation = binaryString.slice(-10, -8);
   const vinCredentials = binaryString.slice(-12, -10);
   const streams = binaryString.slice(-14, -12);
+  const rawData = binaryString.slice(-16, -14);
+  const approximateLocation = binaryString.slice(-18, -16);
 
   // Map binary values to boolean fields in the permissions object
   if (alltimeLocation.includes("1")) {
@@ -161,6 +181,14 @@ export const sacdPermissionArray = (permissionValue: BigInt): string[] => {
 
   if (streams.includes("1")) {
     sacdPermArray.push("STREAMS: Access to real-time data streams.");
+  }
+
+  if (rawData.includes("1")) {
+    sacdPermArray.push("RAW_DATA: Access to raw payload data.");
+  }
+
+  if (approximateLocation.includes("1")) {
+    sacdPermArray.push("APPROXIMATE_LOCATION: Access to approximate vehicle location.");
   }
 
   return sacdPermArray;
