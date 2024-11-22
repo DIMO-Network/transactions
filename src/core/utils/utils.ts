@@ -88,7 +88,7 @@ export const sacdPermissionValue = (sacdPerms: SACD_PERMISSIONS): bigint => {
   let commands = "00";
   let currentLocation = "00";
   let alltimeLocation = "00";
-  let verifiableCredentials = "00";
+  let vinCredentials = "00";
   let streams = "00";
 
   if (sacdPerms.ALLTIME_NONLOCATION) {
@@ -107,8 +107,8 @@ export const sacdPermissionValue = (sacdPerms: SACD_PERMISSIONS): bigint => {
     alltimeLocation = "11";
   }
 
-  if (sacdPerms.VERIFIABLE_CREDENTIALS) {
-    verifiableCredentials = "11";
+  if (sacdPerms.VIN_CREDENTIALS) {
+    vinCredentials = "11";
   }
 
   if (sacdPerms.STREAMS) {
@@ -116,7 +116,7 @@ export const sacdPermissionValue = (sacdPerms: SACD_PERMISSIONS): bigint => {
   }
 
   const permissionString =
-    streams + verifiableCredentials + alltimeLocation + currentLocation + commands + alltimeNonlocation + skipZero;
+    streams + vinCredentials + alltimeLocation + currentLocation + commands + alltimeNonlocation + skipZero;
 
   return BigInt(`0b${permissionString}`);
 };
@@ -133,7 +133,7 @@ export const sacdPermissionArray = (permissionValue: BigInt): string[] => {
   const commands = binaryString.slice(-6, -4);
   const currentLocation = binaryString.slice(-8, -6);
   const alltimeLocation = binaryString.slice(-10, -8);
-  const verifiableCredentials = binaryString.slice(-12, -10);
+  const vinCredentials = binaryString.slice(-12, -10);
   const streams = binaryString.slice(-14, -12);
 
   // Map binary values to boolean fields in the permissions object
@@ -153,7 +153,7 @@ export const sacdPermissionArray = (permissionValue: BigInt): string[] => {
     sacdPermArray.push("CURRENT_LOCATION: access to the vehicle current location.");
   }
 
-  if (verifiableCredentials.includes("1")) {
+  if (vinCredentials.includes("1")) {
     sacdPermArray.push(
       "CREDENTIALS: access to any stored credentials and attestations such as insurance and service records."
     );
