@@ -39,7 +39,7 @@ If you're a developer interested in using the DIMO Transactions SDK for **multi-
     });
 
     const kernelSigner = new KernelSigner(kernelSignerConfig);
-    await kernelSigner.passkeyInit(
+    await kernelSigner.passkeyToSession(
         subOrganizationId,
         walletAddress as `0x${string}`,
         stamper,

@@ -7,7 +7,7 @@ import {
   TransactionReturnType,
   _kernelConfig,
 } from ":core/types/dimo.js";
-import { Chain, PublicClient, createPublicClient, createWalletClient, http } from "viem";
+import { Chain, PublicClient, createPublicClient, http } from "viem";
 import {
   KernelAccountClient,
   createKernelAccount,
@@ -397,14 +397,8 @@ export class KernelSigner {
       ethereumAddress: walletAddress,
     });
 
-    const smartAccountClient = createWalletClient({
-      account: localAccount,
-      chain: this.chain,
-      transport: http(this.config.rpcUrl),
-    });
-
     const ecdsaValidator = await signerToEcdsaValidator(this.publicClient, {
-      signer: smartAccountClient,
+      signer: localAccount,
       entryPoint: this.config.entryPoint,
       kernelVersion: this.config.kernelVersion,
     });
@@ -423,7 +417,7 @@ export class KernelSigner {
     const chain = this.chain;
     const paymasterUrl = this.config.paymasterUrl;
     return createKernelAccountClient({
-      account,
+      account: account,
       chain: this.chain,
       bundlerTransport: http(this.config.bundlerUrl),
       paymaster: {
@@ -934,7 +928,7 @@ export class KernelSigner {
 
   public async deriveKernelAddress(walletAddress: `0x${string}`, number: number = 0): Promise<`0x${string}`> {
     const kernelAddress = await getKernelAddressFromECDSA({
-      entryPointAddress: this.config.entryPoint,
+      entryPoint: this.config.entryPoint,
       kernelVersion: this.config.kernelVersion,
       eoaAddress: walletAddress,
       index: BigInt(number),
