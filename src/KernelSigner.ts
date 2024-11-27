@@ -7,14 +7,14 @@ import {
   TransactionReturnType,
   _kernelConfig,
 } from ":core/types/dimo.js";
-import { Chain, PublicClient, createPublicClient, http } from "viem";
+import { Chain, Client, PublicClient, RpcSchema, Transport, createPublicClient, http } from "viem";
 import {
   KernelAccountClient,
   createKernelAccount,
   createKernelAccountClient,
   createZeroDevPaymasterClient,
 } from "@zerodev/sdk";
-import type { BundlerClient } from "viem/account-abstraction";
+import type { BundlerClient, SmartAccount } from "viem/account-abstraction";
 import {
   mintVehicleWithDeviceDefinition,
   mintVehicleWithDeviceDefinitionBatch,
@@ -71,7 +71,7 @@ export class KernelSigner {
   smartContractAddress: `0x${string}` | undefined;
   apiSessionClient: {
     expires: number;
-    client: KernelAccountClient | undefined;
+    client: KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema> | undefined;
     initialized: boolean;
   } = {
     client: undefined,
@@ -81,7 +81,7 @@ export class KernelSigner {
   passkeyClient: {
     turnkeyClient: TurnkeyClient | undefined;
     valid: boolean;
-    client: KernelAccountClient | undefined;
+    client: KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema> | undefined;
     initialized: boolean;
   } = {
     turnkeyClient: undefined,
@@ -91,7 +91,7 @@ export class KernelSigner {
   };
   passkeySessionClient: {
     expires: number;
-    client: KernelAccountClient | undefined;
+    client: KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema> | undefined;
     initialized: boolean;
   } = {
     expires: 0,
@@ -100,7 +100,7 @@ export class KernelSigner {
   };
   privateKeyClient: {
     valid: boolean;
-    client: KernelAccountClient | undefined;
+    client: KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema> | undefined;
     initialized: boolean;
   } = {
     valid: false,
@@ -182,7 +182,7 @@ export class KernelSigner {
     return false;
   }
 
-  public async getActiveClient(): Promise<KernelAccountClient> {
+  public async getActiveClient(): Promise<KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema>> {
     if (this.config.usePrivateKey) {
       if (this.privateKeyClient.client) {
         return this.privateKeyClient.client;
@@ -218,7 +218,7 @@ export class KernelSigner {
     throw new Error("No active client");
   }
 
-  public async getPasskeyClient(): Promise<KernelAccountClient> {
+  public async getPasskeyClient(): Promise<KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema>> {
     if (this.passkeyClient.valid) {
       if (this.passkeyClient.client) {
         return this.passkeyClient.client;
@@ -388,7 +388,7 @@ export class KernelSigner {
     turnkeyClient: TurnkeyClient,
     subOrganizationId: string,
     walletAddress: `0x${string}`
-  ): Promise<KernelAccountClient> {
+  ): Promise<KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema>> {
     const localAccount = await createAccount({
       // @ts-ignore
       client: turnkeyClient,
@@ -732,7 +732,6 @@ export class KernelSigner {
   public async signChallenge(challenge: string): Promise<`0x${string}`> {
     const client = await this.getActiveClient();
     return client.signMessage({
-      account: client.account!.address,
       message: challenge,
     });
   }
