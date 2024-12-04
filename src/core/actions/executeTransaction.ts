@@ -6,6 +6,9 @@ export const executeTransaction = async (
   args: TransactionData,
   client: KernelAccountClient
 ): Promise<`0x${string}`> => {
+  if (!args.value) {
+    args.value = BigInt(0);
+  }
   return await client.account!.encodeCalls([
     {
       to: args.address,
@@ -24,6 +27,9 @@ export const executeTransactionBatch = async (
   client: KernelAccountClient
 ): Promise<`0x${string}`> => {
   const callData = args.map((arg) => {
+    if (!arg.value) {
+      arg.value = BigInt(0);
+    }
     return {
       to: arg.address,
       value: arg.value as bigint,

@@ -1,4 +1,4 @@
-import { SACD_PERMISSIONS, VehcilePermissionDescription } from ":core/types/args.js";
+import { VehcilePermissionDescription } from ":core/types/args.js";
 import { AccountConfig, KernelConfig, _accountConfig, _kernelConfig } from ":core/types/dimo.js";
 import { KERNEL_V3_1, getEntryPoint } from "@zerodev/sdk/constants";
 
@@ -81,59 +81,18 @@ export const newAccountConfig = (args: AccountConfig): _accountConfig => {
 };
 
 export const sacdPermissionValue = (sacdPerms: SACD_PERMISSIONS): bigint => {
-  // nothing in right most position
-  let skipZero = "00";
-  let alltimeNonlocation = "00";
-  let commands = "00";
-  let currentLocation = "00";
-  let alltimeLocation = "00";
-  let vinCredentials = "00";
-  let streams = "00";
-  let rawData = "00";
-  let approximateLocation = "00";
+  const permissionMap = [
+    sacdPerms.APPROXIMATE_LOCATION,
+    sacdPerms.RAW_DATA,
+    sacdPerms.STREAMS,
+    sacdPerms.CREDENTIALS,
+    sacdPerms.ALLTIME_LOCATION,
+    sacdPerms.CURRENT_LOCATION,
+    sacdPerms.COMMANDS,
+    sacdPerms.NONLOCATION_TELEMETRY,
+  ];
 
-  if (sacdPerms.ALLTIME_NONLOCATION) {
-    alltimeNonlocation = "11";
-  }
-
-  if (sacdPerms.COMMANDS) {
-    commands = "11";
-  }
-
-  if (sacdPerms.CURRENT_LOCATION) {
-    currentLocation = "11";
-  }
-
-  if (sacdPerms.ALLTIME_LOCATION) {
-    alltimeLocation = "11";
-  }
-
-  if (sacdPerms.VIN_CREDENTIALS) {
-    vinCredentials = "11";
-  }
-
-  if (sacdPerms.STREAMS) {
-    streams = "11";
-  }
-
-  if (sacdPerms.RAW_DATA) {
-    rawData = "11";
-  }
-
-  if (sacdPerms.APPROXIMATE_LOCATION) {
-    approximateLocation = "11";
-  }
-
-  const permissionString =
-    approximateLocation +
-    rawData +
-    streams +
-    vinCredentials +
-    alltimeLocation +
-    currentLocation +
-    commands +
-    alltimeNonlocation +
-    skipZero;
+  const permissionString = permissionMap.map((perm) => (perm ? "11" : "00")).join("") + "00";
 
   return BigInt(`0b${permissionString}`);
 };
@@ -142,52 +101,14 @@ export const sacdPermissionArray = (permissionValue: BigInt): string[] => {
   const sacdPermArray: string[] = [];
 
   // Convert the bigint to a binary string
-  const binaryString = permissionValue.toString(2).padStart(14, "0");
+  const binaryString = permissionValue.toString(2).padStart(PERMISSION_CONFIGS.length * 2, "0");
 
-  // Extract each field by slicing the binary string from right to left
-  // Skip zero bits, not used in permissions object: binaryString.slice(-2);
-  const alltimeNonlocation = binaryString.slice(-4, -2);
-  const commands = binaryString.slice(-6, -4);
-  const currentLocation = binaryString.slice(-8, -6);
-  const alltimeLocation = binaryString.slice(-10, -8);
-  const vinCredentials = binaryString.slice(-12, -10);
-  const streams = binaryString.slice(-14, -12);
-  const rawData = binaryString.slice(-16, -14);
-  const approximateLocation = binaryString.slice(-18, -16);
-
-  // Map binary values to boolean fields in the permissions object
-  if (alltimeLocation.includes("1")) {
-    sacdPermArray.push("ALLTIME_LOCATION: access to the vehicle full location history.");
-  }
-
-  if (alltimeNonlocation.includes("1")) {
-    sacdPermArray.push("NONLOCATION_TELEMETRY: non-location vehicle data such as fuel levels and odometer.");
-  }
-
-  if (commands.includes("1")) {
-    sacdPermArray.push("COMMANDS: ability to send commands to the vehicle such as lock and unlock.");
-  }
-
-  if (currentLocation.includes("1")) {
-    sacdPermArray.push("CURRENT_LOCATION: access to the vehicle current location.");
-  }
-
-  if (vinCredentials.includes("1")) {
-    sacdPermArray.push(
-      "CREDENTIALS: access to any stored credentials and attestations such as insurance and service records."
-    );
-  }
-
-  if (streams.includes("1")) {
-    sacdPermArray.push("STREAMS: Access to real-time data streams.");
-  }
-
-  if (rawData.includes("1")) {
-    sacdPermArray.push("RAW_DATA: Access to raw payload data.");
-  }
-
-  if (approximateLocation.includes("1")) {
-    sacdPermArray.push("APPROXIMATE_LOCATION: Access to approximate vehicle location.");
+  for (let i = 0; i < PERMISSION_CONFIGS.length; i++) {
+    const perm = PERMISSION_CONFIGS[i];
+    const permission = binaryString.slice(perm.range[0], perm.range[1]);
+    if (permission.includes("1")) {
+      sacdPermArray.push(perm.description);
+    }
   }
 
   return sacdPermArray;
@@ -197,3 +118,43 @@ export const sacdDescription = (args: VehcilePermissionDescription): string => {
   const description = `By proceeding, you will grant data access and control functions to ${args.appName} effective as of ${args.effectiveAt} until ${new Date(Number(args.expiration) * 1000).toISOString()}. Permissions being granted: ${args.permissionArray.join("; ")} Driver ID: ${args.driverID} App ID: ${args.appID} DIMO Platform, version 1.0.`;
   return description;
 };
+
+export const PERMISSIONS = {
+  NONLOCATION_TELEMETRY: "NONLOCATION_TELEMETRY: non-location vehicle data such as fuel levels and odometer.",
+
+  COMMANDS: "COMMANDS: ability to send commands to the vehicle such as lock and unlock.",
+
+  CURRENT_LOCATION: "CURRENT_LOCATION: access to the vehicle current location.",
+
+  ALLTIME_LOCATION: "ALLTIME_LOCATION: access to the vehicle full location history.",
+
+  CREDENTIALS: "CREDENTIALS: access to any stored credentials and attestations such as insurance and service records.",
+
+  STREAMS: "STREAMS: Access to real-time data streams.",
+
+  RAW_DATA: "RAW_DATA: Access to raw payload data.",
+
+  APPROXIMATE_LOCATION: "APPROXIMATE_LOCATION: Access to approximate vehicle location.",
+};
+
+type PermissionConfig = {
+  range: [number, number];
+  description: string;
+};
+
+type SACD_PERMISSIONS = Partial<Record<keyof typeof PERMISSIONS, boolean>>;
+
+export const PERMISSION_CONFIGS: PermissionConfig[] = Object.keys(PERMISSIONS).map((permission, index) => ({
+  range: [-(2 * (index + 1 * 2)), -(2 * index) - 2],
+  description: PERMISSIONS[permission as keyof typeof PERMISSIONS],
+}));
+
+PERMISSION_CONFIGS.unshift({
+  range: [-2, 0],
+  description: "",
+});
+
+// | APPROX LOCATION | RAW DATA | STREAMS | CREDENTIALS | ALLTIME_LOCATION | CURRENT_LOCATION | COMMANDS | NONLOCATION_TELEMETRY | ZERO-PADDED |
+// |-----------------|----------|---------|-------------|------------------|------------------|----------|-----------------------|-------------|
+// |      11         |   11     |   11    |     11      |       11         |       11         |    11    |          11           |     00      |  262140n
+// |-----------------|----------|---------|-------------|------------------|------------------|----------|-----------------------|-------------|

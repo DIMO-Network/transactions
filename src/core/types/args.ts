@@ -87,17 +87,6 @@ export type ClientConfigDimo = {
   environment: string;
 };
 
-export type SACD_PERMISSIONS = {
-  ALLTIME_NONLOCATION?: boolean;
-  COMMANDS?: boolean;
-  CURRENT_LOCATION?: boolean;
-  ALLTIME_LOCATION?: boolean;
-  VIN_CREDENTIALS?: boolean;
-  RAW_DATA?: boolean;
-  APPROXIMATE_LOCATION?: boolean;
-  STREAMS?: boolean;
-};
-
 export type TransferVehicleAndAftermarketDeviceIDs = {
   vehicleIds: BigInt[];
   aftermarketDeviceIds: BigInt[];
@@ -123,7 +112,7 @@ export type DeriveKernelAddress = {
 
 export type TransactionData = {
   address: `0x${string}`;
-  value: BigInt;
+  value?: BigInt;
   abi: Abi;
   functionName: string;
   args: any[];
