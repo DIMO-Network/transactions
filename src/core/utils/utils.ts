@@ -121,19 +121,12 @@ export const sacdDescription = (args: VehcilePermissionDescription): string => {
 
 export const PERMISSIONS = {
   NONLOCATION_TELEMETRY: "NONLOCATION_TELEMETRY: non-location vehicle data such as fuel levels and odometer.",
-
   COMMANDS: "COMMANDS: ability to send commands to the vehicle such as lock and unlock.",
-
   CURRENT_LOCATION: "CURRENT_LOCATION: access to the vehicle current location.",
-
   ALLTIME_LOCATION: "ALLTIME_LOCATION: access to the vehicle full location history.",
-
   CREDENTIALS: "CREDENTIALS: access to any stored credentials and attestations such as insurance and service records.",
-
   STREAMS: "STREAMS: Access to real-time data streams.",
-
   RAW_DATA: "RAW_DATA: Access to raw payload data.",
-
   APPROXIMATE_LOCATION: "APPROXIMATE_LOCATION: Access to approximate vehicle location.",
 };
 
