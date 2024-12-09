@@ -135,7 +135,7 @@ type PermissionConfig = {
   description: string;
 };
 
-type SACD_PERMISSIONS = Partial<Record<keyof typeof PERMISSIONS, boolean>>;
+export type SACD_PERMISSIONS = Partial<Record<keyof typeof PERMISSIONS, boolean>>;
 
 export const PERMISSION_CONFIGS: PermissionConfig[] = Object.keys(PERMISSIONS).map((permission, index) => ({
   range: [-(2 * (index + 1 * 2)), -(2 * index) - 2],
