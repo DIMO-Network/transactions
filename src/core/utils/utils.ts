@@ -43,6 +43,11 @@ export const newKernelConfig = (args: KernelConfig): _kernelConfig => {
     args.usePrivateKey = false;
   }
 
+  if (args.defaultPermissions == undefined) {
+    const defaultPerms: SACD_PERMISSIONS = {};
+    args.defaultPermissions = defaultPerms;
+  }
+
   return {
     rpcUrl: args.rpcUrl,
     bundlerUrl: args.bundlerUrl,
@@ -57,6 +62,7 @@ export const newKernelConfig = (args: KernelConfig): _kernelConfig => {
     useWalletSession: args.useWalletSession,
     sessionTimeoutSeconds: args.sessionTimeoutSeconds,
     usePrivateKey: args.usePrivateKey,
+    defaultPermissions: args.defaultPermissions,
   };
 };
 
@@ -125,9 +131,9 @@ export const PERMISSIONS = {
   CURRENT_LOCATION: "CURRENT_LOCATION: access to the vehicle current location.",
   ALLTIME_LOCATION: "ALLTIME_LOCATION: access to the vehicle full location history.",
   CREDENTIALS: "CREDENTIALS: access to any stored credentials and attestations such as insurance and service records.",
-  STREAMS: "STREAMS: Access to real-time data streams.",
-  RAW_DATA: "RAW_DATA: Access to raw payload data.",
-  APPROXIMATE_LOCATION: "APPROXIMATE_LOCATION: Access to approximate vehicle location.",
+  STREAMS: "STREAMS: access to real-time data streams.",
+  RAW_DATA: "RAW_DATA: access to raw payload data.",
+  APPROXIMATE_LOCATION: "APPROXIMATE_LOCATION: access to approximate vehicle location.",
 };
 
 type PermissionConfig = {
