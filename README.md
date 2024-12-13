@@ -26,7 +26,7 @@ If you're a developer interested in using the DIMO Transactions SDK for **multi-
     import { PasskeyStamper } from "@turnkey/react-native-passkey-stamper";
     import { KernelSigner, newKernelConfig, sacdPermissionValue } from '@dimo-network/transactions';
 
-    const kernelSignerConfig = newKernelConfig({
+    const kernelSignerConfig = ({
         rpcUrl: RPC_URL,
         bundlerUrl: BUNDLER_RPC,
         paymasterUrl: PAYMASTER_RPC,

@@ -58,6 +58,7 @@ import { uint8ArrayToHexString, uint8ArrayFromHexString } from "@turnkey/encodin
 import { claimAndPairDevice } from ":core/actions/claimAndPair.js";
 import { executeTransaction, executeTransactionBatch } from ":core/actions/executeTransaction.js";
 import { createBundlerClient } from "viem/account-abstraction";
+import { sacdPermissionValue, sacdPermissionArray } from ":core/utils/utils.js";
 
 export class KernelSigner {
   config: _kernelConfig;
@@ -65,62 +66,50 @@ export class KernelSigner {
   bundlerClient: BundlerClient;
   contractMapping: ContractToMapping;
   chain: Chain;
-  kernelAddress: `0x${string}` | undefined;
-  subOrganizationId: string | undefined;
-  walletAddress: `0x${string}` | undefined;
-  smartContractAddress: `0x${string}` | undefined;
-  apiSessionClient: {
-    expires: number;
-    client: KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema> | undefined;
-    initialized: boolean;
-  } = {
-    client: undefined,
-    expires: 0,
-    initialized: false,
-  };
-  passkeyClient: {
-    turnkeyClient: TurnkeyClient | undefined;
-    valid: boolean;
-    client: KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema> | undefined;
-    initialized: boolean;
-  } = {
-    turnkeyClient: undefined,
-    valid: false,
-    client: undefined,
-    initialized: false,
-  };
-  passkeySessionClient: {
-    expires: number;
-    client: KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema> | undefined;
-    initialized: boolean;
-  } = {
-    expires: 0,
-    client: undefined,
-    initialized: false,
-  };
-  privateKeyClient: {
-    valid: boolean;
-    client: KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema> | undefined;
-    initialized: boolean;
-  } = {
-    valid: false,
-    client: undefined,
-    initialized: false,
-  };
+  kernelAddress?: `0x${string}`;
+  subOrganizationId?: string;
+  walletAddress?: `0x${string}`;
+  smartContractAddress?: `0x${string}`;
   authBaseUrl: string;
   ifpsUrl: string;
-  activeClient: boolean = false;
+  activeClient = false;
+
+  apiSessionClient = {
+    client: undefined as KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema> | undefined,
+    expires: 0,
+    initialized: false,
+  };
+
+  passkeyClient = {
+    turnkeyClient: undefined as TurnkeyClient | undefined,
+    valid: false,
+    client: undefined as KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema> | undefined,
+    initialized: false,
+  };
+
+  passkeySessionClient = {
+    client: undefined as KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema> | undefined,
+    expires: 0,
+    initialized: false,
+  };
+
+  privateKeyClient = {
+    valid: false,
+    client: undefined as KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema> | undefined,
+    initialized: false,
+  };
 
   constructor(config: KernelConfig) {
     this.config = config as _kernelConfig;
-    this.chain =
-      ENV_NETWORK_MAPPING.get(ENV_MAPPING.get(this.config.environment ?? "prod") ?? ENVIRONMENT.PROD) ?? polygon;
-    this.contractMapping =
-      CHAIN_ABI_MAPPING[ENV_MAPPING.get(this.config.environment ?? "prod") ?? ENVIRONMENT.PROD].contracts;
-    this.authBaseUrl =
-      ENV_TO_API_MAPPING[ENV_MAPPING.get(this.config.environment ?? "prod") ?? ENVIRONMENT.PROD][DIMO_APIs.AUTH].url;
-    this.ifpsUrl =
-      ENV_TO_API_MAPPING[ENV_MAPPING.get(this.config.environment ?? "prod") ?? ENVIRONMENT.PROD][DIMO_APIs.IPFS].url;
+    const env = ENV_MAPPING.get(this.config.environment ?? "prod") ?? ENVIRONMENT.PROD;
+    this.chain = ENV_NETWORK_MAPPING.get(env) ?? polygon;
+
+    const apiMapping = ENV_TO_API_MAPPING[env];
+
+    this.contractMapping = CHAIN_ABI_MAPPING[env].contracts;
+    this.authBaseUrl = apiMapping[DIMO_APIs.AUTH].url;
+    this.ifpsUrl = apiMapping[DIMO_APIs.IPFS].url;
+
     this.publicClient = createPublicClient({
       transport: http(this.config.rpcUrl),
       chain: this.chain,
@@ -132,49 +121,44 @@ export class KernelSigner {
     });
   }
 
+  // HELPERS
+
   public resetClient(): boolean {
+    const defaultClientState = {
+      client: undefined,
+      expires: 0,
+      initialized: false,
+    };
+
+    this.activeClient = false;
     this.kernelAddress = undefined;
     this.subOrganizationId = undefined;
     this.walletAddress = undefined;
     this.smartContractAddress = undefined;
-    this.apiSessionClient = {
-      client: undefined,
-      expires: 0,
-      initialized: false,
-    };
 
+    this.apiSessionClient = { ...defaultClientState };
     this.passkeyClient = {
       turnkeyClient: undefined,
       valid: false,
-      client: undefined,
-      initialized: false,
+      ...defaultClientState,
     };
-    this.passkeySessionClient = {
-      expires: 0,
-      client: undefined,
-      initialized: false,
-    };
-    this.privateKeyClient = {
-      valid: false,
-      client: undefined,
-      initialized: false,
-    };
-    this.activeClient = false;
+    this.passkeySessionClient = { ...defaultClientState };
+    this.privateKeyClient = { valid: false, ...defaultClientState };
     return true;
   }
 
-  public hasActiveSession(): boolean {
-    if (this.config.usePrivateKey) {
-      return true;
-    }
+  private isSessionActive(session: { expires: number }): boolean {
+    return session.expires > Date.now();
+  }
 
-    if (new Date(this.apiSessionClient.expires) > new Date(Date.now())) {
-      return true;
-    } else if (this.config.useWalletSession) {
-      if (new Date(this.passkeySessionClient.expires) > new Date(Date.now())) {
-        return true;
-      }
-      if (this.passkeyClient.valid) {
+  public hasActiveSession(): boolean {
+    if (this.config.usePrivateKey) return true;
+
+    const now = Date.now();
+    if (this.apiSessionClient.expires > now) return true;
+
+    if (this.config.useWalletSession) {
+      if (this.passkeySessionClient.expires > now || this.passkeyClient.valid) {
         return true;
       }
     }
@@ -183,34 +167,29 @@ export class KernelSigner {
   }
 
   public async getActiveClient(): Promise<KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema>> {
-    if (this.config.usePrivateKey) {
-      if (this.privateKeyClient.client) {
-        return this.privateKeyClient.client;
-      }
+    if (this.config.usePrivateKey && this.privateKeyClient.client) {
+      return this.privateKeyClient.client;
     }
 
-    if (new Date(this.apiSessionClient.expires) > new Date(Date.now())) {
-      if (this.apiSessionClient.client) {
-        return this.apiSessionClient.client;
+    const now = Date.now();
+
+    if (this.apiSessionClient.expires > now && this.apiSessionClient.client) {
+      return this.apiSessionClient.client;
+    }
+
+    if (this.config.useWalletSession) {
+      if (this.passkeySessionClient.expires > now && this.passkeySessionClient.client) {
+        return this.passkeySessionClient.client;
       }
-    } else if (this.config.useWalletSession) {
-      if (new Date(this.passkeySessionClient.expires) > new Date(Date.now())) {
-        if (this.passkeySessionClient.client) {
-          return this.passkeySessionClient.client;
-        }
-      }
+
       try {
         await this.openSessionWithPasskey();
-        if (new Date(this.passkeySessionClient.expires) > new Date(Date.now())) {
-          if (this.passkeySessionClient.client) {
-            return this.passkeySessionClient.client;
-          }
+        if (this.passkeySessionClient.expires > now && this.passkeySessionClient.client) {
+          return this.passkeySessionClient.client;
         }
       } catch {
-        if (this.passkeyClient.valid) {
-          if (this.passkeyClient.client) {
-            return this.passkeyClient.client;
-          }
+        if (this.passkeyClient.valid && this.passkeyClient.client) {
+          return this.passkeyClient.client;
         }
       }
     }
@@ -219,35 +198,101 @@ export class KernelSigner {
   }
 
   public async getPasskeyClient(): Promise<KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema>> {
-    if (this.passkeyClient.valid) {
-      if (this.passkeyClient.client) {
-        return this.passkeyClient.client;
-      }
+    if (this.passkeyClient.valid && this.passkeyClient.client) {
+      return this.passkeyClient.client;
     }
 
     throw new Error("Passkey client not initialized");
   }
 
-  public async passkeyInit(subOrganizationId: string, walletAddress: `0x${string}`, stamper: any) {
+  public getDefaultPermissionValue(): BigInt {
+    return sacdPermissionValue(this.config.defaultPermissions) as BigInt;
+  }
+
+  public getDefaultPermissionArray(): string[] {
+    const val = sacdPermissionValue(this.config.defaultPermissions) as BigInt;
+    return sacdPermissionArray(val);
+  }
+
+  // INITIALIZING SDK
+
+  public async init(subOrganizationId: string, stamper: any): Promise<void> {
+    if (this.isSessionActive(this.passkeySessionClient)) return;
+
+    const timestamp = Date.now();
+    const key = generateP256KeyPair();
+    const targetPubHex = key.publicKeyUncompressed;
+    const expiration = timestamp + parseInt(this.config.sessionTimeoutSeconds) * 0.75 * 1000;
+
     this.subOrganizationId = subOrganizationId;
-    this.walletAddress = walletAddress;
     this.passkeyClient.turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, stamper);
+    this.passkeyClient.valid = true;
+    this.passkeyClient.initialized = true;
+
+    const sessionData = await this.passkeyClient.turnkeyClient!.createReadWriteSession({
+      organizationId: this.subOrganizationId,
+      type: "ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2",
+      timestampMs: timestamp.toString(),
+      parameters: {
+        targetPublicKey: targetPubHex,
+        expirationSeconds: this.config.sessionTimeoutSeconds,
+      },
+    });
+
+    const bundle = sessionData.activity.result.createReadWriteSessionResultV2?.credentialBundle;
+    const decryptedBundle = decryptBundle(bundle!, key.privateKey);
+    const privateKey = uint8ArrayToHexString(decryptedBundle);
+    const apiStamper = new ApiKeyStamper({
+      apiPublicKey: uint8ArrayToHexString(getPublicKey(uint8ArrayFromHexString(privateKey), true)),
+      apiPrivateKey: privateKey,
+    });
+
+    const turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, apiStamper);
+    this.passkeySessionClient.expires = expiration;
+    this.passkeySessionClient.initialized = true;
+    const wallets = await turnkeyClient.getWallets({
+      organizationId: subOrganizationId,
+    });
+    const walletAddr = await turnkeyClient.getWalletAccounts({
+      organizationId: subOrganizationId,
+      walletId: wallets.wallets[0].walletId,
+    });
+
+    this.walletAddress = walletAddr.accounts[0].address as `0x${string}`;
+    this.passkeySessionClient.client = await this._createKernelAccount(
+      turnkeyClient,
+      subOrganizationId,
+      this.walletAddress!
+    );
 
     this.passkeyClient.client = await this._createKernelAccount(
       this.passkeyClient.turnkeyClient,
       subOrganizationId,
       this.walletAddress!
     );
-
-    this.passkeyClient.valid = true;
     this.activeClient = true;
+
     return;
   }
 
+  public async passkeyInit(subOrganizationId: string, walletAddress: `0x${string}`, stamper: any): Promise<void> {
+    this.subOrganizationId = subOrganizationId;
+    this.walletAddress = walletAddress;
+    const turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, stamper);
+
+    this.passkeyClient = {
+      turnkeyClient,
+      client: await this._createKernelAccount(turnkeyClient, subOrganizationId, walletAddress),
+      valid: true,
+      initialized: true,
+    };
+
+    this.activeClient = true;
+  }
+
   public async passkeyToSession(subOrganizationId: string, stamper: any) {
-    if (new Date(this.passkeySessionClient.expires) > new Date(Date.now())) {
-      return;
-    }
+    if (this.isSessionActive(this.passkeySessionClient)) return;
+
     const timestamp = Date.now();
     const key = generateP256KeyPair();
     const targetPubHex = key.publicKeyUncompressed;
