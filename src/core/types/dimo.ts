@@ -16,10 +16,12 @@ export type KernelConfig = {
   entryPoint?: EntryPointType<EntryPointVersion>;
   kernelVersion?: KERNEL_V3_VERSION_TYPE;
   environment?: string;
-  useWalletSession?: boolean;
+  useWalletSession?: boolean; // depricate?
   sessionTimeoutSeconds?: string; // seconds
   usePrivateKey?: boolean;
   defaultPermissions?: SACD_PERMISSIONS;
+  subOrganizationId?: string;
+  stamper?: any;
 };
 
 export type _kernelConfig = {

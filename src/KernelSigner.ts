@@ -13,6 +13,7 @@ import {
   createKernelAccount,
   createKernelAccountClient,
   createZeroDevPaymasterClient,
+  getUserOperationGasPrice,
 } from "@zerodev/sdk";
 import type { BundlerClient, SmartAccount } from "viem/account-abstraction";
 import {
@@ -465,6 +466,7 @@ export class KernelSigner {
       account: account,
       chain: this.chain,
       bundlerTransport: http(this.config.bundlerUrl),
+      client: this.publicClient,
       paymaster: {
         getPaymasterData(userOperation) {
           const paymasterClient = createZeroDevPaymasterClient({
@@ -472,6 +474,11 @@ export class KernelSigner {
             transport: http(paymasterUrl),
           });
           return paymasterClient.sponsorUserOperation({ userOperation });
+        },
+      },
+      userOperation: {
+        estimateFeesPerGas: async ({ bundlerClient }) => {
+          return getUserOperationGasPrice(bundlerClient);
         },
       },
     });
@@ -534,8 +541,9 @@ export class KernelSigner {
     const userOpHash = await client.sendUserOperation({ callData: mintVehicleCallData, nonce });
 
     if (waitForReceipt) {
-      return await this.bundlerClient.waitForUserOperationReceipt({
-        hash: userOpHash,
+      const client = await this.getActiveClient();
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
       });
     }
 
@@ -565,8 +573,9 @@ export class KernelSigner {
     });
 
     if (waitForReceipt) {
-      return await this.bundlerClient.waitForUserOperationReceipt({
-        hash: userOpHash,
+      const client = await this.getActiveClient();
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
       });
     }
 
@@ -588,8 +597,9 @@ export class KernelSigner {
     });
 
     if (waitForReceipt) {
-      return await this.bundlerClient.waitForUserOperationReceipt({
-        hash: userOpHash,
+      const client = await this.getActiveClient();
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
       });
     }
 
@@ -608,8 +618,9 @@ export class KernelSigner {
     });
 
     if (waitForReceipt) {
-      return await this.bundlerClient.waitForUserOperationReceipt({
-        hash: userOpHash,
+      const client = await this.getActiveClient();
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
       });
     }
 
@@ -635,8 +646,9 @@ export class KernelSigner {
     });
 
     if (waitForReceipt) {
-      return await this.bundlerClient.waitForUserOperationReceipt({
-        hash: userOpHash,
+      const client = await this.getActiveClient();
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
       });
     }
 
@@ -658,8 +670,9 @@ export class KernelSigner {
     });
 
     if (waitForReceipt) {
-      return await this.bundlerClient.waitForUserOperationReceipt({
-        hash: userOpHash,
+      const client = await this.getActiveClient();
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
       });
     }
 
@@ -681,8 +694,9 @@ export class KernelSigner {
     });
 
     if (waitForReceipt) {
-      return await this.bundlerClient.waitForUserOperationReceipt({
-        hash: userOpHash,
+      const client = await this.getActiveClient();
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
       });
     }
 
@@ -713,8 +727,9 @@ export class KernelSigner {
     });
 
     if (waitForReceipt) {
-      return await this.bundlerClient.waitForUserOperationReceipt({
-        hash: userOpHash,
+      const client = await this.getActiveClient();
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
       });
     }
 
@@ -736,8 +751,9 @@ export class KernelSigner {
     });
 
     if (waitForReceipt) {
-      return await this.bundlerClient.waitForUserOperationReceipt({
-        hash: userOpHash,
+      const client = await this.getActiveClient();
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
       });
     }
 
@@ -758,8 +774,9 @@ export class KernelSigner {
     });
 
     if (waitForReceipt) {
-      return await this.bundlerClient.waitForUserOperationReceipt({
-        hash: userOpHash,
+      const client = await this.getActiveClient();
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
       });
     }
 
@@ -939,7 +956,8 @@ export class KernelSigner {
   }
 
   public async getUserOperationReceipt(userOperationHash: `0x${string}`): Promise<TransactionReturnType> {
-    const txResult = await this.bundlerClient.waitForUserOperationReceipt({
+    const client = await this.getActiveClient();
+    const txResult = await client.waitForUserOperationReceipt({
       hash: userOperationHash,
     });
     return txResult;
@@ -1006,8 +1024,9 @@ export class KernelSigner {
     });
 
     if (waitForReceipt) {
-      return await this.bundlerClient.waitForUserOperationReceipt({
-        hash: userOpHash,
+      const client = await this.getActiveClient();
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
       });
     }
 
