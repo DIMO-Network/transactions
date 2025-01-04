@@ -3,7 +3,9 @@
   "version": "0.1.77",
   "description": "DIMO Transactions SDK",
   "keywords": [
-    "DIMO"
+    "DIMO",
+    "transactions-sdk",
+    "dimo-network"
   ],
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -61,6 +63,6 @@
     "tslib": "^2.6.0",
     "typescript": "^5.1.6"
   },
-  "author": "",
-  "license": "ISC"
+  "author": "Allyson English",
+  "license": "Apache-2.0"
 }
