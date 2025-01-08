@@ -1,3 +1,4 @@
+import { pad, isAddress } from "viem";
 import { VehcilePermissionDescription } from ":core/types/args.js";
 import { AccountConfig, KernelConfig, _accountConfig, _kernelConfig } from ":core/types/dimo.js";
 import { KERNEL_V3_1, getEntryPoint } from "@zerodev/sdk/constants";
@@ -151,3 +152,12 @@ PERMISSION_CONFIGS.unshift({
 // |-----------------|----------|---------|-------------|------------------|------------------|----------|-----------------------|-------------|
 // |      11         |   11     |   11    |     11      |       11         |       11         |    11    |          11           |     00      |  262140n
 // |-----------------|----------|---------|-------------|------------------|------------------|----------|-----------------------|-------------|
+
+export function addressToBytes32(address: string | `0x${string}`): string {
+  // Validate recipient address
+  if (!isAddress(address)) {
+    throw new Error("Invalid 0x address");
+  }
+
+  return pad(address as `0x${string}`, { size: 32 })
+}
