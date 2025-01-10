@@ -15,7 +15,8 @@
     "build": "tsc -p ./tsconfig.build.json && tsc-alias",
     "dev": "tsc --watch & nodemon --watch dist --delay 1 --exec tsc-alias",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint . --ext .ts,.tsx --fix"
+    "lint": "eslint . --ext .ts,.tsx --fix",
+    "test": "vitest"
   },
   "dependencies": {
     "@turnkey/api-key-stamper": "^0.4.3",
@@ -36,6 +37,7 @@
     "@peculiar/webcrypto": "^1.4.3",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/preact": "^2.0.1",
+    "@types/chai": "^5.0.1",
     "@types/jest": "^27.5.2",
     "@types/node": "^14.18.54",
     "@types/react": "^18.3.7",
@@ -59,7 +61,8 @@
     "ts-node": "^10.9.1",
     "tsc-alias": "^1.8.10",
     "tslib": "^2.6.0",
-    "typescript": "^5.1.6"
+    "typescript": "^5.1.6",
+    "vitest": "^2.1.8"
   },
   "author": "",
   "license": "ISC"
