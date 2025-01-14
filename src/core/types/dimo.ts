@@ -22,6 +22,7 @@ export type KernelConfig = {
   defaultPermissions?: SACD_PERMISSIONS;
   subOrganizationId?: string;
   stamper?: any;
+  feeBoostConfig?: FeeBoostConfig;
 };
 
 export type _kernelConfig = {
@@ -39,6 +40,12 @@ export type _kernelConfig = {
   domain: string;
   redirectUri: string;
   defaultPermissions: SACD_PERMISSIONS;
+  feeBoostConfig: FeeBoostConfig;
+};
+
+export type FeeBoostConfig = {
+  maxFeeMultiplier: number;
+  maxPriorityFeeMultiplier: number;
 };
 
 export type AccountConfig = {
@@ -177,4 +184,12 @@ export type SACDTemplateSigned = {
 export type TransactionReturnType = GetUserOperationReceiptReturnType & {
   userOperationHash?: string;
   status?: string;
+};
+
+export type OptionalArgs = {
+  feeBoostConfig?: FeeBoostConfig;
+};
+
+export type _optionalArgs = {
+  feeBoostConfig: FeeBoostConfig;
 };

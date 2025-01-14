@@ -1,8 +1,15 @@
 import { VehcilePermissionDescription } from ":core/types/args.js";
-import { AccountConfig, KernelConfig, _accountConfig, _kernelConfig } from ":core/types/dimo.js";
+import {
+  AccountConfig,
+  KernelConfig,
+  OptionalArgs,
+  _accountConfig,
+  _kernelConfig,
+  _optionalArgs,
+} from ":core/types/dimo.js";
 import { KERNEL_V3_1, getEntryPoint } from "@zerodev/sdk/constants";
 
-export const newKernelConfig = (args: KernelConfig): _kernelConfig => {
+export const newKernelConfig = (args: KernelConfig): KernelConfig => {
   if (args.rpcUrl == undefined) {
     throw new Error("rpcUrl is required");
   }
@@ -48,6 +55,14 @@ export const newKernelConfig = (args: KernelConfig): _kernelConfig => {
     args.defaultPermissions = defaultPerms;
   }
 
+  if (args.feeBoostConfig == undefined) {
+    const feeBoostConfig = {
+      maxFeeMultiplier: 1,
+      maxPriorityFeeMultiplier: 1,
+    };
+    args.feeBoostConfig = feeBoostConfig;
+  }
+
   return {
     rpcUrl: args.rpcUrl,
     bundlerUrl: args.bundlerUrl,
@@ -63,6 +78,7 @@ export const newKernelConfig = (args: KernelConfig): _kernelConfig => {
     sessionTimeoutSeconds: args.sessionTimeoutSeconds,
     usePrivateKey: args.usePrivateKey,
     defaultPermissions: args.defaultPermissions,
+    feeBoostConfig: args.feeBoostConfig,
   };
 };
 
@@ -83,6 +99,19 @@ export const newAccountConfig = (args: AccountConfig): _accountConfig => {
     rpcUrl: args.rpcUrl,
     account: args.account,
     environment: args.environment,
+  };
+};
+
+export const unpackOptionalArgs = (optionalArgs: OptionalArgs): _optionalArgs => {
+  if (optionalArgs.feeBoostConfig == undefined) {
+    optionalArgs.feeBoostConfig = {
+      maxFeeMultiplier: 1,
+      maxPriorityFeeMultiplier: 1,
+    };
+  }
+
+  return {
+    feeBoostConfig: optionalArgs.feeBoostConfig,
   };
 };
 
