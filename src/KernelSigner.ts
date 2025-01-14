@@ -480,10 +480,14 @@ export class KernelSigner {
       userOperation: {
         estimateFeesPerGas: async ({ bundlerClient }) => {
           const gasPrices = await getUserOperationGasPrice(bundlerClient);
+          const maxFeeIncrease =
+            gasPrices.maxFeePerGas * (BigInt(this.config.feeBoostConfig.maxFeePerGasPercent) / BigInt(100));
+          const maxPriorityFeeIncrease =
+            gasPrices.maxFeePerGas * (BigInt(this.config.feeBoostConfig.maxPriorityFeePerGasPercent) / BigInt(100));
+
           return {
-            maxFeePerGas: gasPrices.maxFeePerGas * BigInt(this.config.feeBoostConfig.maxFeeMultiplier),
-            maxPriorityFeePerGas:
-              gasPrices.maxPriorityFeePerGas * BigInt(this.config.feeBoostConfig.maxPriorityFeeMultiplier),
+            maxFeePerGas: maxFeeIncrease + gasPrices.maxFeePerGas,
+            maxPriorityFeePerGas: maxPriorityFeeIncrease + gasPrices.maxPriorityFeePerGas,
           };
         },
       },
@@ -528,27 +532,10 @@ export class KernelSigner {
     this.activeClient = true;
   }
 
-  async _sendUserOperation(
-    client: KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema>,
-    callData: `0x${string}`,
-    optionalArgs: OptionalArgs = {}
-  ): Promise<`0x${string}`> {
-    const nonce = await client.account!.getNonce();
-    const optArgs = unpackOptionalArgs(optionalArgs);
-    const gasInfos = await client.getUserOperationGasPrice();
-    const userOpHash = await client.sendUserOperation({
-      callData: callData,
-      nonce: nonce,
-      maxFeePerGas: gasInfos.maxFeePerGas * BigInt(optArgs.feeBoostConfig.maxFeeMultiplier),
-      maxPriorityFeePerGas: gasInfos.maxPriorityFeePerGas * BigInt(optArgs.feeBoostConfig.maxPriorityFeeMultiplier),
-    });
-    return userOpHash;
-  }
-
   public async mintVehicleWithDeviceDefinition(
     args: MintVehicleWithDeviceDefinition | MintVehicleWithDeviceDefinition[],
     waitForReceipt: boolean = true,
-    optionalArgs: OptionalArgs = {}
+    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     let mintVehicleCallData: `0x${string}`;
@@ -579,7 +566,7 @@ export class KernelSigner {
   public async setVehiclePermissions(
     args: SetVehiclePermissions | SetVehiclePermissions[],
     waitForReceipt: boolean = true,
-    optionalArgs: OptionalArgs = {}
+    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     let setVehiclePermissionsCallData: `0x${string}`;
@@ -610,7 +597,7 @@ export class KernelSigner {
   public async setVehiclePermissionsBulk(
     args: SetVehiclePermissionsBulk,
     waitForReceipt: boolean = true,
-    optionalArgs: OptionalArgs = {}
+    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const setVehiclePermissionsBulkCallData = await setVehiclePermissionsBulk(args, client, this.config.environment);
@@ -633,7 +620,7 @@ export class KernelSigner {
   public async sendDIMOTokens(
     args: SendDIMOTokens,
     waitForReceipt: boolean = true,
-    optionalArgs: OptionalArgs = {}
+    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getPasskeyClient();
 
@@ -660,7 +647,7 @@ export class KernelSigner {
   public async claimAftermarketDevice(
     args: ClaimAftermarketdevice,
     waitForReceipt: boolean = true,
-    optionalArgs: OptionalArgs = {}
+    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
@@ -683,7 +670,7 @@ export class KernelSigner {
   public async pairAftermarketDevice(
     args: PairAftermarketDevice,
     waitForReceipt: boolean = true,
-    optionalArgs: OptionalArgs = {}
+    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
@@ -705,7 +692,7 @@ export class KernelSigner {
   public async claimAndPairAftermarketDevice(
     args: ClaimAftermarketdevice & PairAftermarketDevice,
     waitForReceipt: boolean = true,
-    optionalArgs: OptionalArgs = {}
+    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
@@ -728,7 +715,7 @@ export class KernelSigner {
   public async burnVehicle(
     args: BurnVehicle | BurnVehicle[],
     waitForReceipt: boolean = true,
-    optionalArgs: OptionalArgs = {}
+    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
@@ -760,7 +747,7 @@ export class KernelSigner {
   public async transferVehicleAndAftermarketDevices(
     args: TransferVehicleAndAftermarketDeviceIDs,
     waitForReceipt: boolean = true,
-    optionalArgs: OptionalArgs = {}
+    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
@@ -783,7 +770,7 @@ export class KernelSigner {
   public async unpairAftermarketDevice(
     args: UnPairAftermarketDevice,
     waitForReceipt: boolean = true,
-    optionalArgs: OptionalArgs = {}
+    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const unpairADCallData = await unpairAftermarketDevice(args, client, this.config.environment);
@@ -1020,7 +1007,7 @@ export class KernelSigner {
   public async executeTransaction(
     args: TransactionInput,
     waitForReceipt: boolean = true,
-    optionalArgs: OptionalArgs = {}
+    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     let client = await this.getActiveClient();
     if (args.requireSignature) {
@@ -1050,5 +1037,27 @@ export class KernelSigner {
       userOperationHash: userOpHash,
       status: "pending",
     } as TransactionReturnType;
+  }
+
+  async _sendUserOperation(
+    client: KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema>,
+    callData: `0x${string}`,
+    optionalArgs?: OptionalArgs
+  ): Promise<`0x${string}`> {
+    const nonce = await client.account!.getNonce();
+    const optArgs = unpackOptionalArgs(optionalArgs);
+    const gasInfos = await client.getUserOperationGasPrice();
+
+    const maxFeeIncrease = gasInfos.maxFeePerGas * (BigInt(optArgs.feeBoostConfig.maxFeePerGasPercent) / BigInt(100));
+    const maxPriorityFeeIncrease =
+      gasInfos.maxFeePerGas * (BigInt(optArgs.feeBoostConfig.maxPriorityFeePerGasPercent) / BigInt(100));
+
+    const userOpHash = await client.sendUserOperation({
+      callData: callData,
+      nonce: nonce,
+      maxFeePerGas: maxFeeIncrease + gasInfos.maxFeePerGas,
+      maxPriorityFeePerGas: maxPriorityFeeIncrease + gasInfos.maxPriorityFeePerGas,
+    });
+    return userOpHash;
   }
 }
