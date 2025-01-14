@@ -76,12 +76,6 @@ export class KernelSigner {
   ifpsUrl: string;
   activeClient = false;
 
-  apiSessionClient = {
-    client: undefined as KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema> | undefined,
-    expires: 0,
-    initialized: false,
-  };
-
   passkeyClient = {
     turnkeyClient: undefined as TurnkeyClient | undefined,
     valid: false,
@@ -138,7 +132,6 @@ export class KernelSigner {
     this.walletAddress = undefined;
     this.smartContractAddress = undefined;
 
-    this.apiSessionClient = { ...defaultClientState };
     this.passkeyClient = {
       turnkeyClient: undefined,
       valid: false,
@@ -157,8 +150,6 @@ export class KernelSigner {
     if (this.config.usePrivateKey) return true;
 
     const now = Date.now();
-    if (this.apiSessionClient.expires > now) return true;
-
     if (this.config.useWalletSession) {
       if (this.passkeySessionClient.expires > now || this.passkeyClient.valid) {
         return true;
@@ -175,25 +166,19 @@ export class KernelSigner {
 
     const now = Date.now();
 
-    if (this.apiSessionClient.expires > now && this.apiSessionClient.client) {
-      return this.apiSessionClient.client;
+    if (this.passkeySessionClient.expires > now && this.passkeySessionClient.client) {
+      return this.passkeySessionClient.client;
     }
 
-    if (this.config.useWalletSession) {
-      if (this.passkeySessionClient.expires > now && this.passkeySessionClient.client) {
-        return this.passkeySessionClient.client;
-      }
-
-      try {
-        await this.openSessionWithPasskey();
-        if (this.passkeySessionClient.expires > now && this.passkeySessionClient.client) {
-          return this.passkeySessionClient.client;
-        }
-      } catch {
-        if (this.passkeyClient.valid && this.passkeyClient.client) {
-          return this.passkeyClient.client;
+    if (this.passkeyClient.valid) {
+      if (this.config.useWalletSession) {
+        try {
+          await this._openWalletSession(this.subOrganizationId!, this.passkeyClient.turnkeyClient!);
+        } catch {
+          return this.passkeySessionClient.client!;
         }
       }
+      return this.passkeyClient.client!;
     }
 
     throw new Error("No active client");
@@ -217,55 +202,78 @@ export class KernelSigner {
   }
 
   // INITIALIZING SDK
+  async _getWalletAddress(subOrganizationId: string, turnkeyClient: TurnkeyClient): Promise<`0x${string}`> {
+    const wallets = await turnkeyClient.getWallets({
+      organizationId: subOrganizationId,
+    });
+    const walletAddr = await turnkeyClient.getWalletAccounts({
+      organizationId: subOrganizationId,
+      walletId: wallets.wallets[0].walletId,
+    });
+
+    return walletAddr.accounts[0].address as `0x${string}`;
+  }
+
+  async _openWalletSession(subOrganizationId: string, tkClient: TurnkeyClient): Promise<void> {
+    if (this.config.useWalletSession && this.isSessionActive(this.passkeySessionClient)) return;
+
+    const timestamp = Date.now();
+    const key = generateP256KeyPair();
+    const targetPubHex = key.publicKeyUncompressed;
+    const expiration = timestamp + parseInt(this.config.sessionTimeoutSeconds) * 0.75 * 1000;
+
+    this.subOrganizationId = subOrganizationId;
+
+    const sessionData = await tkClient!.createReadWriteSession({
+      organizationId: this.subOrganizationId,
+      type: "ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2",
+      timestampMs: timestamp.toString(),
+      parameters: {
+        targetPublicKey: targetPubHex,
+        expirationSeconds: this.config.sessionTimeoutSeconds,
+      },
+    });
+
+    const bundle = sessionData.activity.result.createReadWriteSessionResultV2?.credentialBundle;
+    const decryptedBundle = decryptBundle(bundle!, key.privateKey);
+    const privateKey = uint8ArrayToHexString(decryptedBundle);
+    const apiStamper = new ApiKeyStamper({
+      apiPublicKey: uint8ArrayToHexString(getPublicKey(uint8ArrayFromHexString(privateKey), true)),
+      apiPrivateKey: privateKey,
+    });
+
+    const turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, apiStamper);
+    this.passkeySessionClient.expires = expiration;
+    this.passkeySessionClient.initialized = true;
+
+    this.walletAddress = await this._getWalletAddress(subOrganizationId, turnkeyClient);
+
+    this.passkeySessionClient.client = await this._createKernelAccount(
+      turnkeyClient,
+      subOrganizationId,
+      this.walletAddress!
+    );
+
+    this.activeClient = true;
+  }
 
   public async init(subOrganizationId: string, stamper: any): Promise<void> {
     if (this.isSessionActive(this.passkeySessionClient)) return;
+    if (this.config.useWalletSession) {
+      // openPasskeySession
+      const tkClient = this.passkeyClient.valid
+        ? this.passkeyClient.turnkeyClient!
+        : new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, stamper);
+      await this._openWalletSession(subOrganizationId, tkClient);
+    }
 
-    const timestamp = Date.now();
-    const key = generateP256KeyPair();
-    const targetPubHex = key.publicKeyUncompressed;
-    const expiration = timestamp + parseInt(this.config.sessionTimeoutSeconds) * 0.75 * 1000;
-
-    this.subOrganizationId = subOrganizationId;
     this.passkeyClient.turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, stamper);
     this.passkeyClient.valid = true;
     this.passkeyClient.initialized = true;
 
-    const sessionData = await this.passkeyClient.turnkeyClient!.createReadWriteSession({
-      organizationId: this.subOrganizationId,
-      type: "ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2",
-      timestampMs: timestamp.toString(),
-      parameters: {
-        targetPublicKey: targetPubHex,
-        expirationSeconds: this.config.sessionTimeoutSeconds,
-      },
-    });
-
-    const bundle = sessionData.activity.result.createReadWriteSessionResultV2?.credentialBundle;
-    const decryptedBundle = decryptBundle(bundle!, key.privateKey);
-    const privateKey = uint8ArrayToHexString(decryptedBundle);
-    const apiStamper = new ApiKeyStamper({
-      apiPublicKey: uint8ArrayToHexString(getPublicKey(uint8ArrayFromHexString(privateKey), true)),
-      apiPrivateKey: privateKey,
-    });
-
-    const turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, apiStamper);
-    this.passkeySessionClient.expires = expiration;
-    this.passkeySessionClient.initialized = true;
-    const wallets = await turnkeyClient.getWallets({
-      organizationId: subOrganizationId,
-    });
-    const walletAddr = await turnkeyClient.getWalletAccounts({
-      organizationId: subOrganizationId,
-      walletId: wallets.wallets[0].walletId,
-    });
-
-    this.walletAddress = walletAddr.accounts[0].address as `0x${string}`;
-    this.passkeySessionClient.client = await this._createKernelAccount(
-      turnkeyClient,
-      subOrganizationId,
-      this.walletAddress!
-    );
+    if (this.walletAddress == undefined) {
+      this.walletAddress = await this._getWalletAddress(subOrganizationId, this.passkeyClient.turnkeyClient);
+    }
 
     this.passkeyClient.client = await this._createKernelAccount(
       this.passkeyClient.turnkeyClient,
@@ -274,160 +282,6 @@ export class KernelSigner {
     );
     this.activeClient = true;
 
-    return;
-  }
-
-  public async passkeyInit(subOrganizationId: string, walletAddress: `0x${string}`, stamper: any): Promise<void> {
-    this.subOrganizationId = subOrganizationId;
-    this.walletAddress = walletAddress;
-    const turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, stamper);
-
-    this.passkeyClient = {
-      turnkeyClient,
-      client: await this._createKernelAccount(turnkeyClient, subOrganizationId, walletAddress),
-      valid: true,
-      initialized: true,
-    };
-
-    this.activeClient = true;
-  }
-
-  public async passkeyToSession(subOrganizationId: string, stamper: any) {
-    if (this.isSessionActive(this.passkeySessionClient)) return;
-
-    const timestamp = Date.now();
-    const key = generateP256KeyPair();
-    const targetPubHex = key.publicKeyUncompressed;
-    const expiration = timestamp + parseInt(this.config.sessionTimeoutSeconds) * 0.75 * 1000;
-
-    this.subOrganizationId = subOrganizationId;
-    this.passkeyClient.turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, stamper);
-    this.passkeyClient.valid = true;
-    this.passkeyClient.initialized = true;
-
-    const sessionData = await this.passkeyClient.turnkeyClient!.createReadWriteSession({
-      organizationId: this.subOrganizationId,
-      type: "ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2",
-      timestampMs: timestamp.toString(),
-      parameters: {
-        targetPublicKey: targetPubHex,
-        expirationSeconds: this.config.sessionTimeoutSeconds,
-      },
-    });
-
-    const bundle = sessionData.activity.result.createReadWriteSessionResultV2?.credentialBundle;
-    const decryptedBundle = decryptBundle(bundle!, key.privateKey);
-    const privateKey = uint8ArrayToHexString(decryptedBundle);
-    const apiStamper = new ApiKeyStamper({
-      apiPublicKey: uint8ArrayToHexString(getPublicKey(uint8ArrayFromHexString(privateKey), true)),
-      apiPrivateKey: privateKey,
-    });
-
-    const turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, apiStamper);
-    this.passkeySessionClient.expires = expiration;
-    this.passkeySessionClient.initialized = true;
-    const wallets = await turnkeyClient.getWallets({
-      organizationId: subOrganizationId,
-    });
-    const walletAddr = await turnkeyClient.getWalletAccounts({
-      organizationId: subOrganizationId,
-      walletId: wallets.wallets[0].walletId,
-    });
-
-    this.walletAddress = walletAddr.accounts[0].address as `0x${string}`;
-    this.passkeySessionClient.client = await this._createKernelAccount(
-      turnkeyClient,
-      subOrganizationId,
-      this.walletAddress!
-    );
-
-    this.passkeyClient.client = await this._createKernelAccount(
-      this.passkeyClient.turnkeyClient,
-      subOrganizationId,
-      this.walletAddress!
-    );
-    this.activeClient = true;
-    return;
-  }
-
-  public async openSessionWithPasskey() {
-    if (!this.config.useWalletSession) {
-      throw new Error("Wallet session not enabled");
-    }
-    if (!this.passkeyClient.valid) {
-      throw new Error("Passkey client not initialized");
-    }
-    if (!this.subOrganizationId) {
-      throw new Error("Sub organization id not set");
-    }
-
-    const timestamp = Date.now();
-    const expiration = timestamp + parseInt(this.config.sessionTimeoutSeconds) * 0.75 * 1000;
-    const key = generateP256KeyPair();
-    const targetPubHex = key.publicKeyUncompressed;
-    const sessionData = await this.passkeyClient.turnkeyClient!.createReadWriteSession({
-      organizationId: this.subOrganizationId,
-      type: "ACTIVITY_TYPE_CREATE_READ_WRITE_SESSION_V2",
-      timestampMs: timestamp.toString(),
-      parameters: {
-        targetPublicKey: targetPubHex,
-        expirationSeconds: this.config.sessionTimeoutSeconds,
-      },
-    });
-
-    const bundle = sessionData.activity.result.createReadWriteSessionResultV2?.credentialBundle;
-    const decryptedBundle = decryptBundle(bundle!, key.privateKey);
-    const privateKey = uint8ArrayToHexString(decryptedBundle);
-    const apiStamper = new ApiKeyStamper({
-      apiPublicKey: uint8ArrayToHexString(getPublicKey(uint8ArrayFromHexString(privateKey), true)),
-      apiPrivateKey: privateKey,
-    });
-
-    const turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, apiStamper);
-    const wallets = await turnkeyClient.getWallets({
-      organizationId: this.subOrganizationId!,
-    });
-    const walletAddr = await turnkeyClient.getWalletAccounts({
-      organizationId: this.subOrganizationId!,
-      walletId: wallets.wallets[0].walletId,
-    });
-
-    this.walletAddress = walletAddr.accounts[0].address as `0x${string}`;
-    this.passkeySessionClient.client = await this._createKernelAccount(
-      turnkeyClient,
-      this.subOrganizationId!,
-      this.walletAddress!
-    );
-    this.passkeySessionClient.expires = expiration;
-    this.activeClient = true;
-    return;
-  }
-
-  public async openSessionWithApiStamper(subOrganizationId: string, apiStamper: any) {
-    const timestamp = Date.now();
-    const expiration = timestamp + parseInt(this.config.sessionTimeoutSeconds) * 0.75 * 1000;
-
-    const turnkeyClient = new TurnkeyClient({ baseUrl: this.config.turnkeyApiBaseUrl }, apiStamper);
-
-    const wallets = await turnkeyClient.getWallets({
-      organizationId: subOrganizationId,
-    });
-    const walletAddr = await turnkeyClient.getWalletAccounts({
-      organizationId: subOrganizationId,
-      walletId: wallets.wallets[0].walletId,
-    });
-
-    this.walletAddress = walletAddr.accounts[0].address as `0x${string}`;
-    this.subOrganizationId = subOrganizationId;
-
-    this.apiSessionClient.client = await this._createKernelAccount(
-      turnkeyClient,
-      subOrganizationId,
-      this.walletAddress!
-    );
-    this.apiSessionClient.expires = expiration;
-    this.apiSessionClient.initialized = true;
-    this.activeClient = true;
     return;
   }
 
