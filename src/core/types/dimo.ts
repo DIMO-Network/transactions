@@ -44,8 +44,8 @@ export type _kernelConfig = {
 };
 
 export type FeeBoostConfig = {
-  maxFeeMultiplier: number;
-  maxPriorityFeeMultiplier: number;
+  maxFeePerGasPercent: number;
+  maxPriorityFeePerGasPercent: number;
 };
 
 export type AccountConfig = {
@@ -187,9 +187,5 @@ export type TransactionReturnType = GetUserOperationReceiptReturnType & {
 };
 
 export type OptionalArgs = {
-  feeBoostConfig?: FeeBoostConfig;
-};
-
-export type _optionalArgs = {
   feeBoostConfig: FeeBoostConfig;
 };
