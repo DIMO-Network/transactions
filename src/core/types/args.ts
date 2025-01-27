@@ -122,3 +122,9 @@ export type TransactionInput = {
   data: TransactionData | TransactionData[];
   requireSignature?: boolean;
 };
+
+export type AddStake = {
+  tokenId: BigInt;
+  amount: number;
+  level: number;
+}

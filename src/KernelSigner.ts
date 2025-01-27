@@ -29,6 +29,7 @@ import {
 } from ":core/actions/setPermissionsSACD.js";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING, ENV_TO_API_MAPPING } from ":core/constants/mappings.js";
 import {
+  AddStake,
   BurnVehicle,
   ClaimAftermarketdevice,
   DeriveKernelAddress,
@@ -61,6 +62,7 @@ import { claimAndPairDevice } from ":core/actions/claimAndPair.js";
 import { executeTransaction, executeTransactionBatch } from ":core/actions/executeTransaction.js";
 import { createBundlerClient } from "viem/account-abstraction";
 import { sacdPermissionValue, sacdPermissionArray, unpackOptionalArgs } from ":core/utils/utils.js";
+import { addStake } from ":core/actions/addStake.js";
 
 export class KernelSigner {
   config: _kernelConfig;
@@ -777,6 +779,24 @@ export class KernelSigner {
 
     const userOpHash = await this._sendUserOperation(client, unpairADCallData, optionalArgs);
 
+    if (waitForReceipt) {
+      const client = await this.getActiveClient();
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
+      });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    } as TransactionReturnType;
+  }
+
+  public async addStake(args: AddStake, waitForReceipt: boolean = true,
+                        optionalArgs?: OptionalArgs) {
+    const client = await this.getActiveClient();
+    const addStakeCallData = await addStake(args, client, this.config.environment);
+    const userOpHash = await this._sendUserOperation(client, addStakeCallData, optionalArgs);
     if (waitForReceipt) {
       const client = await this.getActiveClient();
       return await client.waitForUserOperationReceipt({
