@@ -7,6 +7,7 @@ import { abiRegistry } from ":core/abis/DimoRegistry.js";
 import { abiCredits } from ":core/abis/DimoCredit.js";
 import { abiToken } from ":core/abis/DimoToken.js";
 import { abiSacd } from ":core/abis/DimoSacd.js";
+import { abiStaking, abiStakingDev } from ":core/abis/DimoStaking.js";
 
 import {
   AMOY_DIMO_CREDIT_ADDRESS,
@@ -21,6 +22,8 @@ import {
   AMOY_DIMO_FORWARDER,
   POLYGON_DIMO_FORWARDER,
   POLYGON_DIMO_SACD_ADDRESS,
+  AMOY_DIMO_STAKING_ADDRESS,
+  POLYGON_DIMO_STAKING_ADDRESS,
 } from ":core/constants/contractAddrs.js";
 import { Abi } from "viem";
 
@@ -99,6 +102,10 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
         abi: abiForwarder,
         address: AMOY_DIMO_FORWARDER,
       },
+      [ContractType.DIMO_STAKING]: {
+        abi: abiStakingDev,
+        address: AMOY_DIMO_STAKING_ADDRESS,
+      }
     },
   },
   [ENVIRONMENT.PROD]: {
@@ -127,6 +134,10 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
         abi: abiForwarder,
         address: POLYGON_DIMO_FORWARDER,
       },
+      [ContractType.DIMO_STAKING]: {
+        abi: abiStaking,
+        address: POLYGON_DIMO_STAKING_ADDRESS,
+      }
     },
   },
 };

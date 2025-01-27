@@ -80,6 +80,7 @@ export enum ContractType {
   DIMO_SACD,
   DIMO_TOKEN,
   DIMO_FORWARDER,
+  DIMO_STAKING,
 }
 
 export enum SupportedNetworks {
