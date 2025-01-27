@@ -128,3 +128,7 @@ export type AddStake = {
   amount: number;
   level: number;
 }
+
+export type WithdrawStake = {
+  stakeId: BigInt;
+}

@@ -41,7 +41,7 @@ import {
   SetVehiclePermissionsBulk,
   TransactionInput,
   TransferVehicleAndAftermarketDeviceIDs,
-  UnPairAftermarketDevice,
+  UnPairAftermarketDevice, WithdrawStake,
 } from ":core/types/args.js";
 import { claimAftermarketDevice, claimAftermarketDeviceTypeHash } from ":core/actions/claimAftermarketDevice.js";
 import { TypeHashResponse } from ":core/types/responses.js";
@@ -63,6 +63,7 @@ import { executeTransaction, executeTransactionBatch } from ":core/actions/execu
 import { createBundlerClient } from "viem/account-abstraction";
 import { sacdPermissionValue, sacdPermissionArray, unpackOptionalArgs } from ":core/utils/utils.js";
 import { addStake } from ":core/actions/addStake.js";
+import { withdrawStake } from ":core/actions/withdrawStake.js";
 
 export class KernelSigner {
   config: _kernelConfig;
@@ -796,6 +797,23 @@ export class KernelSigner {
                         optionalArgs?: OptionalArgs) {
     const client = await this.getActiveClient();
     const addStakeCallData = await addStake(args, client, this.config.environment);
+    const userOpHash = await this._sendUserOperation(client, addStakeCallData, optionalArgs);
+    if (waitForReceipt) {
+      const client = await this.getActiveClient();
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
+      });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    } as TransactionReturnType;
+  }
+
+  public async withdrawStake(args: WithdrawStake, waitForReceipt: boolean = true, optionalArgs?: OptionalArgs) {
+    const client = await this.getActiveClient();
+    const addStakeCallData = await withdrawStake(args, client, this.config.environment);
     const userOpHash = await this._sendUserOperation(client, addStakeCallData, optionalArgs);
     if (waitForReceipt) {
       const client = await this.getActiveClient();
