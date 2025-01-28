@@ -794,7 +794,7 @@ export class KernelSigner {
   }
 
   public async addStake(args: AddStake, waitForReceipt: boolean = true,
-                        optionalArgs?: OptionalArgs) {
+                        optionalArgs?: OptionalArgs): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const addStakeCallData = await addStake(args, client, this.config.environment);
     const userOpHash = await this._sendUserOperation(client, addStakeCallData, optionalArgs);
@@ -811,7 +811,7 @@ export class KernelSigner {
     } as TransactionReturnType;
   }
 
-  public async withdrawStake(args: WithdrawStake, waitForReceipt: boolean = true, optionalArgs?: OptionalArgs) {
+  public async withdrawStake(args: WithdrawStake, waitForReceipt: boolean = true, optionalArgs?: OptionalArgs): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const addStakeCallData = await withdrawStake(args, client, this.config.environment);
     const userOpHash = await this._sendUserOperation(client, addStakeCallData, optionalArgs);
