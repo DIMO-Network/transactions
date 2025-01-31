@@ -27,10 +27,22 @@ If you're a developer interested in using the DIMO Transactions SDK for **multi-
     import { KernelSigner, newKernelConfig, sacdPermissionValue } from '@dimo-network/transactions';
 
     const kernelSignerConfig = ({
-        rpcUrl: RPC_URL,
-        bundlerUrl: BUNDLER_RPC,
-        paymasterUrl: PAYMASTER_RPC,
-        environment: 'dev', // omit to default to prod
+      rpcUrl: RPC_URL,
+      bundlerUrl: BUNDLER_RPC,
+      paymasterUrl: PAYMASTER_RPC,
+      environment: 'dev', // omit to default to prod
+      useWalletSession: true,
+      clientId: AUTH_CLIENT_ID, 
+      domain: AUTH_ISSUER, 
+      redirectUri: AUTH_ISSUER,
+      defaultPermissions: sacdPermissionValue({
+        NONLOCATION_TELEMETRY: true,
+        COMMANDS: true,
+        CURRENT_LOCATION: true,
+        ALLTIME_LOCATION: true,
+        CREDENTIALS: true,
+        STREAMS: true,
+      }),
     });
 
     // NOTE: use the correct stamper for your framework
@@ -39,17 +51,11 @@ If you're a developer interested in using the DIMO Transactions SDK for **multi-
     });
 
     const kernelSigner = new KernelSigner(kernelSignerConfig);
-    await kernelSigner.passkeyToSession(
-        subOrganizationId,
-        walletAddress as `0x${string}`,
-        stamper,
-    );
+    await kernelSigner.init(suborganizationId, stamper);
 
-    const permissions = sacdPermissionValue({
-        ALLTIME_LOCATION: true,
-    });
+    const permissions = kernelSigner.getDefaultPermissionValue();
 
-      const ipfsRes = await kernelSigner.signAndUploadSACDAgreement({
+    const ipfsRes = await kernelSigner.signAndUploadSACDAgreement({
         driverID: grantee,
         appID: DIMO_APP_ID,
         appName: APP_NAME,
