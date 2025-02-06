@@ -1,25 +1,26 @@
 import { encodeFunctionData } from "viem";
-import { Wormhole, chainToChainId } from "@wormhole-foundation/sdk";
+import { Wormhole, chainToChainId, Network } from "@wormhole-foundation/sdk";
 import { KernelAccountClient } from "@zerodev/sdk";
 import evm from "@wormhole-foundation/sdk/platforms/evm";
+import solana from "@wormhole-foundation/sdk/platforms/solana";
 
 import { addressToBytes32 } from ":core/utils/utils.js";
 import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 import { APPROVE_TOKENS, NTT_TRANSFER } from ":core/constants/methods.js";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING, WORMHOLE_ENV_MAPPING, WORMHOLE_NTT_CONTRACTS, WORMHOLE_TRANSCEIVER_INSTRUCTIONS } from ":core/constants/mappings.js";
-
 import { abiWormholeNttManager } from ":core/abis/WormholeNttManager.js";
 
-type SupportedChain = 'Ethereum' | 'Polygon' | 'Base';
+export type SupportedSourceChain = 'Ethereum' | 'Polygon' | 'Base';
+export type SupportedDestinationChain = SupportedSourceChain | 'Solana';
 
-interface BridgeInitiateArgs {
-  sourceChain: SupportedChain;
-  destinationChain: SupportedChain;
+export interface BridgeInitiateArgs {
+  sourceChain: SupportedSourceChain;
+  destinationChain: SupportedDestinationChain;
   tokenAddress: string;
   amount: bigint;
   recipientAddress: string;
   isRelayed?: boolean;
-  test?: boolean;
+  priceIncreasePercentage?: number;
 }
 
 export async function initiateBridging(
@@ -29,24 +30,12 @@ export async function initiateBridging(
 ): Promise<string> {
   const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
   const sourceNttManagerAddress = WORMHOLE_NTT_CONTRACTS[args.sourceChain]?.manager;
-  const wormhole = new Wormhole(WORMHOLE_ENV_MAPPING.get(environment) ?? "Testnet", [evm.Platform, evm.Platform]);
-  const sourceChain = wormhole.getChain(args.sourceChain);
-  const destChain = wormhole.getChain(args.destinationChain);
-
-  const srcNtt = await sourceChain.getProtocol("Ntt", {
-    ntt: WORMHOLE_NTT_CONTRACTS[args.sourceChain],
-  });
 
   let transferCallValue = BigInt(0);
   let transceiverInstructions = WORMHOLE_TRANSCEIVER_INSTRUCTIONS.notRelayed;
 
   if (args.isRelayed) {
-    transferCallValue = await srcNtt.quoteDeliveryPrice(destChain.chain, {
-      queue: false,
-      automatic: true
-    });
-    // Increase transferCallValue by 10% to avoid underfunding
-    transferCallValue = transferCallValue + (transferCallValue * BigInt(10) / BigInt(100))
+    transferCallValue = await quoteDeliveryPrice(args.sourceChain, args.destinationChain, environment, args.priceIncreasePercentage);
     transceiverInstructions = WORMHOLE_TRANSCEIVER_INSTRUCTIONS.relayed;
   }
 
@@ -66,7 +55,6 @@ export async function initiateBridging(
     data: encodeFunctionData({
       abi: abiWormholeNttManager,
       functionName: NTT_TRANSFER,
-      /* uint256 amount,uint16 recipientChain,bytes32 recipient,bytes32 refundAddress,bool shouldQueue,bytes transceiverInstructions */
       args: [
         args.amount,
         chainToChainId(args.destinationChain),
@@ -79,4 +67,31 @@ export async function initiateBridging(
   };
 
   return await client.account!.encodeCalls([approveCall, transferCall]);
+}
+
+export async function quoteDeliveryPrice(
+  sourceChain: SupportedSourceChain,
+  destinationChain: SupportedDestinationChain,
+  environment: string = "prod",
+  priceIncreasePercentage: number = 10
+): Promise<bigint> {
+  const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Testnet";
+  const wormhole = new Wormhole(wormholeEnv as Network, [evm.Platform, solana.Platform]);
+
+  const srcChain = wormhole.getChain(sourceChain);
+  const destChain = wormhole.getChain(destinationChain);
+
+  const srcNtt = await srcChain.getProtocol("Ntt", {
+    ntt: WORMHOLE_NTT_CONTRACTS[sourceChain],
+  });
+
+  let price = await srcNtt.quoteDeliveryPrice(destChain.chain, {
+    queue: false,
+    automatic: true
+  });
+
+  // Increase price by the specified percentage to avoid underfunding
+  price = price + (price * BigInt(priceIncreasePercentage) / BigInt(100));
+
+  return price;
 }
