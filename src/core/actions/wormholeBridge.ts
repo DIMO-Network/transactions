@@ -1,5 +1,5 @@
 import { encodeFunctionData } from "viem";
-import { Wormhole, chainToChainId, Network } from "@wormhole-foundation/sdk";
+import { Wormhole, TransactionId, chainToChainId, VAA, Network } from "@wormhole-foundation/sdk";
 import { KernelAccountClient } from "@zerodev/sdk";
 import evm from "@wormhole-foundation/sdk/platforms/evm";
 import solana from "@wormhole-foundation/sdk/platforms/solana";
@@ -94,4 +94,28 @@ export async function quoteDeliveryPrice(
   price = price + (price * BigInt(priceIncreasePercentage) / BigInt(100));
 
   return price;
+}
+
+export async function checkNttTransferStatus(
+  txid: string,
+  environment: string = "prod",
+  timeoutMs: number = 30000
+): Promise<{ status: string; vaa: VAA | null }> {
+  const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Testnet";
+  const wormhole = new Wormhole(wormholeEnv as Network, [evm.Platform, solana.Platform]);
+
+  try {
+    // Try to fetch the VAA
+    const vaa = await wormhole.getVaa(txid, "Ntt:WormholeTransfer", timeoutMs);
+
+    if (vaa) {
+      return { status: "Completed", vaa };
+    } else {
+      // If no VAA is found, the transfer is still in progress
+      return { status: "In Progress", vaa: null };
+    }
+  } catch (error) {
+    console.error("Error checking NTT transfer status:", error);
+    return { status: "Error", vaa: null };
+  }
 }
