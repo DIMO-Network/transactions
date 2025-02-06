@@ -1,5 +1,5 @@
 import { encodeFunctionData } from "viem";
-import { Wormhole, TransactionId, chainToChainId, VAA, Network } from "@wormhole-foundation/sdk";
+import { Wormhole, chainToChainId, VAA, Network } from "@wormhole-foundation/sdk";
 import { KernelAccountClient } from "@zerodev/sdk";
 import evm from "@wormhole-foundation/sdk/platforms/evm";
 import solana from "@wormhole-foundation/sdk/platforms/solana";
@@ -23,6 +23,21 @@ export interface BridgeInitiateArgs {
   priceIncreasePercentage?: number;
 }
 
+/**
+ * Initiates a bridging operation for transferring tokens across different chains using Wormhole.
+ * 
+ * @param args - An object containing the bridging parameters.
+ * @param args.sourceChain - The source chain for the bridging operation.
+ * @param args.destinationChain - The destination chain for the bridging operation.
+ * @param args.tokenAddress - The address of the token to be bridged.
+ * @param args.amount - The amount of tokens to be bridged.
+ * @param args.recipientAddress - The address of the recipient on the destination chain.
+ * @param args.isRelayed - Optional. Indicates if the transfer should be relayed.
+ * @param args.priceIncreasePercentage - Optional. The percentage to increase the quoted price by.
+ * @param client - The KernelAccountClient instance used for transaction execution.
+ * @param environment - Optional. The environment to use for the bridging operation. Defaults to "prod".
+ * @returns A Promise that resolves to a string representing the encoded calls for the bridging operation.
+ */
 export async function initiateBridging(
   args: BridgeInitiateArgs,
   client: KernelAccountClient,
@@ -69,6 +84,19 @@ export async function initiateBridging(
   return await client.account!.encodeCalls([approveCall, transferCall]);
 }
 
+/**
+ * Quotes the delivery price for a Wormhole NTT transfer between chains.
+ * 
+ * This function calculates the cost of transferring tokens from a source chain to a destination chain
+ * using Wormhole's NTT (Non-Transferable Token) protocol. It includes an option to increase the quoted
+ * price by a specified percentage to avoid underfunding.
+ *
+ * @param sourceChain - The chain from which the tokens will be transferred.
+ * @param destinationChain - The chain to which the tokens will be transferred.
+ * @param environment - The environment to use for the price quote. Defaults to "prod".
+ * @param priceIncreasePercentage - The percentage by which to increase the quoted price. Defaults to 10%.
+ * @returns A Promise that resolves to a bigint representing the quoted delivery price in the smallest unit of the native token.
+ */
 export async function quoteDeliveryPrice(
   sourceChain: SupportedSourceChain,
   destinationChain: SupportedDestinationChain,
@@ -96,6 +124,19 @@ export async function quoteDeliveryPrice(
   return price;
 }
 
+/**
+ * Checks the status of a Non-Transferable Token (NTT) transfer using Wormhole.
+ * 
+ * This function attempts to fetch the Verified Action Approval (VAA) for a given transaction ID.
+ * The presence of a VAA indicates that the transfer has been completed.
+ *
+ * @param txid - The transaction ID of the NTT transfer to check.
+ * @param environment - The environment to use for the status check. Defaults to "prod".
+ * @param timeoutMs - The timeout in milliseconds for the VAA fetch operation. Defaults to 30000 (30 seconds).
+ * @returns A Promise that resolves to an object containing:
+ *          - status: A string indicating the transfer status ("Completed", "In Progress", or "Error").
+ *          - vaa: The VAA object if the transfer is completed, or null otherwise.
+ */
 export async function checkNttTransferStatus(
   txid: string,
   environment: string = "prod",
