@@ -6,7 +6,7 @@ import solana from "@wormhole-foundation/sdk/platforms/solana";
 
 import { addressToBytes32 } from ":core/utils/utils.js";
 import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
-import { SupportedWormholeNetworks } from ":core/types/wormhole.js";
+import { SupportedWormholeNetworks, BridgeInitiateArgs } from ":core/types/wormhole.js";
 import { APPROVE_TOKENS, NTT_TRANSFER } from ":core/constants/methods.js";
 import { abiWormholeNttManager } from ":core/abis/WormholeNttManager.js";
 import {
@@ -17,16 +17,6 @@ import {
   WORMHOLE_NTT_CONTRACTS,
   WORMHOLE_TRANSCEIVER_INSTRUCTIONS
 } from ":core/constants/mappings.js";
-
-export interface BridgeInitiateArgs {
-  sourceChain: SupportedWormholeNetworks;
-  destinationChain: SupportedWormholeNetworks;
-  tokenAddress: string;
-  amount: bigint;
-  recipientAddress: string;
-  isRelayed?: boolean;
-  priceIncreasePercentage?: number;
-}
 
 /**
  * Initiates a bridging operation for transferring tokens across different chains using Wormhole.
