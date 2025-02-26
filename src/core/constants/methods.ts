@@ -6,4 +6,6 @@ export const UNPAIR_AFTERMARKET_DEVICE = "unpairAftermarketDevice";
 export const PAIR_AFTERMARKET_DEVICE = "pairAftermarketDevice";
 export const SET_PERMISSIONS_SACD = "setPermissions";
 export const SEND_DIMO_TOKENS = "transfer";
+export const APPROVE_TOKENS = "approve";
+export const NTT_TRANSFER = "transfer";
 export const BURN_VEHICLE = "burn";

@@ -1,8 +1,11 @@
 import { EntryPointType, KERNEL_V2_VERSION_TYPE, KERNEL_V3_VERSION_TYPE } from "@zerodev/sdk/types";
 import { SACD_PERMISSIONS } from "src/index.js";
-import { Abi, Account } from "viem";
+import { Account } from "viem";
 import { EntryPointVersion, GetUserOperationReceiptReturnType } from "viem/account-abstraction";
 import { Chain, polygon, polygonAmoy } from "viem/chains";
+
+import { AbiAddressPair } from "./common.js";
+
 export const SUPPORTED_CHAINS: Chain[] = [polygonAmoy, polygon];
 
 export type KernelConfig = {
@@ -132,11 +135,6 @@ export type ChainInfos = {
 
 export type ContractToMapping = {
   [key in ContractType]: AbiAddressPair;
-};
-
-export type AbiAddressPair = {
-  abi: Abi;
-  address: `0x${string}`;
 };
 
 export type SACDTemplate = {
