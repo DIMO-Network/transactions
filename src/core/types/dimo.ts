@@ -1,6 +1,6 @@
 import { EntryPointType, KERNEL_V2_VERSION_TYPE, KERNEL_V3_VERSION_TYPE } from "@zerodev/sdk/types";
 import { SACD_PERMISSIONS } from "src/index.js";
-import { Abi, Account } from "viem";
+import { Account } from "viem";
 import { EntryPointVersion, GetUserOperationReceiptReturnType } from "viem/account-abstraction";
 import { Chain, polygon, polygonAmoy } from "viem/chains";
 

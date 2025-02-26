@@ -6,16 +6,21 @@ import solana from "@wormhole-foundation/sdk/platforms/solana";
 
 import { addressToBytes32 } from ":core/utils/utils.js";
 import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
+import { SupportedWormholeNetworks } from ":core/types/wormhole.js";
 import { APPROVE_TOKENS, NTT_TRANSFER } from ":core/constants/methods.js";
-import { CHAIN_ABI_MAPPING, ENV_MAPPING, WORMHOLE_ENV_MAPPING, WORMHOLE_NTT_CONTRACTS, WORMHOLE_TRANSCEIVER_INSTRUCTIONS } from ":core/constants/mappings.js";
 import { abiWormholeNttManager } from ":core/abis/WormholeNttManager.js";
-
-export type SupportedSourceChain = 'Ethereum' | 'Polygon' | 'Base';
-export type SupportedDestinationChain = SupportedSourceChain | 'Solana';
+import {
+  CHAIN_ABI_MAPPING,
+  ENV_MAPPING,
+  WORMHOLE_ENV_MAPPING,
+  WORMHOLE_CHAIN_MAPPING,
+  WORMHOLE_NTT_CONTRACTS,
+  WORMHOLE_TRANSCEIVER_INSTRUCTIONS
+} from ":core/constants/mappings.js";
 
 export interface BridgeInitiateArgs {
-  sourceChain: SupportedSourceChain;
-  destinationChain: SupportedDestinationChain;
+  sourceChain: SupportedWormholeNetworks;
+  destinationChain: SupportedWormholeNetworks;
   tokenAddress: string;
   amount: bigint;
   recipientAddress: string;
@@ -43,45 +48,58 @@ export async function initiateBridging(
   client: KernelAccountClient,
   environment: string = "prod"
 ): Promise<string> {
-  const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
-  const sourceNttManagerAddress = WORMHOLE_NTT_CONTRACTS[args.sourceChain]?.manager;
+  try {
+    const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
+    const sourceNttManagerAddress = WORMHOLE_NTT_CONTRACTS[args.sourceChain]?.manager;
 
-  let transferCallValue = BigInt(0);
-  let transceiverInstructions = WORMHOLE_TRANSCEIVER_INSTRUCTIONS.notRelayed;
+    if (!sourceNttManagerAddress) {
+      throw new Error(`No NTT manager address found for ${args.sourceChain}`);
+    }
 
-  if (args.isRelayed) {
-    transferCallValue = await quoteDeliveryPrice(args.sourceChain, args.destinationChain, environment, args.priceIncreasePercentage);
-    transceiverInstructions = WORMHOLE_TRANSCEIVER_INSTRUCTIONS.relayed;
+    let transferCallValue = BigInt(0);
+    let transceiverInstructions = WORMHOLE_TRANSCEIVER_INSTRUCTIONS.notRelayed;
+
+    if (args.isRelayed) {
+      transferCallValue = await quoteDeliveryPrice(args.sourceChain, args.destinationChain, environment, args.priceIncreasePercentage);
+      transceiverInstructions = WORMHOLE_TRANSCEIVER_INSTRUCTIONS.relayed;
+    }
+
+    const approveCall = {
+      to: contracts[ContractType.DIMO_TOKEN].address,
+      value: BigInt(0),
+      data: encodeFunctionData({
+        abi: contracts[ContractType.DIMO_TOKEN].abi,
+        functionName: APPROVE_TOKENS,
+        args: [sourceNttManagerAddress, args.amount],
+      }),
+    };
+
+    if (!client.account?.address) {
+      throw new Error("Client account address is not available");
+    }
+
+    const transferCall = {
+      to: sourceNttManagerAddress as `0x${string}`,
+      value: transferCallValue,
+      data: encodeFunctionData({
+        abi: abiWormholeNttManager,
+        functionName: NTT_TRANSFER,
+        args: [
+          args.amount,
+          chainToChainId(WORMHOLE_CHAIN_MAPPING[args.destinationChain]),
+          addressToBytes32(args.recipientAddress),
+          addressToBytes32(client.account?.address as string),
+          false,
+          transceiverInstructions
+        ],
+      }),
+    };
+
+    return await client.account!.encodeCalls([approveCall, transferCall]);
+  } catch (error) {
+    console.error("Error in initiateBridging:", error);
+    throw error;
   }
-
-  const approveCall = {
-    to: contracts[ContractType.DIMO_TOKEN].address,
-    value: BigInt(0),
-    data: encodeFunctionData({
-      abi: contracts[ContractType.DIMO_TOKEN].abi,
-      functionName: APPROVE_TOKENS,
-      args: [sourceNttManagerAddress, args.amount],
-    }),
-  };
-
-  const transferCall = {
-    to: sourceNttManagerAddress as `0x${string}`,
-    value: transferCallValue,
-    data: encodeFunctionData({
-      abi: abiWormholeNttManager,
-      functionName: NTT_TRANSFER,
-      args: [
-        args.amount,
-        chainToChainId(args.destinationChain),
-        addressToBytes32(args.recipientAddress),
-        addressToBytes32(client.account?.address as string),
-        false,
-        transceiverInstructions
-      ],
-    }),
-  };
-
-  return await client.account!.encodeCalls([approveCall, transferCall]);
 }
 
 /**
@@ -98,16 +116,16 @@ export async function initiateBridging(
  * @returns A Promise that resolves to a bigint representing the quoted delivery price in the smallest unit of the native token.
  */
 export async function quoteDeliveryPrice(
-  sourceChain: SupportedSourceChain,
-  destinationChain: SupportedDestinationChain,
+  sourceChain: SupportedWormholeNetworks,
+  destinationChain: SupportedWormholeNetworks,
   environment: string = "prod",
   priceIncreasePercentage: number = 10
 ): Promise<bigint> {
-  const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Testnet";
+  const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Mainnet";
   const wormhole = new Wormhole(wormholeEnv as Network, [evm.Platform, solana.Platform]);
 
-  const srcChain = wormhole.getChain(sourceChain);
-  const destChain = wormhole.getChain(destinationChain);
+  const srcChain = wormhole.getChain(WORMHOLE_CHAIN_MAPPING[sourceChain]);
+  const destChain = wormhole.getChain(WORMHOLE_CHAIN_MAPPING[destinationChain]);
 
   const srcNtt = await srcChain.getProtocol("Ntt", {
     ntt: WORMHOLE_NTT_CONTRACTS[sourceChain],
@@ -142,7 +160,7 @@ export async function checkNttTransferStatus(
   environment: string = "prod",
   timeoutMs: number = 30000
 ): Promise<{ status: string; vaa: VAA | null }> {
-  const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Testnet";
+  const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Mainnet";
   const wormhole = new Wormhole(wormholeEnv as Network, [evm.Platform, solana.Platform]);
 
   try {

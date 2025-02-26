@@ -2,7 +2,7 @@ import { Abi } from "viem";
 import { Chain, polygon, polygonAmoy } from "viem/chains";
 
 import { API_BY_ENV, AllChainInfos, ContractType, DIMO_APIs, ENVIRONMENT } from ":core/types/dimo.js";
-import { WormholeNttManagerMapping, SupportedWormholeNetworks, NttContracts } from ":core/types/wormhole.js";
+import { NttContracts, SupportedWormholeNetworks } from ":core/types/wormhole.js";
 import { Network } from "@wormhole-foundation/sdk";
 import { abiForwarder } from ":core/abis/DimoForwarder.js";
 import { abiVehicleId } from ":core/abis/DimoVehicleId.js";
@@ -11,7 +11,6 @@ import { abiCredits } from ":core/abis/DimoCredit.js";
 import { abiToken } from ":core/abis/DimoToken.js";
 import { abiSacd } from ":core/abis/DimoSacd.js";
 import { abiStaking, abiStakingDev } from ":core/abis/DimoStaking.js";
-import { abiWormholeNttManager } from ":core/abis/WormholeNttManager.js";
 
 import {
   AMOY_DIMO_CREDIT_ADDRESS,
@@ -19,22 +18,26 @@ import {
   AMOY_DIMO_VEHICLE_ID_ADDRESS,
   AMOY_DIMO_TOKEN_ADDRESS,
   AMOY_DIMO_REGISTRY_ADDRESS,
+  AMOY_DIMO_FORWARDER,
+  AMOY_DIMO_STAKING_ADDRESS,
   POLYGON_DIMO_VEHICLE_ID_ADDRESS,
   POLYGON_DIMO_TOKEN_ADDRESS,
   POLYGON_DIMO_CREDIT_ADDRESS,
   POLYGON_DIMO_REGISTRY_ADDRESS,
-  AMOY_DIMO_FORWARDER,
   POLYGON_DIMO_FORWARDER,
   POLYGON_DIMO_SACD_ADDRESS,
-  AMOY_DIMO_STAKING_ADDRESS,
   POLYGON_DIMO_STAKING_ADDRESS,
   POLYGON_WORMHOLE_NTT_MANAGER_ADDRESS,
-  POLYGON_TEST_WORMHOLE_NTT_MANAGER_ADDRESS,
   POLYGON_WORMHOLE_TRANSCEIVER_ADDRESS,
+  POLYGON_TEST_DIMO_TOKEN_ADDRESS,
+  POLYGON_TEST_WORMHOLE_NTT_MANAGER_ADDRESS,
+  POLYGON_TEST_WORMHOLE_TRANSCEIVER_ADDRESS,
   BASE_DIMO_TOKEN_ADDRESS,
   BASE_WORMHOLE_NTT_MANAGER_ADDRESS,
-  BASE_TEST_WORMHOLE_NTT_MANAGER_ADDRESS,
   BASE_WORMHOLE_TRANSCEIVER_ADDRESS,
+  BASE_TEST_DIMO_TOKEN_ADDRESS,
+  BASE_TEST_WORMHOLE_NTT_MANAGER_ADDRESS,
+  BASE_TEST_WORMHOLE_TRANSCEIVER_ADDRESS,
   ETHEREUM_DIMO_TOKEN_ADDRESS,
   ETHEREUM_WORMHOLE_NTT_MANAGER_ADDRESS,
   ETHEREUM_WORMHOLE_TRANSCEIVER_ADDRESS,
@@ -60,6 +63,14 @@ export const WORMHOLE_ENV_MAPPING = new Map<string, Network>([
   ["development", "Testnet"],
   ["dev", "Testnet"],
 ]);
+
+export const WORMHOLE_CHAIN_MAPPING: Record<SupportedWormholeNetworks, "Ethereum" | "Polygon" | "Base"> = {
+  "Ethereum": "Ethereum",
+  "Polygon": "Polygon",
+  "Base": "Base",
+  "PolygonTest": "Polygon",
+  "BaseTest": "Base"
+};
 
 export const ENV_TO_API_MAPPING: API_BY_ENV = {
   [ENVIRONMENT.PROD]: {
@@ -163,29 +174,6 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
   },
 };
 
-export const WORMHOLE_NTT_MANAGER_MAPPING: WormholeNttManagerMapping = {
-  [SupportedWormholeNetworks.POLYGON]: {
-    abi: abiWormholeNttManager,
-    address: POLYGON_WORMHOLE_NTT_MANAGER_ADDRESS,
-  },
-  [SupportedWormholeNetworks.MAINNET]: {
-    abi: abiWormholeNttManager,
-    address: ETHEREUM_WORMHOLE_NTT_MANAGER_ADDRESS,
-  },
-  [SupportedWormholeNetworks.BASE]: {
-    abi: abiWormholeNttManager,
-    address: BASE_WORMHOLE_NTT_MANAGER_ADDRESS,
-  },
-  [SupportedWormholeNetworks.POLYGON_TEST]: {
-    abi: abiWormholeNttManager,
-    address: POLYGON_TEST_WORMHOLE_NTT_MANAGER_ADDRESS,
-  },
-  [SupportedWormholeNetworks.BASE_TEST]: {
-    abi: abiWormholeNttManager,
-    address: BASE_TEST_WORMHOLE_NTT_MANAGER_ADDRESS,
-  },
-};
-
 export const WORMHOLE_NTT_CONTRACTS: NttContracts = {
   Ethereum: {
     token: ETHEREUM_DIMO_TOKEN_ADDRESS,
@@ -201,6 +189,16 @@ export const WORMHOLE_NTT_CONTRACTS: NttContracts = {
     token: BASE_DIMO_TOKEN_ADDRESS,
     manager: BASE_WORMHOLE_NTT_MANAGER_ADDRESS,
     transceiver: { wormhole: BASE_WORMHOLE_TRANSCEIVER_ADDRESS },
+  },
+  PolygonTest: {
+    token: POLYGON_TEST_DIMO_TOKEN_ADDRESS,
+    manager: POLYGON_TEST_WORMHOLE_NTT_MANAGER_ADDRESS,
+    transceiver: { wormhole: POLYGON_TEST_WORMHOLE_TRANSCEIVER_ADDRESS },
+  },
+  BaseTest: {
+    token: BASE_TEST_DIMO_TOKEN_ADDRESS,
+    manager: BASE_TEST_WORMHOLE_NTT_MANAGER_ADDRESS,
+    transceiver: { wormhole: BASE_TEST_WORMHOLE_TRANSCEIVER_ADDRESS },
   },
 };
 
