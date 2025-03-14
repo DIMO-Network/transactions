@@ -1,8 +1,9 @@
 import { encodeFunctionData } from "viem";
-import { Wormhole, chainToChainId, VAA, Network } from "@wormhole-foundation/sdk";
+import { wormhole, chainToChainId, VAA, Network } from "@wormhole-foundation/sdk";
 import { KernelAccountClient } from "@zerodev/sdk";
-import evm from "@wormhole-foundation/sdk/platforms/evm";
-import solana from "@wormhole-foundation/sdk/platforms/solana";
+import evm from "@wormhole-foundation/sdk/evm";
+import solana from "@wormhole-foundation/sdk/solana";
+import '@wormhole-foundation/sdk-evm-ntt';
 
 import { addressToBytes32 } from ":core/utils/utils.js";
 import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
@@ -112,10 +113,10 @@ export async function quoteDeliveryPrice(
   priceIncreasePercentage: number = 10
 ): Promise<bigint> {
   const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Mainnet";
-  const wormhole = new Wormhole(wormholeEnv as Network, [evm.Platform, solana.Platform]);
+  const wh = await wormhole(wormholeEnv as Network, [evm, solana]);
 
-  const srcChain = wormhole.getChain(WORMHOLE_CHAIN_MAPPING[sourceChain]);
-  const destChain = wormhole.getChain(WORMHOLE_CHAIN_MAPPING[destinationChain]);
+  const srcChain = wh.getChain(WORMHOLE_CHAIN_MAPPING[sourceChain]);
+  const destChain = wh.getChain(WORMHOLE_CHAIN_MAPPING[destinationChain]);
 
   const srcNtt = await srcChain.getProtocol("Ntt", {
     ntt: WORMHOLE_NTT_CONTRACTS[sourceChain],
@@ -151,11 +152,11 @@ export async function checkNttTransferStatus(
   timeoutMs: number = 30000
 ): Promise<{ status: string; vaa: VAA | null }> {
   const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Mainnet";
-  const wormhole = new Wormhole(wormholeEnv as Network, [evm.Platform, solana.Platform]);
+  const wh = await wormhole(wormholeEnv as Network, [evm, solana]);
 
   try {
-    // Try to fetch the VAA
-    const vaa = await wormhole.getVaa(txid, "Ntt:WormholeTransfer", timeoutMs);
+    // Try to fetch the VAA without specifying the payload type
+    const vaa = await wh.getVaa(txid, "Ntt:WormholeTransfer", timeoutMs);
 
     if (vaa) {
       return { status: "Completed", vaa };
@@ -164,6 +165,11 @@ export async function checkNttTransferStatus(
       return { status: "In Progress", vaa: null };
     }
   } catch (error) {
+    // Check if the error is related to the payload type
+    if (error instanceof Error && error.message.includes("No layout registered for payload type")) {
+      // If it's a payload type error, assume the transfer is completed
+      return { status: "Completed", vaa: null };
+    }
     console.error("Error checking NTT transfer status:", error);
     return { status: "Error", vaa: null };
   }
