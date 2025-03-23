@@ -7,5 +7,5 @@ export const PAIR_AFTERMARKET_DEVICE = "pairAftermarketDevice";
 export const SET_PERMISSIONS_SACD = "setPermissions";
 export const SEND_DIMO_TOKENS = "transfer";
 export const APPROVE_TOKENS = "approve";
-export const NTT_TRANSFER = "transfer";
+export const NTT_TRANSFER = "0xb293f97f"; // transfer(uint256,uint16,bytes32,bytes32,bool,bytes)
 export const BURN_VEHICLE = "burn";

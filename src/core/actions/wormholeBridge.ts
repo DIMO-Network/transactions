@@ -3,7 +3,7 @@ import { wormhole, chainToChainId, VAA, Network } from "@wormhole-foundation/sdk
 import { KernelAccountClient } from "@zerodev/sdk";
 import evm from "@wormhole-foundation/sdk/evm";
 import solana from "@wormhole-foundation/sdk/solana";
-import '@wormhole-foundation/sdk-evm-ntt';
+import "@wormhole-foundation/sdk-evm-ntt";
 
 import { addressToBytes32 } from ":core/utils/utils.js";
 import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
