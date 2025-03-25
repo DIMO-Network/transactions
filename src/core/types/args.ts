@@ -132,3 +132,9 @@ export type AddStake = {
 export type WithdrawStake = {
   stakeId: BigInt;
 }
+
+export type UpgradeStake = {
+  stakeId: BigInt;
+  level: number;
+  vehicleId: BigInt;
+}
