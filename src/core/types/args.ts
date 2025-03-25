@@ -137,4 +137,5 @@ export type UpgradeStake = {
   stakeId: BigInt;
   level: number;
   vehicleId: BigInt;
+  amountDiff:number
 }
