@@ -11,6 +11,7 @@ import { abiCredits } from ":core/abis/DimoCredit.js";
 import { abiToken } from ":core/abis/DimoToken.js";
 import { abiSacd } from ":core/abis/DimoSacd.js";
 import { abiStaking, abiStakingDev } from ":core/abis/DimoStaking.js";
+import { abiUniswapV3Pool } from ":core/abis/UniswapV3Pool.js";
 
 import * as C from ":core/constants/contractAddrs.js";
 
@@ -28,7 +29,7 @@ export const ENV_MAPPING = new Map<string, ENVIRONMENT>([
   ["prod_test", ENVIRONMENT.PROD_TEST],
 
   ["development", ENVIRONMENT.DEV],
-  ["dev", ENVIRONMENT.DEV]
+  ["dev", ENVIRONMENT.DEV],
 ]);
 
 export const WORMHOLE_ENV_MAPPING = new Map<string, Network>([
@@ -39,16 +40,16 @@ export const WORMHOLE_ENV_MAPPING = new Map<string, Network>([
   ["prod_test", "Mainnet"],
 
   ["development", "Testnet"],
-  ["dev", "Testnet"]
+  ["dev", "Testnet"],
 ]);
 
 export const WORMHOLE_CHAIN_MAPPING: Record<SupportedWormholeNetworks, "Ethereum" | "Polygon" | "Base" | "Solana"> = {
-  "Ethereum": "Ethereum",
-  "Polygon": "Polygon",
-  "Base": "Base",
-  "PolygonTest": "Polygon",
-  "BaseTest": "Base",
-  "SolanaTest": "Solana"
+  Ethereum: "Ethereum",
+  Polygon: "Polygon",
+  Base: "Base",
+  PolygonTest: "Polygon",
+  BaseTest: "Base",
+  SolanaTest: "Solana",
 };
 
 export const ENV_TO_API_MAPPING: API_BY_ENV = {
@@ -132,7 +133,11 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
       [ContractType.DIMO_STAKING]: {
         abi: abiStakingDev,
         address: C.AMOY_DIMO_STAKING_ADDRESS,
-      }
+      },
+      [ContractType.UNISWAP_V3_POOL_WMATIC_DIMO]: {
+        abi: abiUniswapV3Pool,
+        address: C.ZERO_ADDRESS,
+      },
     },
   },
   [ENVIRONMENT.PROD]: {
@@ -164,7 +169,11 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
       [ContractType.DIMO_STAKING]: {
         abi: abiStaking,
         address: C.POLYGON_DIMO_STAKING_ADDRESS,
-      }
+      },
+      [ContractType.UNISWAP_V3_POOL_WMATIC_DIMO]: {
+        abi: abiUniswapV3Pool,
+        address: C.POLYGON_UNISWAP_V3_POOL_WMATIC_DIMO_ADDRESS,
+      },
     },
   },
   [ENVIRONMENT.PROD_TEST]: {
@@ -196,7 +205,11 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
       [ContractType.DIMO_STAKING]: {
         abi: abiStaking,
         address: C.ZERO_ADDRESS,
-      }
+      },
+      [ContractType.UNISWAP_V3_POOL_WMATIC_DIMO]: {
+        abi: abiUniswapV3Pool,
+        address: C.POLYGON_UNISWAP_V3_POOL_WMATIC_DIMO_ADDRESS,
+      },
     },
   },
 };
@@ -231,14 +244,13 @@ export const WORMHOLE_NTT_CONTRACTS: NttContracts = {
     token: C.SOLANA_TEST_DIMO_TOKEN_ADDRESS,
     manager: "",
     transceiver: { wormhole: "" },
-  }
+  },
 };
 
 export const WORMHOLE_TRANSCEIVER_INSTRUCTIONS = {
-  relayed: '0x01000100',
-  notRelayed: '0x01000101'
-}
-
+  relayed: "0x01000100",
+  notRelayed: "0x01000101",
+};
 
 // TODO parse error messages with abi to give specific message
 export const OnChainErrors = {

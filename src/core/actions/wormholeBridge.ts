@@ -6,6 +6,7 @@ import solana from "@wormhole-foundation/sdk/solana";
 import "@wormhole-foundation/sdk-evm-ntt";
 
 import { addressToBytes32 } from ":core/utils/utils.js";
+import { getDIMOPriceFromUniswapV3 } from ":core/utils/priceOracle.js";
 import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 import { SupportedWormholeNetworks, BridgeInitiateArgs } from ":core/types/wormhole.js";
 import { APPROVE_TOKENS, NTT_TRANSFER } from ":core/constants/methods.js";
@@ -16,16 +17,15 @@ import {
   WORMHOLE_ENV_MAPPING,
   WORMHOLE_CHAIN_MAPPING,
   WORMHOLE_NTT_CONTRACTS,
-  WORMHOLE_TRANSCEIVER_INSTRUCTIONS
+  WORMHOLE_TRANSCEIVER_INSTRUCTIONS,
 } from ":core/constants/mappings.js";
 
 /**
  * Initiates a bridging operation for transferring tokens across different chains using Wormhole.
- * 
+ *
  * @param args - An object containing the bridging parameters.
  * @param args.sourceChain - The source chain for the bridging operation.
  * @param args.destinationChain - The destination chain for the bridging operation.
- * @param args.tokenAddress - The address of the token to be bridged.
  * @param args.amount - The amount of tokens to be bridged.
  * @param args.recipientAddress - The address of the recipient on the destination chain.
  * @param args.isRelayed - Optional. Indicates if the transfer should be relayed.
@@ -40,6 +40,10 @@ export async function initiateBridging(
   environment: string = "prod"
 ): Promise<string> {
   try {
+    if (environment === "dev" || environment === "development") {
+      throw new Error("Development environment is not supported yet for bridging operations");
+    }
+
     const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
     const sourceNttManagerAddress = WORMHOLE_NTT_CONTRACTS[args.sourceChain]?.manager;
 
@@ -51,7 +55,12 @@ export async function initiateBridging(
     let transceiverInstructions = WORMHOLE_TRANSCEIVER_INSTRUCTIONS.notRelayed;
 
     if (args.isRelayed) {
-      transferCallValue = await quoteDeliveryPrice(args.sourceChain, args.destinationChain, environment, args.priceIncreasePercentage);
+      transferCallValue = await quoteDeliveryPrice(
+        args.sourceChain,
+        args.destinationChain,
+        environment,
+        args.priceIncreasePercentage
+      );
       transceiverInstructions = WORMHOLE_TRANSCEIVER_INSTRUCTIONS.relayed;
     }
 
@@ -81,7 +90,7 @@ export async function initiateBridging(
           addressToBytes32(args.recipientAddress),
           addressToBytes32(client.account?.address as string),
           false,
-          transceiverInstructions
+          transceiverInstructions,
         ],
       }),
     };
@@ -95,7 +104,7 @@ export async function initiateBridging(
 
 /**
  * Quotes the delivery price for a Wormhole NTT transfer between chains.
- * 
+ *
  * This function calculates the cost of transferring tokens from a source chain to a destination chain
  * using Wormhole's NTT (Non-Transferable Token) protocol. It includes an option to increase the quoted
  * price by a specified percentage to avoid underfunding.
@@ -104,14 +113,22 @@ export async function initiateBridging(
  * @param destinationChain - The chain to which the tokens will be transferred.
  * @param environment - The environment to use for the price quote. Defaults to "prod".
  * @param priceIncreasePercentage - The percentage by which to increase the quoted price. Defaults to 10%.
- * @returns A Promise that resolves to a bigint representing the quoted delivery price in the smallest unit of the native token.
+ * @param returnInDIMO - Whether to return the price in DIMO tokens. Defaults to false (native tokens).
+ * @param rpcUrl - The RPC URL to use for fetching DIMO price. Required if returnInDIMO is true.
+ * @returns A Promise that resolves to a bigint representing the quoted delivery price in the smallest unit of either the native token or DIMO token.
  */
 export async function quoteDeliveryPrice(
   sourceChain: SupportedWormholeNetworks,
   destinationChain: SupportedWormholeNetworks,
   environment: string = "prod",
-  priceIncreasePercentage: number = 10
+  priceIncreasePercentage: number = 10,
+  returnInDIMO: boolean = false,
+  rpcUrl?: string
 ): Promise<bigint> {
+  if (environment === "dev" || environment === "development") {
+    throw new Error("Development environment is not supported yet for bridging operations");
+  }
+
   const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Mainnet";
   const wh = await wormhole(wormholeEnv as Network, [evm, solana]);
 
@@ -124,18 +141,28 @@ export async function quoteDeliveryPrice(
 
   let price = await srcNtt.quoteDeliveryPrice(destChain.chain, {
     queue: false,
-    automatic: true
+    automatic: true,
   });
 
   // Increase price by the specified percentage to avoid underfunding
-  price = price + (price * BigInt(priceIncreasePercentage) / BigInt(100));
+  price = price + (price * BigInt(priceIncreasePercentage)) / BigInt(100);
+
+  if (returnInDIMO) {
+    // Convert price to DIMO tokens
+    if (!rpcUrl) {
+      throw new Error("RPC URL is required when returning price in DIMO tokens");
+    }
+    const dimoPrice = await getDIMOPriceFromUniswapV3(environment, rpcUrl);
+    const priceInDIMO = (price * dimoPrice) / BigInt(1e18);
+    return priceInDIMO;
+  }
 
   return price;
 }
 
 /**
  * Checks the status of a Non-Transferable Token (NTT) transfer using Wormhole.
- * 
+ *
  * This function attempts to fetch the Verified Action Approval (VAA) for a given transaction ID.
  * The presence of a VAA indicates that the transfer has been completed.
  *
@@ -151,6 +178,10 @@ export async function checkNttTransferStatus(
   environment: string = "prod",
   timeoutMs: number = 30000
 ): Promise<{ status: string; vaa: VAA | null }> {
+  if (environment === "dev" || environment === "development") {
+    throw new Error("Development environment is not supported yet for bridging operations");
+  }
+
   const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Mainnet";
   const wh = await wormhole(wormholeEnv as Network, [evm, solana]);
 
