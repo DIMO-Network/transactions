@@ -1,4 +1,4 @@
-import { Abi } from "viem";
+import { Abi, zeroAddress } from "viem";
 import { Chain, polygon, polygonAmoy } from "viem/chains";
 
 import { API_BY_ENV, AllChainInfos, ContractType, DIMO_APIs, ENVIRONMENT } from ":core/types/dimo.js";
@@ -136,7 +136,7 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
       },
       [ContractType.UNISWAP_V3_POOL_WMATIC_DIMO]: {
         abi: abiUniswapV3Pool,
-        address: C.ZERO_ADDRESS,
+        address: zeroAddress,
       },
     },
   },
@@ -180,19 +180,19 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
     contracts: {
       [ContractType.DIMO_SACD]: {
         abi: abiSacd,
-        address: C.ZERO_ADDRESS,
+        address: zeroAddress,
       },
       [ContractType.DIMO_CREDIT]: {
         abi: abiCredits,
-        address: C.ZERO_ADDRESS,
+        address: zeroAddress,
       },
       [ContractType.DIMO_REGISTRY]: {
         abi: abiRegistry,
-        address: C.ZERO_ADDRESS,
+        address: zeroAddress,
       },
       [ContractType.DIMO_VEHICLE_ID]: {
         abi: abiVehicleId,
-        address: C.ZERO_ADDRESS,
+        address: zeroAddress,
       },
       [ContractType.DIMO_TOKEN]: {
         abi: abiToken,
@@ -200,11 +200,11 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
       },
       [ContractType.DIMO_FORWARDER]: {
         abi: abiForwarder,
-        address: C.ZERO_ADDRESS,
+        address: zeroAddress,
       },
       [ContractType.DIMO_STAKING]: {
         abi: abiStaking,
-        address: C.ZERO_ADDRESS,
+        address: zeroAddress,
       },
       [ContractType.UNISWAP_V3_POOL_WMATIC_DIMO]: {
         abi: abiUniswapV3Pool,
