@@ -84,6 +84,7 @@ export enum ContractType {
   DIMO_TOKEN,
   DIMO_FORWARDER,
   DIMO_STAKING,
+  UNISWAP_V3_POOL_WMATIC_DIMO,
 }
 
 export enum SupportedNetworks {
@@ -94,6 +95,7 @@ export enum SupportedNetworks {
 export enum ENVIRONMENT {
   PROD,
   DEV,
+  PROD_TEST
 }
 
 export enum DIMO_APIs {
@@ -126,7 +128,7 @@ export type ApiInfos = {
 };
 
 export type AllChainInfos = {
-  [key in SupportedNetworks]: ChainInfos;
+  [key in ENVIRONMENT]: ChainInfos;
 };
 
 export type ChainInfos = {
