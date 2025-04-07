@@ -139,3 +139,12 @@ export type UpgradeStake = {
   vehicleId: BigInt;
   amountDiff:number
 }
+
+export type AttachVehicle = {
+  stakeId: BigInt;
+  vehicleId: BigInt;
+}
+
+export type DetachVehicle = {
+  vehicleId: BigInt;
+}

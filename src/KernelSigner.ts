@@ -29,10 +29,10 @@ import {
 } from ":core/actions/setPermissionsSACD.js";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING, ENV_TO_API_MAPPING } from ":core/constants/mappings.js";
 import {
-  AddStake,
+  AddStake, AttachVehicle,
   BurnVehicle,
   ClaimAftermarketdevice,
-  DeriveKernelAddress,
+  DeriveKernelAddress, DetachVehicle,
   MintVehicleWithDeviceDefinition,
   PairAftermarketDevice,
   SACDTemplateInputs,
@@ -65,6 +65,8 @@ import { sacdPermissionValue, sacdPermissionArray, unpackOptionalArgs } from ":c
 import { addStake } from ":core/actions/addStake.js";
 import { withdrawStake } from ":core/actions/withdrawStake.js";
 import { upgradeStake } from ":core/actions/upgradeStake.js";
+import { attachVehicle } from ":core/actions/attachVehicle.js";
+import { detachVehicle } from ":core/actions/detachVehicle.js";
 
 export class KernelSigner {
   config: _kernelConfig;
@@ -830,6 +832,40 @@ export class KernelSigner {
   public async upgradeStake(args: UpgradeStake, waitForReceipt: boolean = true, optionalArgs?: OptionalArgs): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const upgradeStakeCallData = await upgradeStake(args, client, this.config.environment);
+    const userOpHash = await this._sendUserOperation(client, upgradeStakeCallData, optionalArgs);
+
+    if (waitForReceipt) {
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
+      });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    } as TransactionReturnType;
+  }
+
+  public async attacheVehicleToStake(args: AttachVehicle, waitForReceipt: boolean = true, optionalArgs?: OptionalArgs): Promise<TransactionReturnType> {
+    const client = await this.getActiveClient();
+    const upgradeStakeCallData = await attachVehicle(args, client, this.config.environment);
+    const userOpHash = await this._sendUserOperation(client, upgradeStakeCallData, optionalArgs);
+
+    if (waitForReceipt) {
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
+      });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    } as TransactionReturnType;
+  }
+
+  public async detachVehicleFromStake(args: DetachVehicle, waitForReceipt: boolean = true, optionalArgs?: OptionalArgs): Promise<TransactionReturnType> {
+    const client = await this.getActiveClient();
+    const upgradeStakeCallData = await detachVehicle(args, client, this.config.environment);
     const userOpHash = await this._sendUserOperation(client, upgradeStakeCallData, optionalArgs);
 
     if (waitForReceipt) {
