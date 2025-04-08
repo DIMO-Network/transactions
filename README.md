@@ -111,3 +111,36 @@ If you're a developer interested in using the DIMO Transactions SDK for **multi-
 |                                                                                                             | signAndUploadSACDAgreement()           |
 |                                                                                                             | getUserOperationReceipt()              |
 |                                                                                                             | resetClient()                          |
+
+## For SDK Maintainers
+
+To update the version of the DIMO Transactions SDK, follow these steps:
+
+1. Update the version number in `package.json`:
+```json
+{
+  "name": "@dimo-network/transactions",
+  "version": "x.y.z",  // Change this to the new version
+  ...
+}
+```
+
+2. Run the prebuild script to update the version in the codebase and `package-lock.json`:
+```bash
+npm run prebuild
+```
+
+3. Build the package:
+```bash
+npm run build
+```
+
+4. Create a local package for testing (optional):
+```bash
+npm pack
+```
+
+5. Publish the new version to npm:
+```bash
+npm publish
+```
