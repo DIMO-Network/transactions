@@ -5,7 +5,8 @@ import type { SwapOptions } from '@uniswap/v3-sdk'
 
 import { getSwapCalldata } from ':core/swap/uniswap/uniswap.js'
 import { createTokenApprovalTransaction, createWMATICWithdrawTransaction } from ':core/utils/tokens.js'
-import { SWAP_ROUTER_ADDRESS, WMATIC_TOKEN } from ':core/constants/uniswapConstants.js'
+import { POLYGON_SWAP_ROUTER_ADDRESS } from ':core/constants/contractAddrs.js'
+import { WMATIC_TOKEN } from ':core/constants/uniswapConstants.js'
 
 /**
  * Generates transaction data for swapping tokens to WMATIC and then withdrawing to POL
@@ -56,7 +57,7 @@ export async function swapToExactPOL(
 
   // Create the swap transaction
   const swapTransaction = {
-    to: SWAP_ROUTER_ADDRESS,
+    to: POLYGON_SWAP_ROUTER_ADDRESS,
     data: swapCalldata,
     value: BigInt(0)
   }
@@ -72,6 +73,8 @@ export async function swapToExactPOL(
 
   // Add withdraw transaction
   transactions.push(withdrawTransaction)
+
+  // TODO Set approval to 0
 
   return transactions
 }

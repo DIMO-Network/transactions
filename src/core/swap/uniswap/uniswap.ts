@@ -15,7 +15,7 @@ import {
 import { ethers, BigNumber } from 'ethers-v5'
 
 import type { TokenTrade, SwapParams } from ':core/types/uniswap.js'
-import { QUOTER_CONTRACT_ADDRESS, POOL_FACTORY_CONTRACT_ADDRESS } from ':core/constants/uniswapConstants.js'
+import { POLYGON_QUOTER_CONTRACT_ADDRESS, POLYGON_POOL_FACTORY_CONTRACT_ADDRESS } from ':core/constants/contractAddrs.js'
 
 import { getPoolInfo } from './pool.js'
 
@@ -38,7 +38,7 @@ async function createTrade(
     const { tokenIn, tokenOut, amount, poolFee, tradeType } = swapParams
 
     const poolInfo = await getPoolInfo(
-        POOL_FACTORY_CONTRACT_ADDRESS,
+        POLYGON_POOL_FACTORY_CONTRACT_ADDRESS,
         tokenIn,
         tokenOut,
         poolFee,
@@ -124,7 +124,7 @@ async function getOutputQuote(
     )
 
     const quoteCallReturnData = await provider.call({
-        to: QUOTER_CONTRACT_ADDRESS,
+        to: POLYGON_QUOTER_CONTRACT_ADDRESS,
         data: calldata,
     })
 

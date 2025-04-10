@@ -1,7 +1,7 @@
 import { encodeFunctionData, Address, maxInt256 } from 'viem'
 
 import { abiErc20, abiWmatic } from ":core/abis/index.js"
-import { SWAP_ROUTER_ADDRESS } from ':core/constants/uniswapConstants.js'
+import { POLYGON_SWAP_ROUTER_ADDRESS } from ':core/constants/contractAddrs.js'
 
 /**
  * Creates a transaction object to withdraw POL from WMATIC
@@ -40,7 +40,7 @@ export function createTokenApprovalTransaction(
     data: encodeFunctionData({
       abi: abiErc20,
       functionName: 'approve',
-      args: [SWAP_ROUTER_ADDRESS as Address, amount ?? maxInt256]
+      args: [POLYGON_SWAP_ROUTER_ADDRESS as Address, amount ?? maxInt256]
     }),
     value: BigInt(0)
   }
