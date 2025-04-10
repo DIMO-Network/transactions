@@ -10,7 +10,7 @@ import { getDIMOPriceFromUniswapV3 } from ":core/utils/priceOracle.js";
 import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 import { SupportedWormholeNetworks, BridgeInitiateArgs } from ":core/types/wormhole.js";
 import { APPROVE_TOKENS, NTT_TRANSFER } from ":core/constants/methods.js";
-import { abiWormholeNttManager } from ":core/abis/WormholeNttManager.js";
+import { abiWormholeNttManager } from ":core/abis/index.js";
 import {
   CHAIN_ABI_MAPPING,
   ENV_MAPPING,

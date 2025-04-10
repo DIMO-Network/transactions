@@ -1,35 +1,7 @@
 import { encodeFunctionData, Address, maxInt256 } from 'viem'
 
+import { abiErc20, abiWmatic } from ":core/abis/index.js"
 import { SWAP_ROUTER_ADDRESS } from ':core/constants/uniswapConstants.js'
-
-// ABI for the WMATIC withdraw function
-const WMATIC_ABI = [
-  {
-    constant: false,
-    inputs: [{ name: 'wad', type: 'uint256' }],
-    name: 'withdraw',
-    outputs: [],
-    payable: false,
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-]
-
-// ERC20 approval ABI
-const ERC20_APPROVAL_ABI = [
-  {
-    constant: false,
-    inputs: [
-      { name: 'spender', type: 'address' },
-      { name: 'amount', type: 'uint256' }
-    ],
-    name: 'approve',
-    outputs: [{ name: '', type: 'bool' }],
-    payable: false,
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-]
 
 /**
  * Creates a transaction object to withdraw POL from WMATIC
@@ -44,7 +16,7 @@ export function createWMATICWithdrawTransaction(
   return {
     to: wMATICAddress,
     data: encodeFunctionData({
-      abi: WMATIC_ABI,
+      abi: abiWmatic,
       functionName: 'withdraw',
       args: [BigInt(amount.toString())]
     }),
@@ -66,7 +38,7 @@ export function createTokenApprovalTransaction(
   return {
     to: tokenAddress,
     data: encodeFunctionData({
-      abi: ERC20_APPROVAL_ABI,
+      abi: abiErc20,
       functionName: 'approve',
       args: [SWAP_ROUTER_ADDRESS as Address, amount ?? maxInt256]
     }),

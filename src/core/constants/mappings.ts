@@ -4,14 +4,17 @@ import { Chain, polygon, polygonAmoy } from "viem/chains";
 import { API_BY_ENV, AllChainInfos, ContractType, DIMO_APIs, ENVIRONMENT } from ":core/types/dimo.js";
 import { NttContracts, SupportedWormholeNetworks } from ":core/types/wormhole.js";
 import { Network } from "@wormhole-foundation/sdk";
-import { abiForwarder } from ":core/abis/DimoForwarder.js";
-import { abiVehicleId } from ":core/abis/DimoVehicleId.js";
-import { abiRegistry } from ":core/abis/DimoRegistry.js";
-import { abiCredits } from ":core/abis/DimoCredit.js";
-import { abiToken } from ":core/abis/DimoToken.js";
-import { abiSacd } from ":core/abis/DimoSacd.js";
-import { abiStaking, abiStakingDev } from ":core/abis/DimoStaking.js";
-import { abiUniswapV3Pool } from ":core/abis/UniswapV3Pool.js";
+import {
+  abiCredits,
+  abiForwarder,
+  abiRegistry,
+  abiSacd,
+  abiStaking,
+  abiStakingDev,
+  abiToken,
+  abiVehicleId,
+  abiUniswapV3Pool
+} from ":core/abis/index.js";
 
 import * as C from ":core/constants/contractAddrs.js";
 
