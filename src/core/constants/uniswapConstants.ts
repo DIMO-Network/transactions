@@ -15,7 +15,7 @@ export const SWAP_ROUTER_ADDRESS = '0xE592427A0AEce92De3Edee1F18E0157C05861564'
 export const WETH_CONTRACT_ADDRESS =
     '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2'
 
-export const WPOL_TOKEN = new Token(
+export const WMATIC_TOKEN = new Token(
     ChainId.POLYGON,
     '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
     18,
