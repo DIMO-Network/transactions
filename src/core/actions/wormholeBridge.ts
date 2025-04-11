@@ -1,14 +1,19 @@
-import { encodeFunctionData } from "viem";
+import { encodeFunctionData, type Hex } from "viem";
 import { wormhole, chainToChainId, VAA, Network } from "@wormhole-foundation/sdk";
 import { KernelAccountClient } from "@zerodev/sdk";
+import { Percent } from "@uniswap/sdk-core";
 import evm from "@wormhole-foundation/sdk/evm";
 import solana from "@wormhole-foundation/sdk/solana";
 import "@wormhole-foundation/sdk-evm-ntt";
 
 import { addressToBytes32 } from ":core/utils/utils.js";
 import { getDIMOPriceFromUniswapV3 } from ":core/utils/priceOracle.js";
+import { swapToExactPOL } from ":core/swap/swapAndWithdraw.js";
+import { DIMO_TOKEN, POLYGON_UNISWAP_V3_POOL_WMATIC_DIMO_POOL_FEE } from ":core/constants/uniswapConstants.js";
 import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
-import { SupportedWormholeNetworks, BridgeInitiateArgs } from ":core/types/wormhole.js";
+import type { Call } from ":core/types/common.js"
+import type { SupportedWormholeNetworks, BridgeInitiateArgs } from ":core/types/wormhole.js";
+import { DINC_ADDRESS } from ":core/constants/dimo.js";
 import { APPROVE_TOKENS, NTT_TRANSFER } from ":core/constants/methods.js";
 import { abiWormholeNttManager } from ":core/abis/index.js";
 import {
@@ -46,6 +51,7 @@ export async function initiateBridging(
 
     const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
     const sourceNttManagerAddress = WORMHOLE_NTT_CONTRACTS[args.sourceChain]?.manager;
+    const transactions: Array<Call> = []
 
     if (!sourceNttManagerAddress) {
       throw new Error(`No NTT manager address found for ${args.sourceChain}`);
@@ -55,15 +61,35 @@ export async function initiateBridging(
     let transceiverInstructions = WORMHOLE_TRANSCEIVER_INSTRUCTIONS.notRelayed;
 
     if (args.isRelayed) {
+      // Calculate the delivery price in native tokens
       transferCallValue = await quoteDeliveryPrice(
         args.sourceChain,
         args.destinationChain,
         environment,
         args.priceIncreasePercentage
       );
+
+      // Swap DIMO to exact POL amount needed for the delivery fee
+      const swapTransactions = await swapToExactPOL(
+        DIMO_TOKEN,
+        transferCallValue,
+        POLYGON_UNISWAP_V3_POOL_WMATIC_DIMO_POOL_FEE,
+        {
+          recipient: client.account?.address as Hex,
+          slippageTolerance: new Percent(args.swapOptions?.slippageTolerance || 100, 10_000), // Default 1% slippage tolerance
+          deadline: args.swapOptions?.deadline || Math.floor(Date.now() / 1000) + 900 // Default 15 minutes
+        },
+        args.rpcUrl,
+        true, // Include approval for max uint256 (will reset to 0)
+      );
+
+      // Add swap transactions to the beginning of our transaction array
+      transactions.push(...swapTransactions);
+
       transceiverInstructions = WORMHOLE_TRANSCEIVER_INSTRUCTIONS.relayed;
     }
 
+    // Add token approval for the bridge
     const approveCall = {
       to: contracts[ContractType.DIMO_TOKEN].address,
       value: BigInt(0),
@@ -73,13 +99,15 @@ export async function initiateBridging(
         args: [sourceNttManagerAddress, args.amount],
       }),
     };
+    transactions.push(approveCall);
 
     if (!client.account?.address) {
       throw new Error("Client account address is not available");
     }
 
+    // Add the bridge transfer call
     const transferCall = {
-      to: sourceNttManagerAddress as `0x${string}`,
+      to: sourceNttManagerAddress as Hex,
       value: transferCallValue,
       data: encodeFunctionData({
         abi: abiWormholeNttManager,
@@ -88,14 +116,15 @@ export async function initiateBridging(
           args.amount,
           chainToChainId(WORMHOLE_CHAIN_MAPPING[args.destinationChain]),
           addressToBytes32(args.recipientAddress),
-          addressToBytes32(client.account?.address as string),
+          addressToBytes32(DINC_ADDRESS), // Refund excess fees
           false,
           transceiverInstructions,
         ],
       }),
     };
+    transactions.push(transferCall);
 
-    return await client.account!.encodeCalls([approveCall, transferCall]);
+    return await client.account!.encodeCalls(transactions);
   } catch (error) {
     console.error("Error in initiateBridging:", error);
     throw error;
