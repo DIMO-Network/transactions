@@ -1,6 +1,7 @@
-import { encodeFunctionData, Address, maxInt256 } from 'viem'
+import { encodeFunctionData, Address, maxInt256, erc20Abi } from 'viem'
 
-import { abiErc20, abiWmatic } from ":core/abis/index.js"
+import type { Call } from ":core/types/common.js"
+import { abiWmatic } from ":core/abis/index.js"
 import { POLYGON_SWAP_ROUTER_ADDRESS } from ':core/constants/contractAddrs.js'
 
 /**
@@ -11,7 +12,7 @@ import { POLYGON_SWAP_ROUTER_ADDRESS } from ':core/constants/contractAddrs.js'
  */
 export function createWMATICWithdrawTransaction(
   wMATICAddress: Address,
-  amount: BigInt
+  amount: bigint
 ) {
   return {
     to: wMATICAddress,
@@ -33,12 +34,12 @@ export function createWMATICWithdrawTransaction(
  */
 export function createTokenApprovalTransaction(
   tokenAddress: Address,
-  amount?: BigInt
-): { to: string, data: string, value: bigint } {
+  amount?: bigint
+): Call {
   return {
     to: tokenAddress,
     data: encodeFunctionData({
-      abi: abiErc20,
+      abi: erc20Abi,
       functionName: 'approve',
       args: [POLYGON_SWAP_ROUTER_ADDRESS as Address, amount ?? maxInt256]
     }),

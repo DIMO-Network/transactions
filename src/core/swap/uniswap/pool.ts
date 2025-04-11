@@ -2,6 +2,7 @@ import IUniswapV3PoolABI from '@uniswap/v3-core/artifacts/contracts/interfaces/I
 import { computePoolAddress } from '@uniswap/v3-sdk'
 import { Token } from '@uniswap/sdk-core'
 import { ethers } from 'ethers-v5'
+import type { Hex } from 'viem';
 
 interface PoolInfo {
   token0?: string
@@ -16,7 +17,7 @@ interface PoolInfo {
 type PoolParam = 'token0' | 'token1' | 'fee' | 'tickSpacing' | 'liquidity' | 'sqrtPriceX96' | 'tick'
 
 export async function getPoolInfoByAddress(
-  poolAddress: `0x${string}`,
+  poolAddress: Hex,
   rpcUrl: string,
   params?: PoolParam[]
 ): Promise<PoolInfo> {
@@ -50,13 +51,13 @@ export async function getPoolInfoByAddress(
 
   // Execute all promises in parallel
   const results = await Promise.all(promises)
-  
+
   // Initialize the result object
   const poolInfo: PoolInfo = {}
-  
+
   // Populate the result object based on which parameters were fetched
   let resultIndex = 0
-  
+
   if (fetchToken0) poolInfo.token0 = results[resultIndex++]
   if (fetchToken1) poolInfo.token1 = results[resultIndex++]
   if (fetchFee) poolInfo.fee = results[resultIndex++]
@@ -67,7 +68,7 @@ export async function getPoolInfoByAddress(
     if (!params || params.includes('sqrtPriceX96')) poolInfo.sqrtPriceX96 = slot0[0]
     if (!params || params.includes('tick')) poolInfo.tick = slot0[1]
   }
-  
+
   return poolInfo
 }
 
@@ -112,18 +113,18 @@ export async function getPoolInfo(
 
   // Execute all promises in parallel
   const results = await Promise.all(promises)
-  
+
   // Initialize the result object with token0, token1, and fee
   const poolInfo: PoolInfo = {}
-  
+
   // Always include token0, token1, and fee if they're in the params list or if params is undefined
   if (!params || params.includes('token0')) poolInfo.token0 = tokenA.address
   if (!params || params.includes('token1')) poolInfo.token1 = tokenB.address
   if (!params || params.includes('fee')) poolInfo.fee = poolFee
-  
+
   // Populate the result object based on which parameters were fetched
   let resultIndex = 0
-  
+
   if (fetchTickSpacing) poolInfo.tickSpacing = results[resultIndex++]
   if (fetchLiquidity) poolInfo.liquidity = results[resultIndex++]
   if (fetchSlot0) {
@@ -131,6 +132,6 @@ export async function getPoolInfo(
     if (!params || params.includes('sqrtPriceX96')) poolInfo.sqrtPriceX96 = slot0[0]
     if (!params || params.includes('tick')) poolInfo.tick = slot0[1]
   }
-  
+
   return poolInfo
 }

@@ -1,8 +1,9 @@
-import { Address, maxInt256 } from 'viem'
+import { Address, maxInt256, Hex } from 'viem'
 import { BigNumber } from 'ethers-v5'
 import { Token, TradeType } from '@uniswap/sdk-core'
 import type { SwapOptions } from '@uniswap/v3-sdk'
 
+import type { Call } from ":core/types/common.js"
 import { getSwapCalldata } from ':core/swap/uniswap/uniswap.js'
 import { createTokenApprovalTransaction, createWMATICWithdrawTransaction } from ':core/utils/tokens.js'
 import { POLYGON_SWAP_ROUTER_ADDRESS } from ':core/constants/contractAddrs.js'
@@ -23,14 +24,14 @@ import { WMATIC_TOKEN } from ':core/constants/uniswapConstants.js'
  */
 export async function swapToExactPOL(
   tokenIn: Token,
-  exactOutputAmount: BigInt,
+  exactOutputAmount: bigint,
   poolFee: number,
   swapOptions: SwapOptions,
   rpcUrl: string,
   includeApproval: boolean = true,
-  approvalAmount?: BigInt
-): Promise<Array<{ to: string, data: string, value?: bigint }>> {
-  const transactions: Array<{ to: string, data: string, value?: bigint }> = []
+  approvalAmount?: bigint
+): Promise<Array<Call>> {
+  const transactions: Array<Call> = []
 
   // Add approval transaction if requested
   if (includeApproval) {
@@ -57,8 +58,8 @@ export async function swapToExactPOL(
 
   // Create the swap transaction
   const swapTransaction = {
-    to: POLYGON_SWAP_ROUTER_ADDRESS,
-    data: swapCalldata,
+    to: POLYGON_SWAP_ROUTER_ADDRESS as Hex,
+    data: swapCalldata as Hex,
     value: BigInt(0)
   }
 
