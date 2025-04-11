@@ -75,7 +75,13 @@ export async function swapToExactPOL(
   // Add withdraw transaction
   transactions.push(withdrawTransaction)
 
-  // TODO Set approval to 0
+  // Reset approval to 0 after the swap is complete
+  if (includeApproval) {
+    transactions.push(createTokenApprovalTransaction(
+      tokenIn.address as Address,
+      BigInt(0)
+    ))
+  }
 
   return transactions
 }
