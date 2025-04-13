@@ -1,8 +1,10 @@
 import { Abi, zeroAddress } from "viem";
 import { Chain, polygon, polygonAmoy } from "viem/chains";
+import { Token } from '@uniswap/sdk-core'
 
 import { API_BY_ENV, AllChainInfos, ContractType, DIMO_APIs, ENVIRONMENT } from ":core/types/dimo.js";
 import { NttContracts, SupportedWormholeNetworks } from ":core/types/wormhole.js";
+import { UniswapMappingArgs } from ":core/types/uniswap.js"
 import { Network } from "@wormhole-foundation/sdk";
 import {
   abiCredits,
@@ -16,7 +18,8 @@ import {
   abiUniswapV3Pool
 } from ":core/abis/index.js";
 
-import * as C from ":core/constants/contractAddrs.js";
+import * as contractAddrs from ":core/constants/contractAddrs.js";
+import * as uniswapConsts from ":core/constants/uniswapConstants.js";
 
 export const ENV_NETWORK_MAPPING = new Map<ENVIRONMENT, Chain>([
   [ENVIRONMENT.PROD, polygon],
@@ -111,33 +114,33 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
     contracts: {
       [ContractType.DIMO_SACD]: {
         abi: abiSacd,
-        address: C.AMOY_DIMO_SACD_ADDRESS,
+        address: contractAddrs.AMOY_DIMO_SACD_ADDRESS,
       },
       [ContractType.DIMO_CREDIT]: {
         abi: abiCredits as Abi,
-        address: C.AMOY_DIMO_CREDIT_ADDRESS,
+        address: contractAddrs.AMOY_DIMO_CREDIT_ADDRESS,
       },
       [ContractType.DIMO_REGISTRY]: {
         abi: abiRegistry,
-        address: C.AMOY_DIMO_REGISTRY_ADDRESS,
+        address: contractAddrs.AMOY_DIMO_REGISTRY_ADDRESS,
       },
       [ContractType.DIMO_VEHICLE_ID]: {
         abi: abiVehicleId,
-        address: C.AMOY_DIMO_VEHICLE_ID_ADDRESS,
+        address: contractAddrs.AMOY_DIMO_VEHICLE_ID_ADDRESS,
       },
       [ContractType.DIMO_TOKEN]: {
         abi: abiToken,
-        address: C.AMOY_DIMO_TOKEN_ADDRESS,
+        address: contractAddrs.AMOY_DIMO_TOKEN_ADDRESS,
       },
       [ContractType.DIMO_FORWARDER]: {
         abi: abiForwarder,
-        address: C.AMOY_DIMO_FORWARDER,
+        address: contractAddrs.AMOY_DIMO_FORWARDER,
       },
       [ContractType.DIMO_STAKING]: {
         abi: abiStakingDev,
-        address: C.AMOY_DIMO_STAKING_ADDRESS,
+        address: contractAddrs.AMOY_DIMO_STAKING_ADDRESS,
       },
-      [ContractType.UNISWAP_V3_POOL_WMATIC_DIMO]: {
+      [ContractType.UNISWAP_V3_POOL]: {
         abi: abiUniswapV3Pool,
         address: zeroAddress,
       },
@@ -147,35 +150,35 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
     contracts: {
       [ContractType.DIMO_SACD]: {
         abi: abiSacd,
-        address: C.POLYGON_DIMO_SACD_ADDRESS,
+        address: contractAddrs.POLYGON_DIMO_SACD_ADDRESS,
       },
       [ContractType.DIMO_CREDIT]: {
         abi: abiCredits,
-        address: C.POLYGON_DIMO_CREDIT_ADDRESS,
+        address: contractAddrs.POLYGON_DIMO_CREDIT_ADDRESS,
       },
       [ContractType.DIMO_REGISTRY]: {
         abi: abiRegistry,
-        address: C.POLYGON_DIMO_REGISTRY_ADDRESS,
+        address: contractAddrs.POLYGON_DIMO_REGISTRY_ADDRESS,
       },
       [ContractType.DIMO_VEHICLE_ID]: {
         abi: abiVehicleId,
-        address: C.POLYGON_DIMO_VEHICLE_ID_ADDRESS,
+        address: contractAddrs.POLYGON_DIMO_VEHICLE_ID_ADDRESS,
       },
       [ContractType.DIMO_TOKEN]: {
         abi: abiToken,
-        address: C.POLYGON_DIMO_TOKEN_ADDRESS,
+        address: contractAddrs.POLYGON_DIMO_TOKEN_ADDRESS,
       },
       [ContractType.DIMO_FORWARDER]: {
         abi: abiForwarder,
-        address: C.POLYGON_DIMO_FORWARDER,
+        address: contractAddrs.POLYGON_DIMO_FORWARDER,
       },
       [ContractType.DIMO_STAKING]: {
         abi: abiStaking,
-        address: C.POLYGON_DIMO_STAKING_ADDRESS,
+        address: contractAddrs.POLYGON_DIMO_STAKING_ADDRESS,
       },
-      [ContractType.UNISWAP_V3_POOL_WMATIC_DIMO]: {
+      [ContractType.UNISWAP_V3_POOL]: {
         abi: abiUniswapV3Pool,
-        address: C.POLYGON_UNISWAP_V3_POOL_WMATIC_DIMO_ADDRESS,
+        address: contractAddrs.POLYGON_UNISWAP_V3_POOL_WMATIC_DIMO_ADDRESS,
       },
     },
   },
@@ -199,7 +202,7 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
       },
       [ContractType.DIMO_TOKEN]: {
         abi: abiToken,
-        address: C.POLYGON_TEST_DIMO_TOKEN_ADDRESS,
+        address: contractAddrs.POLYGON_TEST_DIMO_TOKEN_ADDRESS,
       },
       [ContractType.DIMO_FORWARDER]: {
         abi: abiForwarder,
@@ -209,9 +212,9 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
         abi: abiStaking,
         address: zeroAddress,
       },
-      [ContractType.UNISWAP_V3_POOL_WMATIC_DIMO]: {
+      [ContractType.UNISWAP_V3_POOL]: {
         abi: abiUniswapV3Pool,
-        address: C.POLYGON_UNISWAP_V3_POOL_WMATIC_DIMO_ADDRESS,
+        address: contractAddrs.POLYGON_TEST_UNISWAP_V3_POOL_WMATIC_DIMO_ADDRESS,
       },
     },
   },
@@ -219,32 +222,32 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
 
 export const WORMHOLE_NTT_CONTRACTS: NttContracts = {
   Ethereum: {
-    token: C.ETHEREUM_DIMO_TOKEN_ADDRESS,
-    manager: C.ETHEREUM_WORMHOLE_NTT_MANAGER_ADDRESS,
-    transceiver: { wormhole: C.ETHEREUM_WORMHOLE_TRANSCEIVER_ADDRESS },
+    token: contractAddrs.ETHEREUM_DIMO_TOKEN_ADDRESS,
+    manager: contractAddrs.ETHEREUM_WORMHOLE_NTT_MANAGER_ADDRESS,
+    transceiver: { wormhole: contractAddrs.ETHEREUM_WORMHOLE_TRANSCEIVER_ADDRESS },
   },
   Polygon: {
-    token: C.POLYGON_DIMO_TOKEN_ADDRESS,
-    manager: C.POLYGON_WORMHOLE_NTT_MANAGER_ADDRESS,
-    transceiver: { wormhole: C.POLYGON_WORMHOLE_TRANSCEIVER_ADDRESS },
+    token: contractAddrs.POLYGON_DIMO_TOKEN_ADDRESS,
+    manager: contractAddrs.POLYGON_WORMHOLE_NTT_MANAGER_ADDRESS,
+    transceiver: { wormhole: contractAddrs.POLYGON_WORMHOLE_TRANSCEIVER_ADDRESS },
   },
   Base: {
-    token: C.BASE_DIMO_TOKEN_ADDRESS,
-    manager: C.BASE_WORMHOLE_NTT_MANAGER_ADDRESS,
-    transceiver: { wormhole: C.BASE_WORMHOLE_TRANSCEIVER_ADDRESS },
+    token: contractAddrs.BASE_DIMO_TOKEN_ADDRESS,
+    manager: contractAddrs.BASE_WORMHOLE_NTT_MANAGER_ADDRESS,
+    transceiver: { wormhole: contractAddrs.BASE_WORMHOLE_TRANSCEIVER_ADDRESS },
   },
   PolygonTest: {
-    token: C.POLYGON_TEST_DIMO_TOKEN_ADDRESS,
-    manager: C.POLYGON_TEST_WORMHOLE_NTT_MANAGER_ADDRESS,
-    transceiver: { wormhole: C.POLYGON_TEST_WORMHOLE_TRANSCEIVER_ADDRESS },
+    token: contractAddrs.POLYGON_TEST_DIMO_TOKEN_ADDRESS,
+    manager: contractAddrs.POLYGON_TEST_WORMHOLE_NTT_MANAGER_ADDRESS,
+    transceiver: { wormhole: contractAddrs.POLYGON_TEST_WORMHOLE_TRANSCEIVER_ADDRESS },
   },
   BaseTest: {
-    token: C.BASE_TEST_DIMO_TOKEN_ADDRESS,
-    manager: C.BASE_TEST_WORMHOLE_NTT_MANAGER_ADDRESS,
-    transceiver: { wormhole: C.BASE_TEST_WORMHOLE_TRANSCEIVER_ADDRESS },
+    token: contractAddrs.BASE_TEST_DIMO_TOKEN_ADDRESS,
+    manager: contractAddrs.BASE_TEST_WORMHOLE_NTT_MANAGER_ADDRESS,
+    transceiver: { wormhole: contractAddrs.BASE_TEST_WORMHOLE_TRANSCEIVER_ADDRESS },
   },
   SolanaTest: {
-    token: C.SOLANA_TEST_DIMO_TOKEN_ADDRESS,
+    token: contractAddrs.SOLANA_TEST_DIMO_TOKEN_ADDRESS,
     manager: "",
     transceiver: { wormhole: "" },
   },
@@ -254,6 +257,25 @@ export const WORMHOLE_TRANSCEIVER_INSTRUCTIONS = {
   relayed: "0x01000100",
   notRelayed: "0x01000101",
 };
+
+
+export const UNISWAP_ARGS_MAPPING: UniswapMappingArgs = {
+  [ENVIRONMENT.PROD]: {
+    dimoToken: uniswapConsts.DIMO_TOKEN,
+    uniswapV3Pool: contractAddrs.POLYGON_UNISWAP_V3_POOL_WMATIC_DIMO_ADDRESS,
+    poolFee: uniswapConsts.POLYGON_UNISWAP_V3_POOL_WMATIC_DIMO_POOL_FEE
+  },
+  [ENVIRONMENT.PROD_TEST]: {
+    dimoToken: uniswapConsts.TEST_DIMO_TOKEN,
+    uniswapV3Pool: contractAddrs.POLYGON_UNISWAP_V3_POOL_WMATIC_DIMO_ADDRESS,
+    poolFee: uniswapConsts.POLYGON_TEST_UNISWAP_V3_POOL_WMATIC_DIMO_POOL_FEE
+  },
+  [ENVIRONMENT.DEV]: {
+    dimoToken: new Token(0, zeroAddress, 0),
+    uniswapV3Pool: "",
+    poolFee: 0
+  }
+}
 
 // TODO parse error messages with abi to give specific message
 export const OnChainErrors = {

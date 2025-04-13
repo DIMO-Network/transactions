@@ -9,7 +9,6 @@ import "@wormhole-foundation/sdk-evm-ntt";
 import { addressToBytes32 } from ":core/utils/utils.js";
 import { getDIMOPriceFromUniswapV3 } from ":core/utils/priceOracle.js";
 import { swapToExactPOL } from ":core/swap/swapAndWithdraw.js";
-import { DIMO_TOKEN, POLYGON_UNISWAP_V3_POOL_WMATIC_DIMO_POOL_FEE } from ":core/constants/uniswapConstants.js";
 import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 import type { Call } from ":core/types/common.js"
 import type { SupportedWormholeNetworks, BridgeInitiateArgs } from ":core/types/wormhole.js";
@@ -19,6 +18,7 @@ import { abiWormholeNttManager } from ":core/abis/index.js";
 import {
   CHAIN_ABI_MAPPING,
   ENV_MAPPING,
+  UNISWAP_ARGS_MAPPING,
   WORMHOLE_ENV_MAPPING,
   WORMHOLE_CHAIN_MAPPING,
   WORMHOLE_NTT_CONTRACTS,
@@ -43,7 +43,7 @@ export async function initiateBridging(
   args: BridgeInitiateArgs,
   client: KernelAccountClient,
   environment: string = "prod"
-): Promise<string> {
+): Promise<Hex> {
   try {
     if (environment === "dev" || environment === "development") {
       throw new Error("Development environment is not supported yet for bridging operations");
@@ -61,6 +61,8 @@ export async function initiateBridging(
     let transceiverInstructions = WORMHOLE_TRANSCEIVER_INSTRUCTIONS.notRelayed;
 
     if (args.isRelayed) {
+      const uniswapArgs = UNISWAP_ARGS_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD];
+
       // Calculate the delivery price in native tokens
       transferCallValue = await quoteDeliveryPrice(
         args.sourceChain,
@@ -71,19 +73,19 @@ export async function initiateBridging(
 
       // Swap DIMO to exact POL amount needed for the delivery fee
       const swapTransactions = await swapToExactPOL(
-        DIMO_TOKEN,
+        uniswapArgs.dimoToken,
         transferCallValue,
-        POLYGON_UNISWAP_V3_POOL_WMATIC_DIMO_POOL_FEE,
+        uniswapArgs.poolFee,
         {
           recipient: client.account?.address as Hex,
           slippageTolerance: new Percent(args.swapOptions?.slippageTolerance || 100, 10_000), // Default 1% slippage tolerance
           deadline: args.swapOptions?.deadline || Math.floor(Date.now() / 1000) + 900 // Default 15 minutes
         },
         args.rpcUrl,
-        true, // Include approval for max uint256 (will reset to 0)
+        true, // Include approval for max uint256 (will reset to 0 after)
       );
 
-      // Add swap transactions to the beginning of our transaction array
+      // Add swap transactions to the beginning of the transaction array
       transactions.push(...swapTransactions);
 
       transceiverInstructions = WORMHOLE_TRANSCEIVER_INSTRUCTIONS.relayed;
