@@ -41,8 +41,11 @@ import {
   SetVehiclePermissionsBulk,
   TransactionInput,
   TransferVehicleAndAftermarketDeviceIDs,
-  UnPairAftermarketDevice, UpgradeStake, WithdrawStake,
+  UnPairAftermarketDevice,
+  UpgradeStake,
+  WithdrawStake
 } from ":core/types/args.js";
+import type { BridgeInitiateArgs } from ":core/types/wormhole.js";
 import { claimAftermarketDevice, claimAftermarketDeviceTypeHash } from ":core/actions/claimAftermarketDevice.js";
 import { TypeHashResponse } from ":core/types/responses.js";
 import { sendDIMOTokens } from ":core/actions/sendDIMOTokens.js";
@@ -67,6 +70,7 @@ import { withdrawStake } from ":core/actions/withdrawStake.js";
 import { upgradeStake } from ":core/actions/upgradeStake.js";
 import { attachVehicle } from ":core/actions/attachVehicle.js";
 import { detachVehicle } from ":core/actions/detachVehicle.js";
+import { initiateBridging } from ":core/actions/wormholeBridge.js";
 
 export class KernelSigner {
   config: _kernelConfig;
@@ -797,7 +801,7 @@ export class KernelSigner {
   }
 
   public async addStake(args: AddStake, waitForReceipt: boolean = true,
-                        optionalArgs?: OptionalArgs): Promise<TransactionReturnType> {
+    optionalArgs?: OptionalArgs): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const addStakeCallData = await addStake(args, client, this.config.environment);
     const userOpHash = await this._sendUserOperation(client, addStakeCallData, optionalArgs);
@@ -867,6 +871,23 @@ export class KernelSigner {
     const client = await this.getActiveClient();
     const upgradeStakeCallData = await detachVehicle(args, client, this.config.environment);
     const userOpHash = await this._sendUserOperation(client, upgradeStakeCallData, optionalArgs);
+
+    if (waitForReceipt) {
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
+      });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    } as TransactionReturnType;
+  }
+
+  public async initiateBridging(args: BridgeInitiateArgs, waitForReceipt: boolean = true, optionalArgs?: OptionalArgs): Promise<TransactionReturnType> {
+    const client = await this.getActiveClient();
+    const initiateBridgingCallData = await initiateBridging(args, client, this.config.environment);
+    const userOpHash = await this._sendUserOperation(client, initiateBridgingCallData, optionalArgs);
 
     if (waitForReceipt) {
       return await client.waitForUserOperationReceipt({

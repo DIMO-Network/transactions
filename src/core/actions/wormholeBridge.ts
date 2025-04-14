@@ -1,44 +1,59 @@
-import { encodeFunctionData } from "viem";
+import { encodeFunctionData, type Hex } from "viem";
 import { wormhole, chainToChainId, VAA, Network } from "@wormhole-foundation/sdk";
 import { KernelAccountClient } from "@zerodev/sdk";
+import { Percent } from "@uniswap/sdk-core";
 import evm from "@wormhole-foundation/sdk/evm";
 import solana from "@wormhole-foundation/sdk/solana";
 import "@wormhole-foundation/sdk-evm-ntt";
 
 import { addressToBytes32 } from ":core/utils/utils.js";
 import { getDIMOPriceFromUniswapV3 } from ":core/utils/priceOracle.js";
+import { swapToExactPOL } from ":core/swap/swapAndWithdraw.js";
 import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
-import { SupportedWormholeNetworks, BridgeInitiateArgs } from ":core/types/wormhole.js";
+import type { Call } from ":core/types/common.js"
+import type { SupportedWormholeNetworks, BridgeInitiateArgs } from ":core/types/wormhole.js";
+import { DINC_ADDRESS } from ":core/constants/dimo.js";
 import { APPROVE_TOKENS, NTT_TRANSFER } from ":core/constants/methods.js";
-import { abiWormholeNttManager } from ":core/abis/WormholeNttManager.js";
+import { abiWormholeNttManager } from ":core/abis/index.js";
 import {
   CHAIN_ABI_MAPPING,
   ENV_MAPPING,
+  UNISWAP_ARGS_MAPPING,
   WORMHOLE_ENV_MAPPING,
   WORMHOLE_CHAIN_MAPPING,
   WORMHOLE_NTT_CONTRACTS,
   WORMHOLE_TRANSCEIVER_INSTRUCTIONS,
 } from ":core/constants/mappings.js";
 
+
 /**
  * Initiates a bridging operation for transferring tokens across different chains using Wormhole.
  *
- * @param args - An object containing the bridging parameters.
- * @param args.sourceChain - The source chain for the bridging operation.
- * @param args.destinationChain - The destination chain for the bridging operation.
- * @param args.amount - The amount of tokens to be bridged.
- * @param args.recipientAddress - The address of the recipient on the destination chain.
- * @param args.isRelayed - Optional. Indicates if the transfer should be relayed.
- * @param args.priceIncreasePercentage - Optional. The percentage to increase the quoted price by.
- * @param client - The KernelAccountClient instance used for transaction execution.
- * @param environment - Optional. The environment to use for the bridging operation. Defaults to "prod".
- * @returns A Promise that resolves to a string representing the encoded calls for the bridging operation.
+ * This function prepares and encodes a series of transactions needed to bridge tokens from one chain to another.
+ * It handles token approvals, fee calculations, and optional relaying. If relaying is enabled, it also handles
+ * swapping DIMO tokens to the native token required for the delivery fee.
+ *
+ * @param args - The parameters for the bridging operation
+ * @param args.sourceChain - The source chain from which tokens will be transferred
+ * @param args.destinationChain - The destination chain to which tokens will be transferred
+ * @param args.amount - The amount of tokens to bridge
+ * @param args.recipientAddress - The address that will receive the tokens on the destination chain
+ * @param args.isRelayed - Whether the transfer should be automatically relayed (requires paying a delivery fee)
+ * @param args.priceIncreasePercentage - Percentage to increase the quoted delivery price by to avoid underfunding
+ * @param args.swapOptions - Options for the token swap when paying relay fees
+ * @param args.swapOptions.slippageTolerance - Maximum slippage allowed for the swap (in basis points)
+ * @param args.swapOptions.deadline - Deadline for the swap transaction (in seconds since epoch)
+ * @param args.rpcUrl - RPC URL for the source chain, required for price quotes and swaps
+ * @param client - The KernelAccountClient instance used to execute the transactions
+ * @param environment - The environment to use (prod, dev, etc.). Currently only prod is supported
+ * @returns A Promise resolving to a hex string of encoded transaction calls ready to be executed
+ * @throws Error if the environment is not supported, if no NTT manager is found, or if client account is unavailable
  */
 export async function initiateBridging(
   args: BridgeInitiateArgs,
   client: KernelAccountClient,
   environment: string = "prod"
-): Promise<string> {
+): Promise<Hex> {
   try {
     if (environment === "dev" || environment === "development") {
       throw new Error("Development environment is not supported yet for bridging operations");
@@ -46,6 +61,7 @@ export async function initiateBridging(
 
     const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
     const sourceNttManagerAddress = WORMHOLE_NTT_CONTRACTS[args.sourceChain]?.manager;
+    const transactions: Array<Call> = []
 
     if (!sourceNttManagerAddress) {
       throw new Error(`No NTT manager address found for ${args.sourceChain}`);
@@ -55,15 +71,37 @@ export async function initiateBridging(
     let transceiverInstructions = WORMHOLE_TRANSCEIVER_INSTRUCTIONS.notRelayed;
 
     if (args.isRelayed) {
+      const uniswapArgs = UNISWAP_ARGS_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD];
+
+      // Calculate the delivery price in native tokens
       transferCallValue = await quoteDeliveryPrice(
         args.sourceChain,
         args.destinationChain,
         environment,
         args.priceIncreasePercentage
       );
+
+      // Swap DIMO to exact POL amount needed for the delivery fee
+      const swapTransactions = await swapToExactPOL(
+        uniswapArgs.dimoToken,
+        transferCallValue,
+        uniswapArgs.poolFee,
+        {
+          recipient: client.account?.address as Hex,
+          slippageTolerance: new Percent(args.swapOptions?.slippageTolerance || 100, 10_000), // Default 1% slippage tolerance
+          deadline: args.swapOptions?.deadline || Math.floor(Date.now() / 1000) + 900 // Default 15 minutes
+        },
+        args.rpcUrl,
+        true, // Include approval for max uint256 (will reset to 0 after)
+      );
+
+      // Add swap transactions to the beginning of the transaction array
+      transactions.push(...swapTransactions);
+
       transceiverInstructions = WORMHOLE_TRANSCEIVER_INSTRUCTIONS.relayed;
     }
 
+    // Add token approval for the bridge
     const approveCall = {
       to: contracts[ContractType.DIMO_TOKEN].address,
       value: BigInt(0),
@@ -73,13 +111,15 @@ export async function initiateBridging(
         args: [sourceNttManagerAddress, args.amount],
       }),
     };
+    transactions.push(approveCall);
 
     if (!client.account?.address) {
       throw new Error("Client account address is not available");
     }
 
+    // Add the bridge transfer call
     const transferCall = {
-      to: sourceNttManagerAddress as `0x${string}`,
+      to: sourceNttManagerAddress as Hex,
       value: transferCallValue,
       data: encodeFunctionData({
         abi: abiWormholeNttManager,
@@ -88,14 +128,15 @@ export async function initiateBridging(
           args.amount,
           chainToChainId(WORMHOLE_CHAIN_MAPPING[args.destinationChain]),
           addressToBytes32(args.recipientAddress),
-          addressToBytes32(client.account?.address as string),
+          addressToBytes32(DINC_ADDRESS), // Refund excess fees
           false,
           transceiverInstructions,
         ],
       }),
     };
+    transactions.push(transferCall);
 
-    return await client.account!.encodeCalls([approveCall, transferCall]);
+    return await client.account!.encodeCalls(transactions);
   } catch (error) {
     console.error("Error in initiateBridging:", error);
     throw error;
