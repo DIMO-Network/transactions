@@ -255,7 +255,7 @@ export async function checkNttTransferStatus(
 
   try {
     // Try to fetch the VAA without specifying the payload type
-    const vaa = await wh.getVaa(txid, "Ntt:WormholeTransfer", timeoutMs);
+    const vaa = await wh.getVaa(txid, "Uint8Array", timeoutMs);
 
     if (vaa) {
       return { status: "Completed", vaa };
