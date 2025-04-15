@@ -51,4 +51,6 @@ export { AccountSigner } from "./AccountSigner.js";
 export type { SACD_PERMISSIONS } from "./core/utils/utils.js";
 export type { FeeBoostConfig } from "./core/types/dimo.js";
 export { initiateBridging, quoteDeliveryPrice, checkNttTransferStatus } from "./core/actions/wormholeBridge.js";
-export type { BridgeInitiateArgs } from "./core/types/wormhole.js";
+export type { BridgeInitiateArgs, ChainRpcConfig } from "./core/types/wormhole.js";
+
+export { testUniswap } from "./test.js"

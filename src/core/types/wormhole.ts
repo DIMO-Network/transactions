@@ -6,6 +6,13 @@ export type NttContracts = {
   [key in SupportedWormholeNetworks]?: Ntt.Contracts;
 };
 
+// Define the type for RPC configuration
+export type ChainRpcConfig = {
+  [key in "Polygon" | "Ethereum" | "Base"]?: {
+    rpc: string;
+  };
+};
+
 // Base type with common properties
 type BaseBridgeInitiateArgs = {
   sourceChain: SupportedWormholeNetworks;
@@ -22,13 +29,13 @@ type BaseBridgeInitiateArgs = {
 // Type for non-relayed transfers
 type NonRelayedBridgeArgs = BaseBridgeInitiateArgs & {
   isRelayed?: false;
-  rpcUrl?: string; // Optional for non-relayed transfers
+  rpcConfig?: ChainRpcConfig; // Optional for non-relayed transfers
 };
 
 // Type for relayed transfers
 type RelayedBridgeArgs = BaseBridgeInitiateArgs & {
   isRelayed: true;
-  rpcUrl: string; // Required for relayed transfers
+  rpcConfig: ChainRpcConfig; // Required for relayed transfers
 };
 
 // Combined type
