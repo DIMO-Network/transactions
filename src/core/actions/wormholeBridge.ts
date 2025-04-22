@@ -11,7 +11,7 @@ import { getDIMOPriceFromUniswapV3 } from ":core/utils/priceOracle.js";
 import { swapToExactPOL } from ":core/swap/swapAndWithdraw.js";
 import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 import type { Call } from ":core/types/common.js"
-import type { SupportedWormholeNetworks, BridgeInitiateArgs } from ":core/types/wormhole.js";
+import type { SupportedWormholeNetworks, BridgeInitiateArgs, ChainRpcConfig } from ":core/types/wormhole.js";
 import { DINC_ADDRESS } from ":core/constants/dimo.js";
 import { APPROVE_TOKENS, NTT_TRANSFER } from ":core/constants/methods.js";
 import { abiWormholeNttManager } from ":core/abis/index.js";
@@ -78,8 +78,15 @@ export async function initiateBridging(
         args.sourceChain,
         args.destinationChain,
         environment,
+        args.rpcConfig,
         args.priceIncreasePercentage
       );
+
+      const mappedSourceChain = WORMHOLE_CHAIN_MAPPING[args.sourceChain];
+      const rpcUrl = args.rpcConfig[mappedSourceChain as keyof ChainRpcConfig]?.rpc;
+      if (!rpcUrl) {
+        throw new Error(`No RPC URL available for ${mappedSourceChain}`);
+      }
 
       // Swap DIMO to exact POL amount needed for the delivery fee
       const swapTransactions = await swapToExactPOL(
@@ -91,7 +98,7 @@ export async function initiateBridging(
           slippageTolerance: new Percent(args.swapOptions?.slippageTolerance || 100, 10_000), // Default 1% slippage tolerance
           deadline: args.swapOptions?.deadline || Math.floor(Date.now() / 1000) + 900 // Default 15 minutes
         },
-        args.rpcUrl,
+        rpcUrl,
         true, // Include approval for max uint256 (will reset to 0 after)
       );
 
@@ -143,9 +150,10 @@ export async function initiateBridging(
   }
 }
 
+
 /**
  * Quotes the delivery price for a Wormhole NTT transfer between chains.
- *
+ * 
  * This function calculates the cost of transferring tokens from a source chain to a destination chain
  * using Wormhole's NTT (Non-Transferable Token) protocol. It includes an option to increase the quoted
  * price by a specified percentage to avoid underfunding.
@@ -153,27 +161,39 @@ export async function initiateBridging(
  * @param sourceChain - The chain from which the tokens will be transferred.
  * @param destinationChain - The chain to which the tokens will be transferred.
  * @param environment - The environment to use for the price quote. Defaults to "prod".
- * @param priceIncreasePercentage - The percentage by which to increase the quoted price. Defaults to 10%.
- * @param returnInDIMO - Whether to return the price in DIMO tokens. Defaults to false (native tokens).
- * @param rpcUrl - The RPC URL to use for fetching DIMO price. Required if returnInDIMO is true.
- * @returns A Promise that resolves to a bigint representing the quoted delivery price in the smallest unit of either the native token or DIMO token.
+ * @param rpcConfig - Configuration object containing RPC URLs for the chains involved
+ * @param priceIncreasePercentage - Percentage to increase the quoted price to avoid underfunding. Defaults to 1%
+ * @param returnInDIMO - Whether to return the price in DIMO tokens instead of native tokens. Only works for Polygon source chain. Defaults to false
+ * @returns A Promise resolving to the delivery price as a bigint, either in native tokens or DIMO tokens based on returnInDIMO parameter
+ * @throws Error if the environment is not supported, if no RPC URL is provided for the source chain, or if converting to DIMO is requested for a non-Polygon source chain
  */
 export async function quoteDeliveryPrice(
   sourceChain: SupportedWormholeNetworks,
   destinationChain: SupportedWormholeNetworks,
   environment: string = "prod",
-  priceIncreasePercentage: number = 10,
-  returnInDIMO: boolean = false,
-  rpcUrl?: string
+  rpcConfig: ChainRpcConfig,
+  priceIncreasePercentage: number = 1,
+  returnInDIMO: boolean = false
 ): Promise<bigint> {
   if (environment === "dev" || environment === "development") {
     throw new Error("Development environment is not supported yet for bridging operations");
   }
 
-  const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Mainnet";
-  const wh = await wormhole(wormholeEnv as Network, [evm, solana]);
+  const mappedSourceChain = WORMHOLE_CHAIN_MAPPING[sourceChain];
 
-  const srcChain = wh.getChain(WORMHOLE_CHAIN_MAPPING[sourceChain]);
+  // Validate that we have an RPC URL for the source chain
+  if (!rpcConfig[mappedSourceChain as keyof ChainRpcConfig]) {
+    throw new Error(`No RPC URL provided for ${mappedSourceChain}`);
+  }
+
+  const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Mainnet";
+  const wh = await wormhole(
+    wormholeEnv as Network,
+    [evm, solana], {
+    chains: rpcConfig
+  });
+
+  const srcChain = wh.getChain(mappedSourceChain);
   const destChain = wh.getChain(WORMHOLE_CHAIN_MAPPING[destinationChain]);
 
   const srcNtt = await srcChain.getProtocol("Ntt", {
@@ -189,10 +209,17 @@ export async function quoteDeliveryPrice(
   price = price + (price * BigInt(priceIncreasePercentage)) / BigInt(100);
 
   if (returnInDIMO) {
-    // Convert price to DIMO tokens
-    if (!rpcUrl) {
-      throw new Error("RPC URL is required when returning price in DIMO tokens");
+    // Check if source chain is Polygon, as Uniswap price queries are only supported on Polygon
+    if (!sourceChain.includes('Polygon')) {
+      throw new Error('Converting price to DIMO tokens is only supported when source chain is Polygon');
     }
+
+    const rpcUrl = rpcConfig[mappedSourceChain as keyof ChainRpcConfig]?.rpc;
+    if (!rpcUrl) {
+      throw new Error(`No RPC URL available for ${mappedSourceChain}`);
+    }
+
+    // Convert price to DIMO tokens
     const dimoPrice = await getDIMOPriceFromUniswapV3(environment, rpcUrl);
     const priceInDIMO = (price * dimoPrice) / BigInt(1e18);
     return priceInDIMO;
@@ -228,7 +255,7 @@ export async function checkNttTransferStatus(
 
   try {
     // Try to fetch the VAA without specifying the payload type
-    const vaa = await wh.getVaa(txid, "Ntt:WormholeTransfer", timeoutMs);
+    const vaa = await wh.getVaa(txid, "Uint8Array", timeoutMs);
 
     if (vaa) {
       return { status: "Completed", vaa };
