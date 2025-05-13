@@ -26,14 +26,14 @@ If you're a developer interested in using the DIMO Transactions SDK for **multi-
     import { PasskeyStamper } from "@turnkey/react-native-passkey-stamper";
     import { KernelSigner, newKernelConfig, sacdPermissionValue } from '@dimo-network/transactions';
 
-    const kernelSignerConfig = ({
+    export const kernelSignerConfig = newKernelConfig({
       rpcUrl: RPC_URL,
       bundlerUrl: BUNDLER_RPC,
       paymasterUrl: PAYMASTER_RPC,
-      environment: 'dev', // omit to default to prod
+      environment: BACKEND_ENV,
       useWalletSession: true,
-      clientId: AUTH_CLIENT_ID, 
-      domain: AUTH_ISSUER, 
+      clientId: AUTH_CLIENT_ID,
+      domain: AUTH_ISSUER,
       redirectUri: AUTH_ISSUER,
       defaultPermissions: sacdPermissionValue({
         NONLOCATION_TELEMETRY: true,
@@ -83,34 +83,63 @@ If you're a developer interested in using the DIMO Transactions SDK for **multi-
 
 ```
 
+### Connecting the Signer
+
+Connecting a signer is the first step to working with the DIMO transactions SDK. If you want to take actions directly with a wallet, you have the option to create a signer via private key. However, to build apps on DIMO, we can prompt the user to initialize with 
+
+A few key terms to keep in mind:
+- A session is used as shorthand to indicate a wallet or api session. This means that the user signs an agreement allowing them to take on chain actions for a period of X minutes (configurable in the kernel config). When a session is open, any transactions taken using this session will not require a signature. 
+
+- When creating a signer with a passkey stamper or API stamper, you can move flexibly between API sessions (which require no signature) or a standard passkey signer (which will require a signature for all transactions). When a wallet session is open, you have the option of calling `getPasskeyClient()` to exclude a specific transaction from the wallet session. An example of this might be: use a wallet session for all transactions except those which transfer funds out of the user wallet. 
+
+| Method                           | Notes                                                                                                       | Returns                                 |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| resetClient()                    | Clears all state, this can be used to force user log-out                                                    | -                                       |
+| hasActiveSession()               | Returns true if the user has an active wallet session                                                       | boolean                                 |
+| getActiveClient()                | After initialization, will create active session, if needed, and return signer                              | KernelAccountClient                     |
+| getPasskeyClient()               | Returns passkey client regardless of active session; user will be required to sign any transactions         | KernelAccountClient                     |
+| init()                           | Creates a session with the subOrganizationID and stamper                                                    | -                                       |
+| passkeyInit()                    | Creates a passkey signer with the subOrganizationID, wallet address and stamper                             | -                                       |
+| passkeyToSession()               | Opens a wallet session using passkey signer                                                                 | -                                       |
+| openSessionWithPasskey()         | Prompt the user for their signature to open a wallet session, length of wallet session can be set in config | -                                       |
+| openSessionWithApiStamper()      | Use credentials returned from DIMO Accounts api to open a wallet session for user                           | -                                       |
+| privateKeyInit()                 | Creates a signer via private key; not compatible with sessions                                              | -                                       |
+
+
 ### Actions
 
-| Notes                                                                                                       | Method                                 |
-| ----------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| Initialize signer with user account infos                                                                   | passkeyInit()                          |
-| Prompt the user for their signature to open a wallet session, length of wallet session can be set in config | openSessionWithPasskey()               |
-| Use credentials returned from DIMO Accounts api to open a wallet session for user                           | openSessionWithApiStamper()            |
-| Get passkey client (this will require user to sign for all transactions)                                    | getPasskeyClient()                     |
-| Return active API or wallet session client, if applicable, otherwise, return passkey client                 | getActiveClient()                      |
-|                                                                                                             | mintVehicleWithDeviceDefinition()      |
-|                                                                                                             | setVehiclePermissions()                |
-|                                                                                                             | setVehiclePermissionsBulk()            |
-|                                                                                                             | sendDIMOTokens()                       |
-|                                                                                                             | claimAftermarketDevice()               |
-|                                                                                                             | pairAftermarketDevice()                |
-|                                                                                                             | claimAndPairAftermarketDevice()        |
-|                                                                                                             | burnVehicle()                          |
-|                                                                                                             | transferVehicleAndAftermarketDevices() |
-|                                                                                                             | unpairAftermarketDevice()              |
-|                                                                                                             | signTypedData()                        |
-|                                                                                                             | signChallenge()                        |
-|                                                                                                             | generateChallenge()                    |
-|                                                                                                             | submitWeb3Challenge()                  |
-|                                                                                                             | uploadSACDAgreement()                  |
-|                                                                                                             | signSACDPermissionTemplate()           |
-|                                                                                                             | signAndUploadSACDAgreement()           |
-|                                                                                                             | getUserOperationReceipt()              |
-|                                                                                                             | resetClient()                          |
+- mintVehicleWithDeviceDefinition
+- setVehiclePermissions
+- setVehiclePermissionsBulk
+- sendDIMOTokens
+- claimAftermarketDevice
+- pairAftermarketDevice
+- claimAndPairAftermarketDevice
+- burnVehicle
+- transferVehicleAndAftermarketDevices
+- unpairAftermarketDevice
+- addStake
+- withdrawStake
+- upgradeStake
+- attacheVehicleToStake
+- detachVehicleFromStake
+
+### Helper Methods
+
+- claimAftermarketDeviceTypeHash
+- signTypedData
+- signChallenge
+- generateChallenge
+- submitWeb3Challenge
+- getJWT
+- uploadSACDAgreement
+- signSACDPermissionTemplate
+- signAndUploadSACDAgreement
+- getUserOperationReceipt
+- isDeployed
+- deriveKernelAddress
+- executeTransaction
+- _sendUserOperation
 
 ## For SDK Maintainers
 
