@@ -27,7 +27,7 @@ export async function getDIMOPriceFromUniswapV3(environment: string, rpcUrl: str
     transport: http(rpcUrl),
   });
 
-  const poolAddress = contracts[ContractType.UNISWAP_V3_POOL_WMATIC_DIMO].address;
+  const poolAddress = contracts[ContractType.UNISWAP_V3_POOL].address;
 
   if (poolAddress === "0x0000000000000000000000000000000000000000") {
     throw new Error(`Uniswap pool address is zero for environment: ${environment}`);
