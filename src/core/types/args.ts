@@ -8,7 +8,7 @@ export type MintVehicleWithDeviceDefinition = {
   sacdInput: { grantee: `0x${string}`; permissions: BigInt; expiration: BigInt; source: string };
 };
 
-export type VehcilePermissionDescription = {
+export type VehiclePermissionDescription = {
   driverID: string;
   appID: string;
   appName: string;
@@ -46,12 +46,16 @@ export type BurnVehicle = {
   tokenId: BigInt;
 };
 
+export type BurnSyntheticDevice = {
+  tokenId: BigInt;
+}
+
 export type SendDIMOTokens = {
   recipient: `0x${string}`;
   amount: bigint;
 };
 
-export type ClaimAftermarketdevice = {
+export type ClaimAftermarketDevice = {
   aftermarketDeviceNode: BigInt;
   aftermarketDeviceSig: `0x${string}`;
 };

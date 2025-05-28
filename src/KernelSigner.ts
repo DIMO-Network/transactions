@@ -29,9 +29,9 @@ import {
 } from ":core/actions/setPermissionsSACD.js";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING, ENV_TO_API_MAPPING } from ":core/constants/mappings.js";
 import {
-  AddStake, AttachVehicle,
+  AddStake, AttachVehicle, BurnSyntheticDevice,
   BurnVehicle,
-  ClaimAftermarketdevice,
+  ClaimAftermarketDevice,
   DeriveKernelAddress, DetachVehicle,
   MintVehicleWithDeviceDefinition,
   PairAftermarketDevice,
@@ -43,7 +43,7 @@ import {
   TransferVehicleAndAftermarketDeviceIDs,
   UnPairAftermarketDevice,
   UpgradeStake,
-  WithdrawStake
+  WithdrawStake,
 } from ":core/types/args.js";
 import type { BridgeInitiateArgs } from ":core/types/wormhole.js";
 import { claimAftermarketDevice, claimAftermarketDeviceTypeHash } from ":core/actions/claimAftermarketDevice.js";
@@ -53,6 +53,7 @@ import { pairAftermarketDevice } from ":core/actions/pairAftermarketDevice.js";
 import { TurnkeyClient } from "@turnkey/http";
 import { polygon } from "viem/chains";
 import { burnVehicle, burnVehicleBatch } from ":core/actions/burnVehicle.js";
+import { burnSyntheticDevice, burnSyntheticDeviceBatch } from ":core/actions/burnSyntheticDevice.js";
 import { createAccount } from "@turnkey/viem";
 import { getKernelAddressFromECDSA, signerToEcdsaValidator } from "@zerodev/ecdsa-validator";
 import { privateKeyToAccount } from "viem/accounts";
@@ -655,7 +656,7 @@ export class KernelSigner {
   }
 
   public async claimAftermarketDevice(
-    args: ClaimAftermarketdevice,
+    args: ClaimAftermarketDevice,
     waitForReceipt: boolean = true,
     optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
@@ -700,7 +701,7 @@ export class KernelSigner {
   }
 
   public async claimAndPairAftermarketDevice(
-    args: ClaimAftermarketdevice & PairAftermarketDevice,
+    args: ClaimAftermarketDevice & PairAftermarketDevice,
     waitForReceipt: boolean = true,
     optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
@@ -740,6 +741,38 @@ export class KernelSigner {
     }
 
     const userOpHash = await this._sendUserOperation(client, burnVehicleCallData, optionalArgs);
+
+    if (waitForReceipt) {
+      const client = await this.getActiveClient();
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
+      });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    } as TransactionReturnType;
+  }
+
+  public async burnSyntheticDevice(
+    args: BurnSyntheticDevice | BurnSyntheticDevice[],
+    waitForReceipt: boolean = true,
+    optionalArgs?: OptionalArgs
+  ): Promise<TransactionReturnType> {
+    const client = await this.getActiveClient();
+
+    let burnSyntheticDeviceCallData: `0x${string}`;
+    if (!Array.isArray(args)) {
+      burnSyntheticDeviceCallData = await burnSyntheticDevice(args, client, this.config.environment);
+    } else {
+      if (args.length >= 25) {
+        throw Error("Batch vehicle burn limit: 25");
+      }
+      burnSyntheticDeviceCallData = await burnSyntheticDeviceBatch(args, client, this.config.environment);
+    }
+
+    const userOpHash = await this._sendUserOperation(client, burnSyntheticDeviceCallData, optionalArgs);
 
     if (waitForReceipt) {
       const client = await this.getActiveClient();

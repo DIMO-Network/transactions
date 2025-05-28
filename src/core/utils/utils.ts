@@ -1,5 +1,5 @@
 import { pad, isAddress } from "viem";
-import { VehcilePermissionDescription } from ":core/types/args.js";
+import { VehiclePermissionDescription } from ":core/types/args.js";
 import { AccountConfig, KernelConfig, OptionalArgs, _accountConfig, _kernelConfig } from ":core/types/dimo.js";
 import { KERNEL_V3_1, getEntryPoint } from "@zerodev/sdk/constants";
 
@@ -143,7 +143,7 @@ export const sacdPermissionArray = (permissionValue: BigInt): string[] => {
   return sacdPermArray;
 };
 
-export const sacdDescription = (args: VehcilePermissionDescription): string => {
+export const sacdDescription = (args: VehiclePermissionDescription): string => {
   const description = `By proceeding, you will grant data access and control functions to ${args.appName} effective as of ${args.effectiveAt} until ${new Date(Number(args.expiration) * 1000).toISOString()}. Permissions being granted: ${args.permissionArray.join("; ")} Driver ID: ${args.driverID} App ID: ${args.appID} DIMO Platform, version 1.0.`;
   return description;
 };
