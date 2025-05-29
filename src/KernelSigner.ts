@@ -29,10 +29,13 @@ import {
 } from ":core/actions/setPermissionsSACD.js";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING, ENV_TO_API_MAPPING } from ":core/constants/mappings.js";
 import {
-  AddStake, AttachVehicle, BurnSyntheticDevice,
+  AddStake,
+  AttachVehicle,
+  BurnSyntheticDevice,
   BurnVehicle,
   ClaimAftermarketDevice,
-  DeriveKernelAddress, DetachVehicle,
+  DeriveKernelAddress,
+  DetachVehicle,
   MintVehicleWithDeviceDefinition,
   PairAftermarketDevice,
   SACDTemplateInputs,
@@ -833,8 +836,11 @@ export class KernelSigner {
     } as TransactionReturnType;
   }
 
-  public async addStake(args: AddStake, waitForReceipt: boolean = true,
-    optionalArgs?: OptionalArgs): Promise<TransactionReturnType> {
+  public async addStake(
+    args: AddStake,
+    waitForReceipt: boolean = true,
+    optionalArgs?: OptionalArgs
+  ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const addStakeCallData = await addStake(args, client, this.config.environment);
     const userOpHash = await this._sendUserOperation(client, addStakeCallData, optionalArgs);
@@ -850,7 +856,11 @@ export class KernelSigner {
     } as TransactionReturnType;
   }
 
-  public async withdrawStake(args: WithdrawStake, waitForReceipt: boolean = true, optionalArgs?: OptionalArgs): Promise<TransactionReturnType> {
+  public async withdrawStake(
+    args: WithdrawStake,
+    waitForReceipt: boolean = true,
+    optionalArgs?: OptionalArgs
+  ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const addStakeCallData = await withdrawStake(args, client, this.config.environment);
     const userOpHash = await this._sendUserOperation(client, addStakeCallData, optionalArgs);
@@ -866,7 +876,11 @@ export class KernelSigner {
     } as TransactionReturnType;
   }
 
-  public async upgradeStake(args: UpgradeStake, waitForReceipt: boolean = true, optionalArgs?: OptionalArgs): Promise<TransactionReturnType> {
+  public async upgradeStake(
+    args: UpgradeStake,
+    waitForReceipt: boolean = true,
+    optionalArgs?: OptionalArgs
+  ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const upgradeStakeCallData = await upgradeStake(args, client, this.config.environment);
     const userOpHash = await this._sendUserOperation(client, upgradeStakeCallData, optionalArgs);
@@ -883,7 +897,11 @@ export class KernelSigner {
     } as TransactionReturnType;
   }
 
-  public async attacheVehicleToStake(args: AttachVehicle, waitForReceipt: boolean = true, optionalArgs?: OptionalArgs): Promise<TransactionReturnType> {
+  public async attacheVehicleToStake(
+    args: AttachVehicle,
+    waitForReceipt: boolean = true,
+    optionalArgs?: OptionalArgs
+  ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const upgradeStakeCallData = await attachVehicle(args, client, this.config.environment);
     const userOpHash = await this._sendUserOperation(client, upgradeStakeCallData, optionalArgs);
@@ -900,7 +918,11 @@ export class KernelSigner {
     } as TransactionReturnType;
   }
 
-  public async detachVehicleFromStake(args: DetachVehicle, waitForReceipt: boolean = true, optionalArgs?: OptionalArgs): Promise<TransactionReturnType> {
+  public async detachVehicleFromStake(
+    args: DetachVehicle,
+    waitForReceipt: boolean = true,
+    optionalArgs?: OptionalArgs
+  ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const upgradeStakeCallData = await detachVehicle(args, client, this.config.environment);
     const userOpHash = await this._sendUserOperation(client, upgradeStakeCallData, optionalArgs);
@@ -917,7 +939,11 @@ export class KernelSigner {
     } as TransactionReturnType;
   }
 
-  public async initiateBridging(args: BridgeInitiateArgs, waitForReceipt: boolean = true, optionalArgs?: OptionalArgs): Promise<TransactionReturnType> {
+  public async initiateBridging(
+    args: BridgeInitiateArgs,
+    waitForReceipt: boolean = true,
+    optionalArgs?: OptionalArgs
+  ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const initiateBridgingCallData = await initiateBridging(args, client, this.config.environment);
     const userOpHash = await this._sendUserOperation(client, initiateBridgingCallData, optionalArgs);

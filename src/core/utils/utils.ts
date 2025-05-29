@@ -187,5 +187,5 @@ export function addressToBytes32(address: string | `0x${string}`): string {
     throw new Error("Invalid 0x address");
   }
 
-  return pad(address as `0x${string}`, { size: 32 })
+  return pad(address as `0x${string}`, { size: 32 });
 }

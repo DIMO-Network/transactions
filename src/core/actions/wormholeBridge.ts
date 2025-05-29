@@ -10,7 +10,7 @@ import { addressToBytes32 } from ":core/utils/utils.js";
 import { getDIMOPriceFromUniswapV3 } from ":core/utils/priceOracle.js";
 import { swapToExactPOL } from ":core/swap/swapAndWithdraw.js";
 import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
-import type { Call } from ":core/types/common.js"
+import type { Call } from ":core/types/common.js";
 import type { SupportedWormholeNetworks, BridgeInitiateArgs, ChainRpcConfig } from ":core/types/wormhole.js";
 import { DINC_ADDRESS } from ":core/constants/dimo.js";
 import { APPROVE_TOKENS, NTT_TRANSFER } from ":core/constants/methods.js";
@@ -24,7 +24,6 @@ import {
   WORMHOLE_NTT_CONTRACTS,
   WORMHOLE_TRANSCEIVER_INSTRUCTIONS,
 } from ":core/constants/mappings.js";
-
 
 /**
  * Initiates a bridging operation for transferring tokens across different chains using Wormhole.
@@ -61,7 +60,7 @@ export async function initiateBridging(
 
     const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
     const sourceNttManagerAddress = WORMHOLE_NTT_CONTRACTS[args.sourceChain]?.manager;
-    const transactions: Array<Call> = []
+    const transactions: Array<Call> = [];
 
     if (!sourceNttManagerAddress) {
       throw new Error(`No NTT manager address found for ${args.sourceChain}`);
@@ -96,10 +95,10 @@ export async function initiateBridging(
         {
           recipient: client.account?.address as Hex,
           slippageTolerance: new Percent(args.swapOptions?.slippageTolerance || 100, 10_000), // Default 1% slippage tolerance
-          deadline: args.swapOptions?.deadline || Math.floor(Date.now() / 1000) + 900 // Default 15 minutes
+          deadline: args.swapOptions?.deadline || Math.floor(Date.now() / 1000) + 900, // Default 15 minutes
         },
         rpcUrl,
-        true, // Include approval for max uint256 (will reset to 0 after)
+        true // Include approval for max uint256 (will reset to 0 after)
       );
 
       // Add swap transactions to the beginning of the transaction array
@@ -150,10 +149,9 @@ export async function initiateBridging(
   }
 }
 
-
 /**
  * Quotes the delivery price for a Wormhole NTT transfer between chains.
- * 
+ *
  * This function calculates the cost of transferring tokens from a source chain to a destination chain
  * using Wormhole's NTT (Non-Transferable Token) protocol. It includes an option to increase the quoted
  * price by a specified percentage to avoid underfunding.
@@ -187,10 +185,8 @@ export async function quoteDeliveryPrice(
   }
 
   const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Mainnet";
-  const wh = await wormhole(
-    wormholeEnv as Network,
-    [evm, solana], {
-    chains: rpcConfig
+  const wh = await wormhole(wormholeEnv as Network, [evm, solana], {
+    chains: rpcConfig,
   });
 
   const srcChain = wh.getChain(mappedSourceChain);
@@ -210,8 +206,8 @@ export async function quoteDeliveryPrice(
 
   if (returnInDIMO) {
     // Check if source chain is Polygon, as Uniswap price queries are only supported on Polygon
-    if (!sourceChain.includes('Polygon')) {
-      throw new Error('Converting price to DIMO tokens is only supported when source chain is Polygon');
+    if (!sourceChain.includes("Polygon")) {
+      throw new Error("Converting price to DIMO tokens is only supported when source chain is Polygon");
     }
 
     const rpcUrl = rpcConfig[mappedSourceChain as keyof ChainRpcConfig]?.rpc;

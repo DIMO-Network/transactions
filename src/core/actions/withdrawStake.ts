@@ -16,7 +16,7 @@ export async function withdrawStake(
       value: BigInt(0),
       data: encodeFunctionData({
         abi: contracts[ContractType.DIMO_STAKING].abi,
-        functionName: 'withdraw',
+        functionName: "withdraw",
         args: [args.stakeId],
       }),
     },

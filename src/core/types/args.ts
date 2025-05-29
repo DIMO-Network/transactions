@@ -48,7 +48,7 @@ export type BurnVehicle = {
 
 export type BurnSyntheticDevice = {
   tokenId: BigInt;
-}
+};
 
 export type SendDIMOTokens = {
   recipient: `0x${string}`;
@@ -131,24 +131,24 @@ export type AddStake = {
   tokenId: BigInt;
   amount: number;
   level: number;
-}
+};
 
 export type WithdrawStake = {
   stakeId: BigInt;
-}
+};
 
 export type UpgradeStake = {
   stakeId: BigInt;
   level: number;
   vehicleId: BigInt;
-  amountDiff:number
-}
+  amountDiff: number;
+};
 
 export type AttachVehicle = {
   stakeId: BigInt;
   vehicleId: BigInt;
-}
+};
 
 export type DetachVehicle = {
   vehicleId: BigInt;
-}
+};

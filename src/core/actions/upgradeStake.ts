@@ -13,14 +13,11 @@ export async function upgradeStake(
   return await client.account!.encodeCalls([
     {
       to: contracts[ContractType.DIMO_TOKEN].address,
-      value: BigInt('0'),
+      value: BigInt("0"),
       data: encodeFunctionData({
         abi: contracts[ContractType.DIMO_TOKEN].abi,
-        functionName: 'approve',
-        args: [
-          contracts[ContractType.DIMO_STAKING].address,
-          BigInt(parseEther(args.amountDiff.toString())),
-        ],
+        functionName: "approve",
+        args: [contracts[ContractType.DIMO_STAKING].address, BigInt(parseEther(args.amountDiff.toString()))],
       }),
     },
     {
@@ -28,7 +25,7 @@ export async function upgradeStake(
       value: BigInt(0),
       data: encodeFunctionData({
         abi: contracts[ContractType.DIMO_STAKING].abi,
-        functionName: 'upgradeStake',
+        functionName: "upgradeStake",
         args: [args.stakeId, args.level, args.vehicleId],
       }),
     },

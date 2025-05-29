@@ -14,7 +14,6 @@ export function burnSyntheticDeviceCallData(args: BurnSyntheticDevice, environme
   });
 }
 
-
 export async function burnSyntheticDevice(
   args: BurnSyntheticDevice,
   client: KernelAccountClient,

@@ -2710,13 +2710,13 @@ export const abiRegistry: Abi = [
       {
         internalType: "uint256",
         name: "tokenId",
-        type: "uint256"
-      }
+        type: "uint256",
+      },
     ],
     name: "validateSdBurnAndResetNode",
     outputs: [],
     stateMutability: "nonpayable",
-    type: "function"
+    type: "function",
   },
   {
     anonymous: false,
