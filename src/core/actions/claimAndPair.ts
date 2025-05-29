@@ -3,10 +3,10 @@ import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
 import { KernelAccountClient } from "@zerodev/sdk";
 import { CLAIM_AFTERMARKET_DEVICE, PAIR_AFTERMARKET_DEVICE } from ":core/constants/methods.js";
-import { ClaimAftermarketdevice, PairAftermarketDevice } from ":core/types/args.js";
+import { ClaimAftermarketDevice, PairAftermarketDevice } from ":core/types/args.js";
 
 export const claimAndPairDevice = async (
-  args: ClaimAftermarketdevice & PairAftermarketDevice,
+  args: ClaimAftermarketDevice & PairAftermarketDevice,
   client: KernelAccountClient,
   environment: string = "prod"
 ): Promise<`0x${string}`> => {

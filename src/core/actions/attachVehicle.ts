@@ -16,7 +16,7 @@ export async function attachVehicle(
       value: BigInt(0),
       data: encodeFunctionData({
         abi: contracts[ContractType.DIMO_STAKING].abi,
-        functionName: 'attachVehicle',
+        functionName: "attachVehicle",
         args: [args.stakeId, args.vehicleId],
       }),
     },

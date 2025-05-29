@@ -85,26 +85,26 @@ If you're a developer interested in using the DIMO Transactions SDK for **multi-
 
 ### Connecting the Signer
 
-Connecting a signer is the first step to working with the DIMO transactions SDK. If you want to take actions directly with a wallet, you have the option to create a signer via private key. However, to build apps on DIMO, we can prompt the user to initialize with 
+Connecting a signer is the first step to working with the DIMO transactions SDK. If you want to take actions directly with a wallet, you have the option to create a signer via private key. However, to build apps on DIMO, we can prompt the user to initialize with
 
 A few key terms to keep in mind:
-- A session is used as shorthand to indicate a wallet or api session. This means that the user signs an agreement allowing them to take on chain actions for a period of X minutes (configurable in the kernel config). When a session is open, any transactions taken using this session will not require a signature. 
 
-- When creating a signer with a passkey stamper or API stamper, you can move flexibly between API sessions (which require no signature) or a standard passkey signer (which will require a signature for all transactions). When a wallet session is open, you have the option of calling `getPasskeyClient()` to exclude a specific transaction from the wallet session. An example of this might be: use a wallet session for all transactions except those which transfer funds out of the user wallet. 
+- A session is used as shorthand to indicate a wallet or api session. This means that the user signs an agreement allowing them to take on chain actions for a period of X minutes (configurable in the kernel config). When a session is open, any transactions taken using this session will not require a signature.
 
-| Method                           | Notes                                                                                                       | Returns                                 |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| resetClient()                    | Clears all state, this can be used to force user log-out                                                    | -                                       |
-| hasActiveSession()               | Returns true if the user has an active wallet session                                                       | boolean                                 |
-| getActiveClient()                | After initialization, will create active session, if needed, and return signer                              | KernelAccountClient                     |
-| getPasskeyClient()               | Returns passkey client regardless of active session; user will be required to sign any transactions         | KernelAccountClient                     |
-| init()                           | Creates a session with the subOrganizationID and stamper                                                    | -                                       |
-| passkeyInit()                    | Creates a passkey signer with the subOrganizationID, wallet address and stamper                             | -                                       |
-| passkeyToSession()               | Opens a wallet session using passkey signer                                                                 | -                                       |
-| openSessionWithPasskey()         | Prompt the user for their signature to open a wallet session, length of wallet session can be set in config | -                                       |
-| openSessionWithApiStamper()      | Use credentials returned from DIMO Accounts api to open a wallet session for user                           | -                                       |
-| privateKeyInit()                 | Creates a signer via private key; not compatible with sessions                                              | -                                       |
+- When creating a signer with a passkey stamper or API stamper, you can move flexibly between API sessions (which require no signature) or a standard passkey signer (which will require a signature for all transactions). When a wallet session is open, you have the option of calling `getPasskeyClient()` to exclude a specific transaction from the wallet session. An example of this might be: use a wallet session for all transactions except those which transfer funds out of the user wallet.
 
+| Method                      | Notes                                                                                                       | Returns             |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------- |
+| resetClient()               | Clears all state, this can be used to force user log-out                                                    | -                   |
+| hasActiveSession()          | Returns true if the user has an active wallet session                                                       | boolean             |
+| getActiveClient()           | After initialization, will create active session, if needed, and return signer                              | KernelAccountClient |
+| getPasskeyClient()          | Returns passkey client regardless of active session; user will be required to sign any transactions         | KernelAccountClient |
+| init()                      | Creates a session with the subOrganizationID and stamper                                                    | -                   |
+| passkeyInit()               | Creates a passkey signer with the subOrganizationID, wallet address and stamper                             | -                   |
+| passkeyToSession()          | Opens a wallet session using passkey signer                                                                 | -                   |
+| openSessionWithPasskey()    | Prompt the user for their signature to open a wallet session, length of wallet session can be set in config | -                   |
+| openSessionWithApiStamper() | Use credentials returned from DIMO Accounts api to open a wallet session for user                           | -                   |
+| privateKeyInit()            | Creates a signer via private key; not compatible with sessions                                              | -                   |
 
 ### Actions
 
@@ -139,13 +139,14 @@ A few key terms to keep in mind:
 - isDeployed
 - deriveKernelAddress
 - executeTransaction
-- _sendUserOperation
+- \_sendUserOperation
 
 ## For SDK Maintainers
 
 To update the version of the DIMO Transactions SDK, follow these steps:
 
 1. Update the version number in `package.json`:
+
 ```json
 {
   "name": "@dimo-network/transactions",
@@ -155,21 +156,25 @@ To update the version of the DIMO Transactions SDK, follow these steps:
 ```
 
 2. Run the prebuild script to update the version in the codebase and `package-lock.json`:
+
 ```bash
 npm run prebuild
 ```
 
 3. Build the package:
+
 ```bash
 npm run build
 ```
 
 4. Create a local package for testing (optional):
+
 ```bash
 npm pack
 ```
 
 5. Publish the new version to npm:
+
 ```bash
 npm publish
 ```

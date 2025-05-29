@@ -8,7 +8,7 @@ export type MintVehicleWithDeviceDefinition = {
   sacdInput: { grantee: `0x${string}`; permissions: BigInt; expiration: BigInt; source: string };
 };
 
-export type VehcilePermissionDescription = {
+export type VehiclePermissionDescription = {
   driverID: string;
   appID: string;
   appName: string;
@@ -46,12 +46,16 @@ export type BurnVehicle = {
   tokenId: BigInt;
 };
 
+export type BurnSyntheticDevice = {
+  tokenId: BigInt;
+};
+
 export type SendDIMOTokens = {
   recipient: `0x${string}`;
   amount: bigint;
 };
 
-export type ClaimAftermarketdevice = {
+export type ClaimAftermarketDevice = {
   aftermarketDeviceNode: BigInt;
   aftermarketDeviceSig: `0x${string}`;
 };
@@ -127,24 +131,24 @@ export type AddStake = {
   tokenId: BigInt;
   amount: number;
   level: number;
-}
+};
 
 export type WithdrawStake = {
   stakeId: BigInt;
-}
+};
 
 export type UpgradeStake = {
   stakeId: BigInt;
   level: number;
   vehicleId: BigInt;
-  amountDiff:number
-}
+  amountDiff: number;
+};
 
 export type AttachVehicle = {
   stakeId: BigInt;
   vehicleId: BigInt;
-}
+};
 
 export type DetachVehicle = {
   vehicleId: BigInt;
-}
+};

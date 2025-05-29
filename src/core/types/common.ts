@@ -6,7 +6,7 @@ export type AbiAddressPair = {
 };
 
 export type Call = {
-  to: Hex
-  data?: Hex | undefined
-  value?: bigint | undefined
-}
+  to: Hex;
+  data?: Hex | undefined;
+  value?: bigint | undefined;
+};

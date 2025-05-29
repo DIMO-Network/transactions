@@ -13,14 +13,11 @@ export async function addStake(
   return await client.account!.encodeCalls([
     {
       to: contracts[ContractType.DIMO_TOKEN].address,
-      value: BigInt('0'),
+      value: BigInt("0"),
       data: encodeFunctionData({
         abi: contracts[ContractType.DIMO_TOKEN].abi,
-        functionName: 'approve',
-        args: [
-          contracts[ContractType.DIMO_STAKING].address,
-          BigInt(parseEther(args.amount.toString())),
-        ],
+        functionName: "approve",
+        args: [contracts[ContractType.DIMO_STAKING].address, BigInt(parseEther(args.amount.toString()))],
       }),
     },
     {
@@ -28,7 +25,7 @@ export async function addStake(
       value: BigInt(0),
       data: encodeFunctionData({
         abi: contracts[ContractType.DIMO_STAKING].abi,
-        functionName: 'stake',
+        functionName: "stake",
         args: [args.level, args.tokenId],
       }),
     },
