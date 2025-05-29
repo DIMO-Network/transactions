@@ -39,17 +39,15 @@ export async function burnSyntheticDeviceBatch(
   environment: string = "prod"
 ): Promise<`0x${string}`> {
   const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
-  const callData = args.map((arg) => {
-    return {
-      to: contracts[ContractType.DIMO_REGISTRY].address,
-      value: BigInt(0),
-      data: encodeFunctionData({
-        abi: contracts[ContractType.DIMO_REGISTRY].abi,
-        functionName: BURN_SYNTHETIC_DEVICE,
-        args: [arg.tokenId],
-      }),
-    };
-  });
+  const callData = args.map((arg) => ({
+    to: contracts[ContractType.DIMO_REGISTRY].address,
+    value: BigInt(0),
+    data: encodeFunctionData({
+      abi: contracts[ContractType.DIMO_REGISTRY].abi,
+      functionName: BURN_SYNTHETIC_DEVICE,
+      args: [arg.tokenId],
+    }),
+  }));
 
   return await client.account!.encodeCalls(callData);
 }
