@@ -1,6 +1,13 @@
 import { Ntt } from "@wormhole-foundation/sdk-definitions-ntt";
 
-export type SupportedWormholeNetworks = "Ethereum" | "Polygon" | "Base" | "EthereumTest" | "PolygonTest" | "BaseTest" | "SolanaTest";
+export type SupportedWormholeNetworks =
+  | "Ethereum"
+  | "Polygon"
+  | "Base"
+  | "EthereumTest"
+  | "PolygonTest"
+  | "BaseTest"
+  | "SolanaTest";
 
 export type NttContracts = {
   [key in SupportedWormholeNetworks]?: Ntt.Contracts;
@@ -23,7 +30,7 @@ type BaseBridgeInitiateArgs = {
   swapOptions?: {
     slippageTolerance?: number; // In basis points (e.g., 500 = 5%)
     deadline?: number; // Unix timestamp in seconds
-  }
+  };
 };
 
 // Type for non-relayed transfers

@@ -95,7 +95,7 @@ export enum SupportedNetworks {
 export enum ENVIRONMENT {
   PROD,
   DEV,
-  PROD_TEST
+  PROD_TEST,
 }
 
 export enum DIMO_APIs {

@@ -3,7 +3,7 @@ import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING } from ":core/constants/mappings.js";
 import { KernelAccountClient } from "@zerodev/sdk";
 import { CLAIM_AFTERMARKET_DEVICE } from ":core/constants/methods.js";
-import { ClaimAftermarketdevice } from ":core/types/args.js";
+import { ClaimAftermarketDevice } from ":core/types/args.js";
 import { polygon } from "viem/chains";
 import { ethers } from "ethers";
 import { TypeHashResponse } from ":core/types/responses.js";
@@ -51,7 +51,7 @@ export const claimAftermarketDeviceTypeHash = (
 };
 
 export function claimAftermarketDeviceCallData(
-  args: ClaimAftermarketdevice,
+  args: ClaimAftermarketDevice,
   environment: string = "prod"
 ): `0x${string}` {
   const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
@@ -63,7 +63,7 @@ export function claimAftermarketDeviceCallData(
 }
 
 export const claimAftermarketDevice = async (
-  args: ClaimAftermarketdevice,
+  args: ClaimAftermarketDevice,
   client: KernelAccountClient,
   environment: string = "prod"
 ): Promise<`0x${string}`> => {

@@ -1,10 +1,10 @@
 import { Abi, zeroAddress } from "viem";
 import { Chain, polygon, polygonAmoy } from "viem/chains";
-import { Token } from '@uniswap/sdk-core'
+import { Token } from "@uniswap/sdk-core";
 
 import { API_BY_ENV, AllChainInfos, ContractType, DIMO_APIs, ENVIRONMENT } from ":core/types/dimo.js";
 import { NttContracts, SupportedWormholeNetworks } from ":core/types/wormhole.js";
-import { UniswapMappingArgs } from ":core/types/uniswap.js"
+import { UniswapMappingArgs } from ":core/types/uniswap.js";
 import { Network } from "@wormhole-foundation/sdk";
 import {
   abiCredits,
@@ -15,7 +15,7 @@ import {
   abiStakingDev,
   abiToken,
   abiVehicleId,
-  abiUniswapV3Pool
+  abiUniswapV3Pool,
 } from ":core/abis/index.js";
 
 import * as contractAddrs from ":core/constants/contractAddrs.js";
@@ -264,24 +264,23 @@ export const WORMHOLE_TRANSCEIVER_INSTRUCTIONS = {
   notRelayed: "0x01000101",
 };
 
-
 export const UNISWAP_ARGS_MAPPING: UniswapMappingArgs = {
   [ENVIRONMENT.PROD]: {
     dimoToken: uniswapConsts.DIMO_TOKEN,
     uniswapV3Pool: contractAddrs.POLYGON_UNISWAP_V3_POOL_WMATIC_DIMO_ADDRESS,
-    poolFee: uniswapConsts.POLYGON_UNISWAP_V3_POOL_WMATIC_DIMO_POOL_FEE
+    poolFee: uniswapConsts.POLYGON_UNISWAP_V3_POOL_WMATIC_DIMO_POOL_FEE,
   },
   [ENVIRONMENT.PROD_TEST]: {
     dimoToken: uniswapConsts.TEST_DIMO_TOKEN,
     uniswapV3Pool: contractAddrs.POLYGON_UNISWAP_V3_POOL_WMATIC_DIMO_ADDRESS,
-    poolFee: uniswapConsts.POLYGON_TEST_UNISWAP_V3_POOL_WMATIC_DIMO_POOL_FEE
+    poolFee: uniswapConsts.POLYGON_TEST_UNISWAP_V3_POOL_WMATIC_DIMO_POOL_FEE,
   },
   [ENVIRONMENT.DEV]: {
     dimoToken: new Token(0, zeroAddress, 0),
     uniswapV3Pool: "",
-    poolFee: 0
-  }
-}
+    poolFee: 0,
+  },
+};
 
 // TODO parse error messages with abi to give specific message
 export const OnChainErrors = {
