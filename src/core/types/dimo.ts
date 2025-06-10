@@ -141,44 +141,40 @@ export type ContractToMapping = {
 
 export type SACDTemplate = {
   specVersion: string;
-  id: string;
+  timestamp: string;
   type: string;
-  datacontentype: string;
-  time: string;
   data: {
-    templateId: string;
-    version: string;
-    grantor: string;
-    grantee: string;
-    scope: {
-      permissions: string[];
+    grantor: {
+      address: `0x${string}`;
+      name?: string;
+    };
+    grantee: {
+      address: `0x${string}`;
+      name?: string;
     };
     effectiveAt: string;
     expiresAt: string;
-    attachments: string[];
-    description: string;
-  };
-};
-
-export type SACDTemplateSigned = {
-  specVersion: string;
-  id: string;
-  type: string;
-  datacontentype: string;
-  time: string;
-  "com.dimo.grantor.signature": string;
-  data: {
-    templateId: string;
-    version: string;
-    grantor: string;
-    grantee: string;
-    scope: {
-      permissions: string[];
-    };
-    effectiveAt: string;
-    expiresAt: string;
-    attachments: string[];
-    description: string;
+    additionalDates: {};
+    agreements: {
+      type: string;
+      asset: `did:${string}`;
+      permissions: {
+        name: string;
+        description?: string;
+      }[];
+      attachments: {
+        name: string;
+        description: string;
+        contentType: string;
+        url: string;
+      }[];
+      signatures: {
+        signer: `0x${string}`;
+        signature: `0x${string}`;
+        timestamp: string;
+      }[];
+    }[];
+    extensions: {};
   };
 };
 

@@ -4,9 +4,9 @@ import {
   ENVIRONMENT,
   KernelConfig,
   OptionalArgs,
-  SACDTemplateSigned,
   TransactionReturnType,
   _kernelConfig,
+  SACDTemplate,
 } from ":core/types/dimo.js";
 import { Chain, Client, PublicClient, RpcSchema, Transport, createPublicClient, http } from "viem";
 import {
@@ -1092,17 +1092,19 @@ export class KernelSigner {
     }
   }
 
-  public async signSACDPermissionTemplate(args: SACDTemplateInputs): Promise<SACDTemplateSigned> {
+  public async signSACDPermissionTemplate(args: SACDTemplateInputs): Promise<SACDTemplate> {
     const template = await generateSACDTemplate(args);
     const templateStr = JSON.stringify(template);
     const signature = await this.signChallenge(templateStr);
 
-    const signedTemplate: SACDTemplateSigned = {
-      ...template,
-      "com.dimo.grantor.signature": signature,
-    };
+    const now = new Date(Date.now());
+    template.data.agreements[0].signatures.push({
+      signer: args.grantor,
+      signature: signature,
+      timestamp: now.toISOString(),
+    });
 
-    return signedTemplate;
+    return template;
   }
 
   public async signAndUploadSACDAgreement(args: SACDTemplateInputs): Promise<{ success: boolean; cid: string }> {
