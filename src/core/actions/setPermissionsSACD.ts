@@ -4,13 +4,12 @@ import { KernelAccountClient } from "@zerodev/sdk";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
 import { SET_PERMISSIONS_SACD } from ":core/constants/methods.js";
 import {
+  Permission,
   SACDTemplateInputs,
   SetPermissionsSACD,
   SetVehiclePermissions,
   SetVehiclePermissionsBulk,
 } from ":core/types/args.js";
-import { v4 as uuidv4 } from "uuid";
-import { sacdDescription, sacdPermissionArray } from ":core/utils/utils.js";
 
 export async function setVehiclePermissions(
   args: SetVehiclePermissions,
@@ -77,7 +76,7 @@ export async function setVehiclePermissionsBatch(
           contracts[ContractType.DIMO_VEHICLE_ID].address,
           arg.tokenId,
           arg.grantee,
-          arg.permissions,
+          BigInt(args.permissions),
           arg.expiration,
           arg.source,
         ],
@@ -100,7 +99,7 @@ export async function setPermissionsSACD(
       data: encodeFunctionData({
         abi: contracts[ContractType.DIMO_SACD].abi,
         functionName: SET_PERMISSIONS_SACD,
-        args: [args.asset, args.tokenId, args.grantee, args.permissions, args.expiration, args.source],
+        args: [args.asset, args.tokenId, args.grantee, BigInt(args.permissions), args.expiration, args.source],
       }),
     },
   ]);
@@ -111,44 +110,51 @@ export function sacdCallData(args: SetPermissionsSACD, environment: string = "pr
   return encodeFunctionData({
     abi: contracts[ContractType.DIMO_SACD].abi,
     functionName: SET_PERMISSIONS_SACD,
-    args: [args.asset, args.tokenId, args.grantee, args.permissions, args.expiration, args.source],
+    args: [args.asset, args.tokenId, args.grantee, BigInt(args.permissions), args.expiration, args.source],
   });
 }
 
 export const generateSACDTemplate = async (args: SACDTemplateInputs): Promise<SACDTemplate> => {
-  const templateId = uuidv4();
-  const permissionArray = sacdPermissionArray(args.permissions);
+  if (!args) {
+    throw new Error("SACD inputs are required");
+  }
 
-  const currentTime = new Date();
-  const description = sacdDescription({
-    driverID: args.driverID,
-    appID: args.appID,
-    appName: args.appName,
-    expiration: args.expiration,
-    permissionArray: permissionArray,
-    effectiveAt: currentTime.toISOString(),
-  });
+  const { grantor, grantee, asset, permissions, attachments } = args;
+  const now = new Date(Date.now());
+  const expiration = new Date(Number(args.expiration) * 1000);
 
-  const template: SACDTemplate = {
+  const permissionKeys = Object.keys(Permission).filter((key) =>
+    permissions.includes(Permission[key as keyof typeof Permission])
+  );
+
+  const sacd: SACDTemplate = {
     specVersion: "1.0",
-    id: templateId,
-    type: "org.dimo.permission.grant.v1",
-    datacontentype: "application/json",
-    time: currentTime.toISOString(),
+    timestamp: now.toISOString(),
+    type: "dimo.sacd",
     data: {
-      templateId: templateId,
-      version: "1.0",
-      grantor: args.grantor,
-      grantee: args.grantee,
-      scope: {
-        permissions: permissionArray,
+      grantor: {
+        address: grantor,
       },
-      effectiveAt: currentTime.toISOString(),
-      expiresAt: new Date(Number(args.expiration) * 1000).toISOString(),
-      attachments: args.attachments,
-      description: description,
+      grantee: {
+        address: grantee,
+      },
+      effectiveAt: now.toISOString(),
+      expiresAt: expiration.toISOString(),
+      additionalDates: {},
+      agreements: [
+        {
+          type: "permission",
+          asset: asset,
+          permissions: permissionKeys.map((permission) => ({
+            name: `privilege:${permission}`,
+          })),
+          attachments: attachments,
+          signatures: [],
+        },
+      ],
+      extensions: {},
     },
   };
 
-  return template;
+  return sacd;
 };
