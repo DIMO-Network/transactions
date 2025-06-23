@@ -5,7 +5,7 @@ import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
 import { SET_PERMISSIONS_SACD } from ":core/constants/methods.js";
 import {
   Permission,
-  SACDTemplateInputs,
+  PermissionsSACDTemplateInputs,
   SetPermissionsSACD,
   SetVehiclePermissions,
   SetVehiclePermissionsBulk,
@@ -128,7 +128,7 @@ export function sacdCallData(args: SetPermissionsSACD, environment: string = "pr
   });
 }
 
-export const generatePermissionsSACDTemplate = async (args: SACDTemplateInputs): Promise<SACDTemplate> => {
+export const generatePermissionsSACDTemplate = async (args: PermissionsSACDTemplateInputs): Promise<SACDTemplate> => {
   if (!args) {
     throw new Error("SACD inputs are required");
   }

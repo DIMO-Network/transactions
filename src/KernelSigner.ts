@@ -38,7 +38,7 @@ import {
   DetachVehicle,
   MintVehicleWithDeviceDefinition,
   PairAftermarketDevice,
-  SACDTemplateInputs,
+  PermissionsSACDTemplateInputs,
   SendDIMOTokens,
   SetVehiclePermissions,
   SetVehiclePermissionsBulk,
@@ -1092,7 +1092,7 @@ export class KernelSigner {
     }
   }
 
-  public async signSACDPermissionTemplate(args: SACDTemplateInputs): Promise<SACDTemplate> {
+  public async signSACDPermissionTemplate(args: PermissionsSACDTemplateInputs): Promise<SACDTemplate> {
     const template = await generatePermissionsSACDTemplate(args);
     const templateStr = JSON.stringify(template);
     const signature = await this.signChallenge(templateStr);
@@ -1100,7 +1100,7 @@ export class KernelSigner {
     return template;
   }
 
-  public async signAndUploadSACDAgreement(args: SACDTemplateInputs): Promise<{ success: boolean; cid: string }> {
+  public async signAndUploadSACDAgreement(args: PermissionsSACDTemplateInputs): Promise<{ success: boolean; cid: string }> {
     const signedSACD = await this.signSACDPermissionTemplate(args);
 
     try {

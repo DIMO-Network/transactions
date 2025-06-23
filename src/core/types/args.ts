@@ -108,7 +108,7 @@ export enum Permission {
   GetApproximateLocation = 8, // Approximate location
 }
 
-export type SACDTemplateInputs = {
+export type PermissionsSACDTemplateInputs = {
   grantor: `0x${string}`;
   grantee: `0x${string}`;
   asset: `did:${string}`;
