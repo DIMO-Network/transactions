@@ -139,10 +139,67 @@ export type ContractToMapping = {
   [key in ContractType]: AbiAddressPair;
 };
 
+interface CloudEventSACDAgreement {
+  type: "cloudevent";
+  eventType: string;
+  source: `0x${string}`;
+  asset: `did:${string}`;
+  ids: string[];
+  effectiveAt: string;
+  expiresAt: string;
+  extensions: {
+    [key: string]: unknown;
+  };
+};
+
+interface PaymentSACDAgreement {
+  type: "payment";
+  asset: `did:${string}`;
+  payment: {
+    amount: string;
+    recurrence: "one-time" | "recurring";
+    terms: {
+      initialPayment: string;
+      paymentMethod: "direct transfer" | "crypto transfer";
+    };
+  };
+  purpose: string;
+  attachments: {
+    name: string;
+    description: string;
+    contentType: string;
+    uri: string;
+  }[];
+  extensions?: {
+    invoicing: {
+      invoiceFrequency: "one-time" | "recurring";
+      invoiceRecipient: string;
+    }
+  };
+};
+
+interface PermissionSACDAgreement {
+  type: "permission";
+  asset: `did:${string}`;
+  permissions: {
+    name: string;
+    description?: string;
+  }[];
+  attachments: {
+    [key: string]: unknown;
+  }[];
+  extensions?: {
+    [key: string]: unknown;
+  };
+};
+
+// Union type for SACD agreements, this way we can have different types of agreements in the same SACD and will rise type errors if the structure is not correct
+type SACDAgreement = CloudEventSACDAgreement | PaymentSACDAgreement | PermissionSACDAgreement;
+
 export type SACDTemplate = {
   specVersion: string;
   timestamp: string;
-  type: string;
+  type: "dimo.sacd";
   data: {
     grantor: {
       address: `0x${string}`;
@@ -154,28 +211,12 @@ export type SACDTemplate = {
     };
     effectiveAt: string;
     expiresAt: string;
-    additionalDates: {};
-    agreements: {
-      type: string;
-      asset: `did:${string}`;
-      permissions: {
-        name: string;
-        description?: string;
-      }[];
-      attachments: {
-        name: string;
-        description: string;
-        contentType: string;
-        url: string;
-      }[];
-      signatures: {
-        signer: `0x${string}`;
-        signature: `0x${string}`;
-        timestamp: string;
-      }[];
-    }[];
-    extensions: {};
+    additionalDates: {
+      [key: string]: unknown;
+    };
+    agreements: SACDAgreement[];
   };
+  signature: `0x${string}`;
 };
 
 export type TransactionReturnType = GetUserOperationReceiptReturnType & {

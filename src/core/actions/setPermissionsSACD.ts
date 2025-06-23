@@ -22,7 +22,7 @@ export async function setVehiclePermissions(
       asset: contracts[ContractType.DIMO_VEHICLE_ID].address,
       tokenId: args.tokenId,
       grantee: args.grantee,
-      permissions: args.permissions,
+      permission: args.permission,
       expiration: args.expiration,
       source: args.source,
     },
@@ -48,7 +48,7 @@ export async function setVehiclePermissionsBulk(
           contracts[ContractType.DIMO_VEHICLE_ID].address,
           tokenId,
           arg.grantee,
-          arg.permissions,
+          BigInt(arg.permission),
           arg.expiration,
           arg.source,
         ],
@@ -76,9 +76,9 @@ export async function setVehiclePermissionsBatch(
           contracts[ContractType.DIMO_VEHICLE_ID].address,
           arg.tokenId,
           arg.grantee,
-          BigInt(args.permissions),
+          BigInt(arg.permission),
           arg.expiration,
-          arg.source,
+          arg.source
         ],
       }),
     };
@@ -99,7 +99,14 @@ export async function setPermissionsSACD(
       data: encodeFunctionData({
         abi: contracts[ContractType.DIMO_SACD].abi,
         functionName: SET_PERMISSIONS_SACD,
-        args: [args.asset, args.tokenId, args.grantee, BigInt(args.permissions), args.expiration, args.source],
+        args: [
+          args.asset,
+          args.tokenId,
+          args.grantee,
+          BigInt(args.permission),
+          args.expiration,
+          args.source
+        ],
       }),
     },
   ]);
@@ -110,7 +117,14 @@ export function sacdCallData(args: SetPermissionsSACD, environment: string = "pr
   return encodeFunctionData({
     abi: contracts[ContractType.DIMO_SACD].abi,
     functionName: SET_PERMISSIONS_SACD,
-    args: [args.asset, args.tokenId, args.grantee, BigInt(args.permissions), args.expiration, args.source],
+    args: [
+      args.asset,
+      args.tokenId,
+      args.grantee,
+      BigInt(args.permission),
+      args.expiration,
+      args.source
+    ],
   });
 }
 
@@ -149,11 +163,11 @@ export const generateSACDTemplate = async (args: SACDTemplateInputs): Promise<SA
             name: `privilege:${permission}`,
           })),
           attachments: attachments,
-          signatures: [],
+          extensions: {},
         },
       ],
-      extensions: {},
     },
+    signature: "0x", // Placeholder for signature, to be filled in later
   };
 
   return sacd;

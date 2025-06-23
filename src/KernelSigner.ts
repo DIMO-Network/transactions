@@ -1096,14 +1096,7 @@ export class KernelSigner {
     const template = await generateSACDTemplate(args);
     const templateStr = JSON.stringify(template);
     const signature = await this.signChallenge(templateStr);
-
-    const now = new Date(Date.now());
-    template.data.agreements[0].signatures.push({
-      signer: args.grantor,
-      signature: signature,
-      timestamp: now.toISOString(),
-    });
-
+   template.signature = signature;
     return template;
   }
 

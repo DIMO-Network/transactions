@@ -20,7 +20,7 @@ export type VehiclePermissionDescription = {
 export type SetVehiclePermissions = {
   tokenId: BigInt;
   grantee: `0x${string}`;
-  permissions: Permission;
+  permission: Permission;
   expiration: BigInt;
   source: string;
 };
@@ -28,7 +28,7 @@ export type SetVehiclePermissions = {
 export type SetVehiclePermissionsBulk = {
   tokenIds: BigInt[];
   grantee: `0x${string}`;
-  permissions: BigInt;
+  permission: Permission;
   expiration: BigInt;
   source: string;
 };
@@ -37,7 +37,7 @@ export type SetPermissionsSACD = {
   asset: `0x${string}`;
   tokenId: BigInt;
   grantee: `0x${string}`;
-  permissions: Permission;
+  permission: Permission;
   expiration: BigInt;
   source: string;
 };
