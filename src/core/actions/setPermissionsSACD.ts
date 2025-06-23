@@ -128,7 +128,7 @@ export function sacdCallData(args: SetPermissionsSACD, environment: string = "pr
   });
 }
 
-export const generateSACDTemplate = async (args: SACDTemplateInputs): Promise<SACDTemplate> => {
+export const generatePermissionsSACDTemplate = async (args: SACDTemplateInputs): Promise<SACDTemplate> => {
   if (!args) {
     throw new Error("SACD inputs are required");
   }

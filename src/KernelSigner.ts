@@ -22,7 +22,7 @@ import {
   mintVehicleWithDeviceDefinitionBatch,
 } from ":core/actions/mintVehicleWithDeviceDefinition.js";
 import {
-  generateSACDTemplate,
+  generatePermissionsSACDTemplate,
   setVehiclePermissions,
   setVehiclePermissionsBatch,
   setVehiclePermissionsBulk,
@@ -1093,7 +1093,7 @@ export class KernelSigner {
   }
 
   public async signSACDPermissionTemplate(args: SACDTemplateInputs): Promise<SACDTemplate> {
-    const template = await generateSACDTemplate(args);
+    const template = await generatePermissionsSACDTemplate(args);
     const templateStr = JSON.stringify(template);
     const signature = await this.signChallenge(templateStr);
    template.signature = signature;
