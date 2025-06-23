@@ -4,9 +4,9 @@ import {
   ENVIRONMENT,
   KernelConfig,
   OptionalArgs,
-  SACDTemplateSigned,
   TransactionReturnType,
   _kernelConfig,
+  SACDTemplate,
 } from ":core/types/dimo.js";
 import { Chain, Client, PublicClient, RpcSchema, Transport, createPublicClient, http } from "viem";
 import {
@@ -22,7 +22,7 @@ import {
   mintVehicleWithDeviceDefinitionBatch,
 } from ":core/actions/mintVehicleWithDeviceDefinition.js";
 import {
-  generateSACDTemplate,
+  generatePermissionsSACDTemplate,
   setVehiclePermissions,
   setVehiclePermissionsBatch,
   setVehiclePermissionsBulk,
@@ -38,7 +38,7 @@ import {
   DetachVehicle,
   MintVehicleWithDeviceDefinition,
   PairAftermarketDevice,
-  SACDTemplateInputs,
+  PermissionsSACDTemplateInputs,
   SendDIMOTokens,
   SetVehiclePermissions,
   SetVehiclePermissionsBulk,
@@ -1092,20 +1092,15 @@ export class KernelSigner {
     }
   }
 
-  public async signSACDPermissionTemplate(args: SACDTemplateInputs): Promise<SACDTemplateSigned> {
-    const template = await generateSACDTemplate(args);
+  public async signSACDPermissionTemplate(args: PermissionsSACDTemplateInputs): Promise<SACDTemplate> {
+    const template = await generatePermissionsSACDTemplate(args);
     const templateStr = JSON.stringify(template);
     const signature = await this.signChallenge(templateStr);
-
-    const signedTemplate: SACDTemplateSigned = {
-      ...template,
-      "com.dimo.grantor.signature": signature,
-    };
-
-    return signedTemplate;
+   template.signature = signature;
+    return template;
   }
 
-  public async signAndUploadSACDAgreement(args: SACDTemplateInputs): Promise<{ success: boolean; cid: string }> {
+  public async signAndUploadSACDAgreement(args: PermissionsSACDTemplateInputs): Promise<{ success: boolean; cid: string }> {
     const signedSACD = await this.signSACDPermissionTemplate(args);
 
     try {

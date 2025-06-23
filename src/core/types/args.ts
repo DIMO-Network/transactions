@@ -20,7 +20,7 @@ export type VehiclePermissionDescription = {
 export type SetVehiclePermissions = {
   tokenId: BigInt;
   grantee: `0x${string}`;
-  permissions: BigInt;
+  permission: Permission;
   expiration: BigInt;
   source: string;
 };
@@ -28,7 +28,7 @@ export type SetVehiclePermissions = {
 export type SetVehiclePermissionsBulk = {
   tokenIds: BigInt[];
   grantee: `0x${string}`;
-  permissions: BigInt;
+  permission: Permission;
   expiration: BigInt;
   source: string;
 };
@@ -37,7 +37,7 @@ export type SetPermissionsSACD = {
   asset: `0x${string}`;
   tokenId: BigInt;
   grantee: `0x${string}`;
-  permissions: BigInt;
+  permission: Permission;
   expiration: BigInt;
   source: string;
 };
@@ -97,15 +97,24 @@ export type TransferVehicleAndAftermarketDeviceIDs = {
   to: `0x${string}`;
 };
 
-export type SACDTemplateInputs = {
-  appName: string;
-  appID: string;
-  driverID: string;
-  grantee: `0x${string}`;
+export enum Permission {
+  GetNonLocationHistory = 1, // All-time non-location data
+  ExecuteCommands = 2, // Commands
+  GetCurrentLocation = 3, // Current location
+  GetLocationHistory = 4, // All-time location
+  GetVINCredential = 5, // View VIN credential
+  GetLiveData = 6, // Subscribe live data
+  GetRawData = 7, // Raw data
+  GetApproximateLocation = 8, // Approximate location
+}
+
+export type PermissionsSACDTemplateInputs = {
   grantor: `0x${string}`;
-  permissions: BigInt;
+  grantee: `0x${string}`;
+  asset: `did:${string}`;
+  permissions: Permission[];
+  attachments: { name: string; description: string; contentType: string; url: string }[];
   expiration: BigInt;
-  attachments: string[];
 };
 
 export type DeriveKernelAddress = {

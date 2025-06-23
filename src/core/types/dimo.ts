@@ -139,47 +139,84 @@ export type ContractToMapping = {
   [key in ContractType]: AbiAddressPair;
 };
 
-export type SACDTemplate = {
-  specVersion: string;
-  id: string;
-  type: string;
-  datacontentype: string;
-  time: string;
-  data: {
-    templateId: string;
-    version: string;
-    grantor: string;
-    grantee: string;
-    scope: {
-      permissions: string[];
-    };
-    effectiveAt: string;
-    expiresAt: string;
-    attachments: string[];
-    description: string;
+interface CloudEventSACDAgreement {
+  type: "cloudevent";
+  eventType: string;
+  source: `0x${string}`;
+  asset: `did:${string}`;
+  ids: string[];
+  effectiveAt: string;
+  expiresAt: string;
+  extensions: {
+    [key: string]: unknown;
   };
 };
 
-export type SACDTemplateSigned = {
+interface PaymentSACDAgreement {
+  type: "payment";
+  asset: `did:${string}`;
+  payment: {
+    amount: string;
+    recurrence: "one-time" | "recurring";
+    terms: {
+      initialPayment: string;
+      paymentMethod: "direct transfer" | "crypto transfer";
+    };
+  };
+  purpose: string;
+  attachments: {
+    name: string;
+    description: string;
+    contentType: string;
+    uri: string;
+  }[];
+  extensions?: {
+    invoicing: {
+      invoiceFrequency: "one-time" | "recurring";
+      invoiceRecipient: string;
+    }
+  };
+};
+
+interface PermissionSACDAgreement {
+  type: "permission";
+  asset: `did:${string}`;
+  permissions: {
+    name: string;
+    description?: string;
+  }[];
+  attachments: {
+    [key: string]: unknown;
+  }[];
+  extensions?: {
+    [key: string]: unknown;
+  };
+};
+
+// Union type for SACD agreements, this way we can have different types of agreements in the same SACD and will rise type errors if the structure is not correct
+type SACDAgreement = CloudEventSACDAgreement | PaymentSACDAgreement | PermissionSACDAgreement;
+
+export type SACDTemplate = {
   specVersion: string;
-  id: string;
-  type: string;
-  datacontentype: string;
-  time: string;
-  "com.dimo.grantor.signature": string;
+  timestamp: string;
+  type: "dimo.sacd";
   data: {
-    templateId: string;
-    version: string;
-    grantor: string;
-    grantee: string;
-    scope: {
-      permissions: string[];
+    grantor: {
+      address: `0x${string}`;
+      name?: string;
+    };
+    grantee: {
+      address: `0x${string}`;
+      name?: string;
     };
     effectiveAt: string;
     expiresAt: string;
-    attachments: string[];
-    description: string;
+    additionalDates: {
+      [key: string]: unknown;
+    };
+    agreements: SACDAgreement[];
   };
+  signature: `0x${string}`;
 };
 
 export type TransactionReturnType = GetUserOperationReceiptReturnType & {
