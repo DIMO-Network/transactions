@@ -182,26 +182,31 @@ export const generatePermissionsSACDTemplate = async (args: PermissionsSACDTempl
 };
 
 const getPermissionsValue = (permissions: Permission[]): bigint => {
-  const permissionKeys = Object.keys(Permission).map((key) =>
-    permissions.includes(Permission[key as keyof typeof Permission]) ? "11" : "00"
-  );
+  const present = new Set(permissions);
+  const allPermissions = Object.values(Permission).filter(p => typeof p === 'number') as number[];
+  allPermissions.sort((a, b) => a - b);
 
-  return BigInt(`0b${permissionKeys.join("")}00`);
+  const encodedPermissions = allPermissions.map(p => present.has(p) ? '11' : '00').reverse();
+
+  return BigInt(`0b${encodedPermissions.join("")}00`);
 };
 
-//TODO: check if this is the best way to convert permissions to an array
 export function getPermissionsArray(permissionValue: bigint): Permission[] {
-  const permissionKeys = Object.keys(Permission);
+  const bin = permissionValue.toString(2).padStart(18, '0');
+  const bits = bin.slice(0, -2);
+
   const permissions: Permission[] = [];
 
-  for (let i = 0; i < permissionKeys.length; i++) {
-    const bit = (permissionValue >> (permissionKeys.length - 1 - i)) & BigInt(1);
-    if (bit === BigInt(1)) {
-      permissions.push(Permission[permissionKeys[i] as keyof typeof Permission]);
+  for (let i = 0; i < bits.length; i += 2) {
+    const chunk = bits.slice(i, i + 2);
+    const indexFromEnd = i / 2;
+    const permissionEnumValue = 8 - indexFromEnd;
+    if (chunk === '11') {
+      permissions.push(permissionEnumValue as Permission);
     }
   }
 
-  return permissions;
+  return permissions.reverse();
 }
 
 
