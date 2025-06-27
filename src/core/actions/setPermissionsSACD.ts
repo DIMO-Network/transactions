@@ -121,12 +121,7 @@ export async function setPermissionsSACD(
 
 export function sacdCallData(args: SetPermissionsSACD, environment: string = "prod"): `0x${string}` {
   const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
-  const { permissions } = args;
-  const permissionKeys = Object.keys(Permission).map((key) =>
-    permissions.includes(Permission[key as keyof typeof Permission]) ? "11" : "00"
-  );
-
-  const permissionValue = BigInt(`0b${permissionKeys.join("")}00`);
+  const permissionValue = getPermissionsValue(args.permissions);
   return encodeFunctionData({
     abi: contracts[ContractType.DIMO_SACD].abi,
     functionName: SET_PERMISSIONS_SACD,
