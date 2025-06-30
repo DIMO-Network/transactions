@@ -4,6 +4,8 @@ import { KernelAccountClient } from "@zerodev/sdk";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
 import { SET_PERMISSIONS_SACD } from ":core/constants/methods.js";
 import {
+  MAX_PERMISSION_INDEX,
+  MAX_PERMISSIONS,
   Permission,
   PermissionsSACDTemplateInputs,
   SetPermissionsSACD,
@@ -200,7 +202,7 @@ export function getPermissionsArray(permissionValue: bigint): Permission[] {
   for (let i = 0; i < bits.length; i += 2) {
     const chunk = bits.slice(i, i + 2);
     const indexFromEnd = i / 2;
-    const permissionEnumValue = 8 - indexFromEnd;
+    const permissionEnumValue = MAX_PERMISSION_INDEX - indexFromEnd;
     if (chunk === '11') {
       permissions.push(permissionEnumValue as Permission);
     }

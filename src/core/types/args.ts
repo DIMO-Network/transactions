@@ -97,6 +97,9 @@ export type TransferVehicleAndAftermarketDeviceIDs = {
   to: `0x${string}`;
 };
 
+
+export const MAX_PERMISSION_INDEX = 8; // Maximum number of permissions that can be granted in a single SACD template
+
 export enum Permission {
   GetNonLocationHistory = 1, // All-time non-location data
   ExecuteCommands = 2, // Commands
