@@ -5,7 +5,6 @@ import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
 import { SET_PERMISSIONS_SACD } from ":core/constants/methods.js";
 import {
   MAX_PERMISSION_INDEX,
-  MAX_PERMISSIONS,
   Permission,
   PermissionsSACDTemplateInputs,
   SetPermissionsSACD,
