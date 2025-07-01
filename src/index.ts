@@ -10,6 +10,7 @@ export type {
   VehiclePermissionDescription,
 } from "./core/types/args.js";
 export { ContractType } from "./core/types/dimo.js";
+export { Permission } from "./core/types/args.js";
 export type { VehicleNodeMintedWithDeviceDefinition } from "./core/types/responses.js";
 export * from "./core/constants/mappings.js";
 export * from "./core/constants/methods.js";
@@ -40,15 +41,12 @@ export { unpairAftermarketDeviceCallData, unpairAftermarketDevice } from "./core
 export {
   newAccountConfig,
   newKernelConfig,
-  sacdPermissionValue,
   sacdDescription,
-  sacdPermissionArray,
-  PERMISSION_CONFIGS,
-  PERMISSIONS,
+  getPermissionsValue,
+  getPermissionsArray,
 } from "./core/utils/utils.js";
 export { KernelSigner } from "./KernelSigner.js";
 export { AccountSigner } from "./AccountSigner.js";
-export type { SACD_PERMISSIONS } from "./core/utils/utils.js";
 export type { FeeBoostConfig } from "./core/types/dimo.js";
 export { initiateBridging, quoteDeliveryPrice, checkNttTransferStatus } from "./core/actions/wormholeBridge.js";
 export type { BridgeInitiateArgs, ChainRpcConfig } from "./core/types/wormhole.js";

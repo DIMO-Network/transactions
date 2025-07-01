@@ -1,5 +1,5 @@
 import { pad, isAddress } from "viem";
-import { VehiclePermissionDescription } from ":core/types/args.js";
+import { MAX_PERMISSION_INDEX, Permission, VehiclePermissionDescription } from ":core/types/args.js";
 import { AccountConfig, KernelConfig, OptionalArgs, _accountConfig, _kernelConfig } from ":core/types/dimo.js";
 import { KERNEL_V3_1, getEntryPoint } from "@zerodev/sdk/constants";
 
@@ -45,7 +45,7 @@ export const newKernelConfig = (args: KernelConfig): KernelConfig => {
   }
 
   if (args.defaultPermissions == undefined) {
-    const defaultPerms: SACD_PERMISSIONS = {};
+    const defaultPerms: Permission[] = [];
     args.defaultPermissions = defaultPerms;
   }
 
@@ -109,17 +109,40 @@ export const unpackOptionalArgs = (optionalArgs?: OptionalArgs): OptionalArgs =>
   return optionalArgs;
 };
 
+export const getPermissionsValue = (permissions: Permission[]): bigint => {
+  const present = new Set(permissions);
+  const allPermissions = Object.values(Permission).filter(p => typeof p === 'number') as number[];
+  allPermissions.sort((a, b) => a - b);
+
+  const encodedPermissions = allPermissions.map(p => present.has(p) ? '11' : '00').reverse();
+
+  return BigInt(`0b${encodedPermissions.join("")}00`);
+};
+
+export const getPermissionsArray = (permissionValue: bigint): Permission[] => {
+  const bin = permissionValue.toString(2).padStart(18, '0');
+  const bits = bin.slice(0, -2);
+
+  const permissions: Permission[] = [];
+
+  for (let i = 0; i < bits.length; i += 2) {
+    const chunk = bits.slice(i, i + 2);
+    const indexFromEnd = i / 2;
+    const permissionEnumValue = MAX_PERMISSION_INDEX - indexFromEnd;
+    if (chunk === '11') {
+      permissions.push(permissionEnumValue as Permission);
+    }
+  }
+
+  return permissions.reverse();
+}
+
 
 export const sacdDescription = (args: VehiclePermissionDescription): string => {
   const description = `By proceeding, you will grant data access and control functions to ${args.appName} effective as of ${args.effectiveAt} until ${new Date(Number(args.expiration) * 1000).toISOString()}. Permissions being granted: ${args.permissionArray.join("; ")} Driver ID: ${args.driverID} App ID: ${args.appID} DIMO Platform, version 1.0.`;
   return description;
 };
 
-
-type PermissionConfig = {
-  range: [number, number];
-  description: string;
-};
 
 // | APPROX LOCATION | RAW DATA | STREAMS | CREDENTIALS | ALLTIME_LOCATION | CURRENT_LOCATION | COMMANDS | NONLOCATION_TELEMETRY | ZERO-PADDED |
 // |-----------------|----------|---------|-------------|------------------|------------------|----------|-----------------------|-------------|

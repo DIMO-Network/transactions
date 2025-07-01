@@ -4,13 +4,13 @@ import { KernelAccountClient } from "@zerodev/sdk";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
 import { SET_PERMISSIONS_SACD } from ":core/constants/methods.js";
 import {
-  MAX_PERMISSION_INDEX,
   Permission,
   PermissionsSACDTemplateInputs,
   SetPermissionsSACD,
   SetVehiclePermissions,
   SetVehiclePermissionsBulk,
 } from ":core/types/args.js";
+import { getPermissionsValue } from ":core/utils/utils.js";
 
 export async function setVehiclePermissions(
   args: SetVehiclePermissions,
@@ -181,33 +181,3 @@ export const generatePermissionsSACDTemplate = async (args: PermissionsSACDTempl
 
   return sacd;
 };
-
-const getPermissionsValue = (permissions: Permission[]): bigint => {
-  const present = new Set(permissions);
-  const allPermissions = Object.values(Permission).filter(p => typeof p === 'number') as number[];
-  allPermissions.sort((a, b) => a - b);
-
-  const encodedPermissions = allPermissions.map(p => present.has(p) ? '11' : '00').reverse();
-
-  return BigInt(`0b${encodedPermissions.join("")}00`);
-};
-
-export function getPermissionsArray(permissionValue: bigint): Permission[] {
-  const bin = permissionValue.toString(2).padStart(18, '0');
-  const bits = bin.slice(0, -2);
-
-  const permissions: Permission[] = [];
-
-  for (let i = 0; i < bits.length; i += 2) {
-    const chunk = bits.slice(i, i + 2);
-    const indexFromEnd = i / 2;
-    const permissionEnumValue = MAX_PERMISSION_INDEX - indexFromEnd;
-    if (chunk === '11') {
-      permissions.push(permissionEnumValue as Permission);
-    }
-  }
-
-  return permissions.reverse();
-}
-
-

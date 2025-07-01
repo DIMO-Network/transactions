@@ -1,10 +1,10 @@
 import { EntryPointType, KERNEL_V2_VERSION_TYPE, KERNEL_V3_VERSION_TYPE } from "@zerodev/sdk/types";
-import { SACD_PERMISSIONS } from "src/index.js";
 import { Account } from "viem";
 import { EntryPointVersion, GetUserOperationReceiptReturnType } from "viem/account-abstraction";
 import { Chain, polygon, polygonAmoy } from "viem/chains";
 
 import { AbiAddressPair } from "./common.js";
+import { Permission } from ":core/types/args.js";
 
 export const SUPPORTED_CHAINS: Chain[] = [polygonAmoy, polygon];
 
@@ -22,7 +22,7 @@ export type KernelConfig = {
   useWalletSession?: boolean; // depricate?
   sessionTimeoutSeconds?: string; // seconds
   usePrivateKey?: boolean;
-  defaultPermissions?: SACD_PERMISSIONS;
+  defaultPermissions?: Permission[];
   subOrganizationId?: string;
   stamper?: any;
   feeBoostConfig?: FeeBoostConfig;
@@ -42,7 +42,7 @@ export type _kernelConfig = {
   clientId: string;
   domain: string;
   redirectUri: string;
-  defaultPermissions: SACD_PERMISSIONS;
+  defaultPermissions: Permission[];
   feeBoostConfig: FeeBoostConfig;
 };
 

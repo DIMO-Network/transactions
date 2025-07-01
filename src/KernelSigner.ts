@@ -47,6 +47,7 @@ import {
   UnPairAftermarketDevice,
   UpgradeStake,
   WithdrawStake,
+  Permission,
 } from ":core/types/args.js";
 import type { BridgeInitiateArgs } from ":core/types/wormhole.js";
 import { claimAftermarketDevice, claimAftermarketDeviceTypeHash } from ":core/actions/claimAftermarketDevice.js";
@@ -68,7 +69,7 @@ import { uint8ArrayToHexString, uint8ArrayFromHexString } from "@turnkey/encodin
 import { claimAndPairDevice } from ":core/actions/claimAndPair.js";
 import { executeTransaction, executeTransactionBatch } from ":core/actions/executeTransaction.js";
 import { createBundlerClient } from "viem/account-abstraction";
-import { sacdPermissionValue, sacdPermissionArray, unpackOptionalArgs } from ":core/utils/utils.js";
+import { getPermissionsValue, getPermissionsArray, unpackOptionalArgs } from ":core/utils/utils.js";
 import { addStake } from ":core/actions/addStake.js";
 import { withdrawStake } from ":core/actions/withdrawStake.js";
 import { upgradeStake } from ":core/actions/upgradeStake.js";
@@ -221,13 +222,13 @@ export class KernelSigner {
     throw new Error("Passkey client not initialized");
   }
 
-  public getDefaultPermissionValue(): BigInt {
-    return sacdPermissionValue(this.config.defaultPermissions) as BigInt;
+  public getDefaultPermissionValue(): bigint {
+    return getPermissionsValue(this.config.defaultPermissions) as bigint;
   }
 
-  public getDefaultPermissionArray(): string[] {
-    const val = sacdPermissionValue(this.config.defaultPermissions) as BigInt;
-    return sacdPermissionArray(val);
+  public getDefaultPermissionArray(): Permission[] {
+    const val: bigint = getPermissionsValue(this.config.defaultPermissions) as bigint;
+    return getPermissionsArray(val);
   }
 
   // INITIALIZING SDK
