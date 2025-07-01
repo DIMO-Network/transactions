@@ -109,72 +109,17 @@ export const unpackOptionalArgs = (optionalArgs?: OptionalArgs): OptionalArgs =>
   return optionalArgs;
 };
 
-export const sacdPermissionValue = (sacdPerms: SACD_PERMISSIONS): bigint => {
-  const permissionMap = [
-    sacdPerms.APPROXIMATE_LOCATION,
-    sacdPerms.RAW_DATA,
-    sacdPerms.STREAMS,
-    sacdPerms.CREDENTIALS,
-    sacdPerms.ALLTIME_LOCATION,
-    sacdPerms.CURRENT_LOCATION,
-    sacdPerms.COMMANDS,
-    sacdPerms.NONLOCATION_TELEMETRY,
-  ];
-
-  const permissionString = permissionMap.map((perm) => (perm ? "11" : "00")).join("") + "00";
-
-  return BigInt(`0b${permissionString}`);
-};
-
-export const sacdPermissionArray = (permissionValue: BigInt): string[] => {
-  const sacdPermArray: string[] = [];
-
-  // Convert the bigint to a binary string
-  const binaryString = permissionValue.toString(2).padStart(PERMISSION_CONFIGS.length * 2, "0");
-
-  for (let i = 0; i < PERMISSION_CONFIGS.length; i++) {
-    const perm = PERMISSION_CONFIGS[i];
-    const permission = binaryString.slice(perm.range[0], perm.range[1]);
-    if (permission.includes("1")) {
-      sacdPermArray.push(perm.description);
-    }
-  }
-
-  return sacdPermArray;
-};
 
 export const sacdDescription = (args: VehiclePermissionDescription): string => {
   const description = `By proceeding, you will grant data access and control functions to ${args.appName} effective as of ${args.effectiveAt} until ${new Date(Number(args.expiration) * 1000).toISOString()}. Permissions being granted: ${args.permissionArray.join("; ")} Driver ID: ${args.driverID} App ID: ${args.appID} DIMO Platform, version 1.0.`;
   return description;
 };
 
-export const PERMISSIONS = {
-  NONLOCATION_TELEMETRY: "NONLOCATION_TELEMETRY: non-location vehicle data such as fuel levels and odometer.",
-  COMMANDS: "COMMANDS: ability to send commands to the vehicle such as lock and unlock.",
-  CURRENT_LOCATION: "CURRENT_LOCATION: access to the vehicle current location.",
-  ALLTIME_LOCATION: "ALLTIME_LOCATION: access to the vehicle full location history.",
-  CREDENTIALS: "CREDENTIALS: access to any stored credentials and attestations such as insurance and service records.",
-  STREAMS: "STREAMS: access to real-time data streams.",
-  RAW_DATA: "RAW_DATA: access to raw payload data.",
-  APPROXIMATE_LOCATION: "APPROXIMATE_LOCATION: access to approximate vehicle location.",
-};
 
 type PermissionConfig = {
   range: [number, number];
   description: string;
 };
-
-export type SACD_PERMISSIONS = Partial<Record<keyof typeof PERMISSIONS, boolean>>;
-
-export const PERMISSION_CONFIGS: PermissionConfig[] = Object.keys(PERMISSIONS).map((permission, index) => ({
-  range: [-(2 * (index + 1 * 2)), -(2 * index) - 2],
-  description: PERMISSIONS[permission as keyof typeof PERMISSIONS],
-}));
-
-PERMISSION_CONFIGS.unshift({
-  range: [-2, 0],
-  description: "",
-});
 
 // | APPROX LOCATION | RAW DATA | STREAMS | CREDENTIALS | ALLTIME_LOCATION | CURRENT_LOCATION | COMMANDS | NONLOCATION_TELEMETRY | ZERO-PADDED |
 // |-----------------|----------|---------|-------------|------------------|------------------|----------|-----------------------|-------------|

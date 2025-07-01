@@ -20,7 +20,7 @@ export type VehiclePermissionDescription = {
 export type SetVehiclePermissions = {
   tokenId: BigInt;
   grantee: `0x${string}`;
-  permission: Permission;
+  permissions: Permission[];
   expiration: BigInt;
   source: string;
 };
@@ -28,7 +28,7 @@ export type SetVehiclePermissions = {
 export type SetVehiclePermissionsBulk = {
   tokenIds: BigInt[];
   grantee: `0x${string}`;
-  permission: Permission;
+  permissions: Permission[];
   expiration: BigInt;
   source: string;
 };
@@ -37,7 +37,7 @@ export type SetPermissionsSACD = {
   asset: `0x${string}`;
   tokenId: BigInt;
   grantee: `0x${string}`;
-  permission: Permission;
+  permissions: Permission[];
   expiration: BigInt;
   source: string;
 };
@@ -96,6 +96,9 @@ export type TransferVehicleAndAftermarketDeviceIDs = {
   aftermarketDeviceIds: BigInt[];
   to: `0x${string}`;
 };
+
+
+export const MAX_PERMISSION_INDEX = 8; // Maximum number of permissions that can be granted in a single SACD template
 
 export enum Permission {
   GetNonLocationHistory = 1, // All-time non-location data

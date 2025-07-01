@@ -4,6 +4,7 @@ import { KernelAccountClient } from "@zerodev/sdk";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
 import { SET_PERMISSIONS_SACD } from ":core/constants/methods.js";
 import {
+  MAX_PERMISSION_INDEX,
   Permission,
   PermissionsSACDTemplateInputs,
   SetPermissionsSACD,
@@ -22,7 +23,7 @@ export async function setVehiclePermissions(
       asset: contracts[ContractType.DIMO_VEHICLE_ID].address,
       tokenId: args.tokenId,
       grantee: args.grantee,
-      permission: args.permission,
+      permissions: args.permissions,
       expiration: args.expiration,
       source: args.source,
     },
@@ -37,6 +38,8 @@ export async function setVehiclePermissionsBulk(
   environment: string = "prod"
 ): Promise<`0x${string}`> {
   const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
+  const permissionValue = getPermissionsValue(arg.permissions);
+
   const callData = arg.tokenIds.map((tokenId) => {
     return {
       to: contracts[ContractType.DIMO_SACD].address,
@@ -48,7 +51,7 @@ export async function setVehiclePermissionsBulk(
           contracts[ContractType.DIMO_VEHICLE_ID].address,
           tokenId,
           arg.grantee,
-          BigInt(arg.permission),
+          permissionValue,
           arg.expiration,
           arg.source,
         ],
@@ -66,6 +69,8 @@ export async function setVehiclePermissionsBatch(
 ): Promise<`0x${string}`> {
   const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
   const callData = args.map((arg) => {
+    const permissionValue = getPermissionsValue(arg.permissions);
+
     return {
       to: contracts[ContractType.DIMO_SACD].address,
       value: BigInt(0),
@@ -76,7 +81,7 @@ export async function setVehiclePermissionsBatch(
           contracts[ContractType.DIMO_VEHICLE_ID].address,
           arg.tokenId,
           arg.grantee,
-          BigInt(arg.permission),
+          permissionValue,
           arg.expiration,
           arg.source
         ],
@@ -92,6 +97,9 @@ export async function setPermissionsSACD(
   client: KernelAccountClient,
   contracts: ContractToMapping
 ): Promise<`0x${string}`> {
+
+  const permissionValue = getPermissionsValue(args.permissions);
+
   return await client.account!.encodeCalls([
     {
       to: contracts[ContractType.DIMO_SACD].address,
@@ -103,7 +111,7 @@ export async function setPermissionsSACD(
           args.asset,
           args.tokenId,
           args.grantee,
-          BigInt(args.permission),
+          permissionValue,
           args.expiration,
           args.source
         ],
@@ -114,6 +122,7 @@ export async function setPermissionsSACD(
 
 export function sacdCallData(args: SetPermissionsSACD, environment: string = "prod"): `0x${string}` {
   const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
+  const permissionValue = getPermissionsValue(args.permissions);
   return encodeFunctionData({
     abi: contracts[ContractType.DIMO_SACD].abi,
     functionName: SET_PERMISSIONS_SACD,
@@ -121,7 +130,7 @@ export function sacdCallData(args: SetPermissionsSACD, environment: string = "pr
       args.asset,
       args.tokenId,
       args.grantee,
-      BigInt(args.permission),
+      permissionValue,
       args.expiration,
       args.source
     ],
@@ -143,7 +152,7 @@ export const generatePermissionsSACDTemplate = async (args: PermissionsSACDTempl
 
   const sacd: SACDTemplate = {
     specVersion: "1.0",
-    timestamp: now.toISOString(),
+    time: now.toISOString(),
     type: "dimo.sacd",
     data: {
       grantor: {
@@ -172,3 +181,33 @@ export const generatePermissionsSACDTemplate = async (args: PermissionsSACDTempl
 
   return sacd;
 };
+
+const getPermissionsValue = (permissions: Permission[]): bigint => {
+  const present = new Set(permissions);
+  const allPermissions = Object.values(Permission).filter(p => typeof p === 'number') as number[];
+  allPermissions.sort((a, b) => a - b);
+
+  const encodedPermissions = allPermissions.map(p => present.has(p) ? '11' : '00').reverse();
+
+  return BigInt(`0b${encodedPermissions.join("")}00`);
+};
+
+export function getPermissionsArray(permissionValue: bigint): Permission[] {
+  const bin = permissionValue.toString(2).padStart(18, '0');
+  const bits = bin.slice(0, -2);
+
+  const permissions: Permission[] = [];
+
+  for (let i = 0; i < bits.length; i += 2) {
+    const chunk = bits.slice(i, i + 2);
+    const indexFromEnd = i / 2;
+    const permissionEnumValue = MAX_PERMISSION_INDEX - indexFromEnd;
+    if (chunk === '11') {
+      permissions.push(permissionEnumValue as Permission);
+    }
+  }
+
+  return permissions.reverse();
+}
+
+

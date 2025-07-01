@@ -198,7 +198,7 @@ type SACDAgreement = CloudEventSACDAgreement | PaymentSACDAgreement | Permission
 
 export type SACDTemplate = {
   specVersion: string;
-  timestamp: string;
+  time: string;
   type: "dimo.sacd";
   data: {
     grantor: {
