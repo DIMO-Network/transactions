@@ -4,6 +4,7 @@ export type SupportedWormholeNetworks =
   | "Ethereum"
   | "Polygon"
   | "Base"
+  | "Solana"
   | "EthereumTest"
   | "PolygonTest"
   | "BaseTest"
