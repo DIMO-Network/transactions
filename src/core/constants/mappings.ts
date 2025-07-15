@@ -53,6 +53,7 @@ export const WORMHOLE_CHAIN_MAPPING: Record<SupportedWormholeNetworks, "Ethereum
   Ethereum: "Ethereum",
   Polygon: "Polygon",
   Base: "Base",
+  Solana: "Solana",
   EthereumTest: "Ethereum",
   PolygonTest: "Polygon",
   BaseTest: "Base",
