@@ -3,7 +3,6 @@ import {
   DIMO_APIs,
   ENVIRONMENT,
   KernelConfig,
-  OptionalArgs,
   TransactionReturnType,
   _kernelConfig,
   SACDTemplate,
@@ -69,7 +68,7 @@ import { uint8ArrayToHexString, uint8ArrayFromHexString } from "@turnkey/encodin
 import { claimAndPairDevice } from ":core/actions/claimAndPair.js";
 import { executeTransaction, executeTransactionBatch } from ":core/actions/executeTransaction.js";
 import { createBundlerClient } from "viem/account-abstraction";
-import { getPermissionsValue, getPermissionsArray, unpackOptionalArgs } from ":core/utils/utils.js";
+import { getPermissionsValue, getPermissionsArray } from ":core/utils/utils.js";
 import { addStake } from ":core/actions/addStake.js";
 import { withdrawStake } from ":core/actions/withdrawStake.js";
 import { upgradeStake } from ":core/actions/upgradeStake.js";
@@ -550,7 +549,6 @@ export class KernelSigner {
   public async mintVehicleWithDeviceDefinition(
     args: MintVehicleWithDeviceDefinition | MintVehicleWithDeviceDefinition[],
     waitForReceipt: boolean = true,
-    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     let mintVehicleCallData: `0x${string}`;
@@ -563,7 +561,7 @@ export class KernelSigner {
       mintVehicleCallData = await mintVehicleWithDeviceDefinitionBatch(args, client, this.config.environment);
     }
 
-    const userOpHash = await this._sendUserOperation(client, mintVehicleCallData, optionalArgs);
+    const userOpHash = await this._sendUserOperation(client, mintVehicleCallData);
 
     if (waitForReceipt) {
       const client = await this.getActiveClient();
@@ -581,7 +579,6 @@ export class KernelSigner {
   public async setVehiclePermissions(
     args: SetVehiclePermissions | SetVehiclePermissions[],
     waitForReceipt: boolean = true,
-    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     let setVehiclePermissionsCallData: `0x${string}`;
@@ -594,7 +591,7 @@ export class KernelSigner {
       setVehiclePermissionsCallData = await setVehiclePermissionsBatch(args, client, this.config.environment);
     }
 
-    const userOpHash = await this._sendUserOperation(client, setVehiclePermissionsCallData, optionalArgs);
+    const userOpHash = await this._sendUserOperation(client, setVehiclePermissionsCallData);
 
     if (waitForReceipt) {
       const client = await this.getActiveClient();
@@ -612,12 +609,11 @@ export class KernelSigner {
   public async setVehiclePermissionsBulk(
     args: SetVehiclePermissionsBulk,
     waitForReceipt: boolean = true,
-    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const setVehiclePermissionsBulkCallData = await setVehiclePermissionsBulk(args, client, this.config.environment);
 
-    const userOpHash = await this._sendUserOperation(client, setVehiclePermissionsBulkCallData, optionalArgs);
+    const userOpHash = await this._sendUserOperation(client, setVehiclePermissionsBulkCallData);
 
     if (waitForReceipt) {
       const client = await this.getActiveClient();
@@ -635,12 +631,11 @@ export class KernelSigner {
   public async sendDIMOTokens(
     args: SendDIMOTokens,
     waitForReceipt: boolean = true,
-    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getPasskeyClient();
 
     const sendDIMOTokensCallData = await sendDIMOTokens(args, client, this.config.environment);
-    const userOpHash = await this._sendUserOperation(client, sendDIMOTokensCallData, optionalArgs);
+    const userOpHash = await this._sendUserOperation(client, sendDIMOTokensCallData);
 
     if (waitForReceipt) {
       const client = await this.getActiveClient();
@@ -662,12 +657,11 @@ export class KernelSigner {
   public async claimAftermarketDevice(
     args: ClaimAftermarketDevice,
     waitForReceipt: boolean = true,
-    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
     const claimADCallData = await claimAftermarketDevice(args, client, this.config.environment);
-    const userOpHash = await this._sendUserOperation(client, claimADCallData, optionalArgs);
+    const userOpHash = await this._sendUserOperation(client, claimADCallData);
 
     if (waitForReceipt) {
       const client = await this.getActiveClient();
@@ -685,12 +679,11 @@ export class KernelSigner {
   public async pairAftermarketDevice(
     args: PairAftermarketDevice,
     waitForReceipt: boolean = true,
-    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
     const pairADCallData = await pairAftermarketDevice(args, client, this.config.environment);
-    const userOpHash = await this._sendUserOperation(client, pairADCallData, optionalArgs);
+    const userOpHash = await this._sendUserOperation(client, pairADCallData);
     if (waitForReceipt) {
       const client = await this.getActiveClient();
       return await client.waitForUserOperationReceipt({
@@ -707,12 +700,11 @@ export class KernelSigner {
   public async claimAndPairAftermarketDevice(
     args: ClaimAftermarketDevice & PairAftermarketDevice,
     waitForReceipt: boolean = true,
-    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
     const claimAndPairCallData = await claimAndPairDevice(args, client, this.config.environment);
-    const userOpHash = await this._sendUserOperation(client, claimAndPairCallData, optionalArgs);
+    const userOpHash = await this._sendUserOperation(client, claimAndPairCallData);
 
     if (waitForReceipt) {
       const client = await this.getActiveClient();
@@ -730,7 +722,6 @@ export class KernelSigner {
   public async burnVehicle(
     args: BurnVehicle | BurnVehicle[],
     waitForReceipt: boolean = true,
-    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
@@ -744,7 +735,7 @@ export class KernelSigner {
       burnVehicleCallData = await burnVehicleBatch(args, client, this.config.environment);
     }
 
-    const userOpHash = await this._sendUserOperation(client, burnVehicleCallData, optionalArgs);
+    const userOpHash = await this._sendUserOperation(client, burnVehicleCallData);
 
     if (waitForReceipt) {
       const client = await this.getActiveClient();
@@ -762,7 +753,6 @@ export class KernelSigner {
   public async burnSyntheticDevice(
     args: BurnSyntheticDevice | BurnSyntheticDevice[],
     waitForReceipt: boolean = true,
-    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
@@ -776,7 +766,7 @@ export class KernelSigner {
       burnSyntheticDeviceCallData = await burnSyntheticDeviceBatch(args, client, this.config.environment);
     }
 
-    const userOpHash = await this._sendUserOperation(client, burnSyntheticDeviceCallData, optionalArgs);
+    const userOpHash = await this._sendUserOperation(client, burnSyntheticDeviceCallData);
 
     if (waitForReceipt) {
       const client = await this.getActiveClient();
@@ -794,12 +784,11 @@ export class KernelSigner {
   public async transferVehicleAndAftermarketDevices(
     args: TransferVehicleAndAftermarketDeviceIDs,
     waitForReceipt: boolean = true,
-    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
     const callData = await transferVehicleAndAftermarketDeviceIDs(args, client, this.config.environment);
-    const userOpHash = await this._sendUserOperation(client, callData, optionalArgs);
+    const userOpHash = await this._sendUserOperation(client, callData);
 
     if (waitForReceipt) {
       const client = await this.getActiveClient();
@@ -817,12 +806,11 @@ export class KernelSigner {
   public async unpairAftermarketDevice(
     args: UnPairAftermarketDevice,
     waitForReceipt: boolean = true,
-    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const unpairADCallData = await unpairAftermarketDevice(args, client, this.config.environment);
 
-    const userOpHash = await this._sendUserOperation(client, unpairADCallData, optionalArgs);
+    const userOpHash = await this._sendUserOperation(client, unpairADCallData);
 
     if (waitForReceipt) {
       const client = await this.getActiveClient();
@@ -840,11 +828,10 @@ export class KernelSigner {
   public async addStake(
     args: AddStake,
     waitForReceipt: boolean = true,
-    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const addStakeCallData = await addStake(args, client, this.config.environment);
-    const userOpHash = await this._sendUserOperation(client, addStakeCallData, optionalArgs);
+    const userOpHash = await this._sendUserOperation(client, addStakeCallData);
     if (waitForReceipt) {
       return await client.waitForUserOperationReceipt({
         hash: userOpHash as `0x${string}`,
@@ -860,11 +847,10 @@ export class KernelSigner {
   public async withdrawStake(
     args: WithdrawStake,
     waitForReceipt: boolean = true,
-    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const addStakeCallData = await withdrawStake(args, client, this.config.environment);
-    const userOpHash = await this._sendUserOperation(client, addStakeCallData, optionalArgs);
+    const userOpHash = await this._sendUserOperation(client, addStakeCallData);
     if (waitForReceipt) {
       return await client.waitForUserOperationReceipt({
         hash: userOpHash as `0x${string}`,
@@ -880,11 +866,10 @@ export class KernelSigner {
   public async upgradeStake(
     args: UpgradeStake,
     waitForReceipt: boolean = true,
-    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const upgradeStakeCallData = await upgradeStake(args, client, this.config.environment);
-    const userOpHash = await this._sendUserOperation(client, upgradeStakeCallData, optionalArgs);
+    const userOpHash = await this._sendUserOperation(client, upgradeStakeCallData);
 
     if (waitForReceipt) {
       return await client.waitForUserOperationReceipt({
@@ -901,11 +886,10 @@ export class KernelSigner {
   public async attacheVehicleToStake(
     args: AttachVehicle,
     waitForReceipt: boolean = true,
-    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const upgradeStakeCallData = await attachVehicle(args, client, this.config.environment);
-    const userOpHash = await this._sendUserOperation(client, upgradeStakeCallData, optionalArgs);
+    const userOpHash = await this._sendUserOperation(client, upgradeStakeCallData);
 
     if (waitForReceipt) {
       return await client.waitForUserOperationReceipt({
@@ -922,11 +906,10 @@ export class KernelSigner {
   public async detachVehicleFromStake(
     args: DetachVehicle,
     waitForReceipt: boolean = true,
-    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const upgradeStakeCallData = await detachVehicle(args, client, this.config.environment);
-    const userOpHash = await this._sendUserOperation(client, upgradeStakeCallData, optionalArgs);
+    const userOpHash = await this._sendUserOperation(client, upgradeStakeCallData);
 
     if (waitForReceipt) {
       return await client.waitForUserOperationReceipt({
@@ -943,11 +926,10 @@ export class KernelSigner {
   public async initiateBridging(
     args: BridgeInitiateArgs,
     waitForReceipt: boolean = true,
-    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const initiateBridgingCallData = await initiateBridging(args, client, this.config.environment);
-    const userOpHash = await this._sendUserOperation(client, initiateBridgingCallData, optionalArgs);
+    const userOpHash = await this._sendUserOperation(client, initiateBridgingCallData);
 
     if (waitForReceipt) {
       return await client.waitForUserOperationReceipt({
@@ -1173,7 +1155,6 @@ export class KernelSigner {
   public async executeTransaction(
     args: TransactionInput,
     waitForReceipt: boolean = true,
-    optionalArgs?: OptionalArgs
   ): Promise<TransactionReturnType> {
     let client = await this.getActiveClient();
     if (args.requireSignature) {
@@ -1190,7 +1171,7 @@ export class KernelSigner {
       transactionCallData = await executeTransactionBatch(args.data, client);
     }
 
-    const userOpHash = await this._sendUserOperation(client, transactionCallData, optionalArgs);
+    const userOpHash = await this._sendUserOperation(client, transactionCallData);
 
     if (waitForReceipt) {
       const client = await this.getActiveClient();
@@ -1207,22 +1188,12 @@ export class KernelSigner {
 
   async _sendUserOperation(
     client: KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema>,
-    callData: `0x${string}`,
-    optionalArgs?: OptionalArgs
+    callData: `0x${string}`
   ): Promise<`0x${string}`> {
     const nonce = await client.account!.getNonce();
-    const optArgs = unpackOptionalArgs(optionalArgs);
-    const gasInfos = await client.getUserOperationGasPrice();
-
-    const maxFeeIncrease = gasInfos.maxFeePerGas * (BigInt(optArgs.feeBoostConfig.maxFeePerGasPercent) / BigInt(100));
-    const maxPriorityFeeIncrease =
-      gasInfos.maxFeePerGas * (BigInt(optArgs.feeBoostConfig.maxPriorityFeePerGasPercent) / BigInt(100));
-
     const userOpHash = await client.sendUserOperation({
       callData: callData,
       nonce: nonce,
-      maxFeePerGas: maxFeeIncrease + gasInfos.maxFeePerGas,
-      maxPriorityFeePerGas: maxPriorityFeeIncrease + gasInfos.maxPriorityFeePerGas,
     });
     return userOpHash;
   }

@@ -96,19 +96,6 @@ export const newAccountConfig = (args: AccountConfig): _accountConfig => {
   };
 };
 
-export const unpackOptionalArgs = (optionalArgs?: OptionalArgs): OptionalArgs => {
-  if (optionalArgs == undefined) {
-    return {
-      feeBoostConfig: {
-        maxFeePerGasPercent: 0,
-        maxPriorityFeePerGasPercent: 0,
-      },
-    };
-  }
-
-  return optionalArgs;
-};
-
 export const getPermissionsValue = (permissions: Permission[]): bigint => {
   const present = new Set(permissions);
   const allPermissions = Object.values(Permission).filter(p => typeof p === 'number') as number[];
