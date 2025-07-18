@@ -25,7 +25,6 @@ export type KernelConfig = {
   defaultPermissions?: Permission[];
   subOrganizationId?: string;
   stamper?: any;
-  feeBoostConfig?: FeeBoostConfig;
 };
 
 export type _kernelConfig = {
@@ -43,12 +42,6 @@ export type _kernelConfig = {
   domain: string;
   redirectUri: string;
   defaultPermissions: Permission[];
-  feeBoostConfig: FeeBoostConfig;
-};
-
-export type FeeBoostConfig = {
-  maxFeePerGasPercent: number;
-  maxPriorityFeePerGasPercent: number;
 };
 
 export type AccountConfig = {
@@ -222,8 +215,4 @@ export type SACDTemplate = {
 export type TransactionReturnType = GetUserOperationReceiptReturnType & {
   userOperationHash?: string;
   status?: string;
-};
-
-export type OptionalArgs = {
-  feeBoostConfig: FeeBoostConfig;
 };
