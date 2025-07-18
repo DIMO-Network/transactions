@@ -883,7 +883,7 @@ export class KernelSigner {
     } as TransactionReturnType;
   }
 
-  public async attacheVehicleToStake(
+  public async attachVehicleToStake(
     args: AttachVehicle,
     waitForReceipt: boolean = true,
   ): Promise<TransactionReturnType> {
