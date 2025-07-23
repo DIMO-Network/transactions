@@ -5,10 +5,24 @@ export type SupportedWormholeNetworks =
   | "Polygon"
   | "Base"
   | "Solana"
+  | "Sepolia"
+  | "BaseSepolia"
+  | "PolygonSepolia"
+  | "Amoy"
+  | "SolanaTestnet"
   | "EthereumTest"
   | "PolygonTest"
   | "BaseTest"
   | "SolanaTest";
+
+export type SupportedRelayingWormholeNetworks =
+  | "Ethereum"
+  | "Polygon"
+  | "Base"
+  | "Solana"
+  | "Sepolia"
+  | "BaseSepolia"
+  | "SolanaTestnet"
 
 export type NttContracts = {
   [key in SupportedWormholeNetworks]?: Ntt.Contracts;
@@ -16,7 +30,7 @@ export type NttContracts = {
 
 // Define the type for RPC configuration
 export type ChainRpcConfig = {
-  [key in "Polygon" | "Ethereum" | "Base"]?: {
+  [key in SupportedWormholeNetworks]?: {
     rpc: string;
   };
 };

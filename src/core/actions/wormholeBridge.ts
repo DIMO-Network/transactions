@@ -14,7 +14,7 @@ import { getDIMOPriceFromUniswapV3 } from ":core/utils/priceOracle.js";
 import { swapToExactPOL } from ":core/swap/swapAndWithdraw.js";
 import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 import type { Call } from ":core/types/common.js";
-import type { SupportedWormholeNetworks, BridgeInitiateArgs, ChainRpcConfig } from ":core/types/wormhole.js";
+import type { SupportedWormholeNetworks, SupportedRelayingWormholeNetworks, BridgeInitiateArgs, ChainRpcConfig } from ":core/types/wormhole.js";
 import { DINC_ADDRESS } from ":core/constants/dimo.js";
 import { APPROVE_TOKENS, NTT_TRANSFER } from ":core/constants/methods.js";
 import { abiWormholeNttManager } from ":core/abis/index.js";
@@ -22,11 +22,13 @@ import {
   CHAIN_ABI_MAPPING,
   ENV_MAPPING,
   UNISWAP_ARGS_MAPPING,
+} from ":core/constants/mappings.js";
+import {
   WORMHOLE_ENV_MAPPING,
   WORMHOLE_CHAIN_MAPPING,
   WORMHOLE_NTT_CONTRACTS,
   WORMHOLE_TRANSCEIVER_INSTRUCTIONS,
-} from ":core/constants/mappings.js";
+} from ":core/constants/wormholeMappings.js";
 
 /**
  * Initiates a bridging operation for transferring tokens across different chains using Wormhole.
@@ -77,7 +79,7 @@ export async function initiateBridging(
 
       // Calculate the delivery price in native tokens
       transferCallValue = await quoteDeliveryPrice(
-        args.sourceChain,
+        args.sourceChain as SupportedRelayingWormholeNetworks,
         args.destinationChain,
         environment,
         args.rpcConfig,
@@ -171,7 +173,7 @@ export async function initiateBridging(
  * @throws Error if the environment is not supported, if no RPC URL is provided for the source chain, or if converting to DIMO is requested for a non-Polygon source chain.
  */
 export async function quoteDeliveryPrice(
-  sourceChain: SupportedWormholeNetworks,
+  sourceChain: SupportedRelayingWormholeNetworks,
   destinationChain: SupportedWormholeNetworks,
   environment: string = "prod",
   rpcConfig: ChainRpcConfig,
@@ -179,10 +181,6 @@ export async function quoteDeliveryPrice(
   priceIncreasePercentage: number = 1,
   returnInDIMO: boolean = false
 ): Promise<bigint> {
-  if (environment === "dev" || environment === "development") {
-    throw new Error("Development environment is not supported yet for bridging operations");
-  }
-
   const mappedSourceChain = WORMHOLE_CHAIN_MAPPING[sourceChain];
 
   // Validate that we have an RPC URL for the source chain
