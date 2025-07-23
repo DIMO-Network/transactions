@@ -1,12 +1,15 @@
 import { encodeFunctionData, type Hex } from "viem";
-import { wormhole, chainToChainId, VAA, Network } from "@wormhole-foundation/sdk";
+import { Wormhole, chainToChainId, VAA, Network, routes, amount } from "@wormhole-foundation/sdk";
+import { NttExecutorRoute, nttExecutorRoute } from "@wormhole-foundation/sdk-route-ntt";
 import { KernelAccountClient } from "@zerodev/sdk";
 import { Percent } from "@uniswap/sdk-core";
-import evm from "@wormhole-foundation/sdk/evm";
-import solana from "@wormhole-foundation/sdk/solana";
+import evm from "@wormhole-foundation/sdk/platforms/evm";
+import solana from "@wormhole-foundation/sdk/platforms/solana";
 import "@wormhole-foundation/sdk-evm-ntt";
+import "@wormhole-foundation/sdk-solana-ntt";
 
 import { addressToBytes32 } from ":core/utils/utils.js";
+import { convertToExecutorConfig } from ":core/utils/wormhole.js";
 import { getDIMOPriceFromUniswapV3 } from ":core/utils/priceOracle.js";
 import { swapToExactPOL } from ":core/swap/swapAndWithdraw.js";
 import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
@@ -78,6 +81,7 @@ export async function initiateBridging(
         args.destinationChain,
         environment,
         args.rpcConfig,
+        args.amount,
         args.priceIncreasePercentage
       );
 
@@ -159,17 +163,19 @@ export async function initiateBridging(
  * @param sourceChain - The chain from which the tokens will be transferred.
  * @param destinationChain - The chain to which the tokens will be transferred.
  * @param environment - The environment to use for the price quote. Defaults to "prod".
- * @param rpcConfig - Configuration object containing RPC URLs for the chains involved
- * @param priceIncreasePercentage - Percentage to increase the quoted price to avoid underfunding. Defaults to 1%
- * @param returnInDIMO - Whether to return the price in DIMO tokens instead of native tokens. Only works for Polygon source chain. Defaults to false
- * @returns A Promise resolving to the delivery price as a bigint, either in native tokens or DIMO tokens based on returnInDIMO parameter
- * @throws Error if the environment is not supported, if no RPC URL is provided for the source chain, or if converting to DIMO is requested for a non-Polygon source chain
+ * @param rpcConfig - Configuration object containing RPC URLs for the chains involved.
+ * @param amountTokens - The amount of tokens to bridge.
+ * @param priceIncreasePercentage - Percentage to increase the quoted delivery price by to avoid underfunding. Defaults to 1%.
+ * @param returnInDIMO - Whether to return the price in DIMO tokens instead of native tokens. Only works for Polygon source chain. Defaults to false.
+ * @returns A Promise resolving to the delivery price as a bigint, either in native tokens or DIMO tokens based on returnInDIMO parameter.
+ * @throws Error if the environment is not supported, if no RPC URL is provided for the source chain, or if converting to DIMO is requested for a non-Polygon source chain.
  */
 export async function quoteDeliveryPrice(
   sourceChain: SupportedWormholeNetworks,
   destinationChain: SupportedWormholeNetworks,
   environment: string = "prod",
   rpcConfig: ChainRpcConfig,
+  amountTokens: bigint,
   priceIncreasePercentage: number = 1,
   returnInDIMO: boolean = false
 ): Promise<bigint> {
@@ -185,7 +191,7 @@ export async function quoteDeliveryPrice(
   }
 
   const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Mainnet";
-  const wh = await wormhole(wormholeEnv as Network, [evm, solana], {
+  const wh = new Wormhole(wormholeEnv as Network, [evm.Platform, solana.Platform], {
     chains: rpcConfig,
   });
 
@@ -196,13 +202,28 @@ export async function quoteDeliveryPrice(
     ntt: WORMHOLE_NTT_CONTRACTS[sourceChain],
   });
 
-  let price = await srcNtt.quoteDeliveryPrice(destChain.chain, {
-    queue: false,
-    automatic: true,
+  const executorRoute = nttExecutorRoute(convertToExecutorConfig(WORMHOLE_NTT_CONTRACTS));
+  const routeInstance = new executorRoute(wh);
+
+  const transferRequest = await routes.RouteTransferRequest.create(wh, {
+    source: Wormhole.tokenId(srcChain.chain, WORMHOLE_NTT_CONTRACTS[sourceChain]!.token),
+    destination: Wormhole.tokenId(destChain.chain, WORMHOLE_NTT_CONTRACTS[destinationChain]!.token),
   });
 
+  // Validate parameters
+  const validated = await routeInstance.validate(transferRequest, {
+    amount: amount.fmt(amountTokens, await srcNtt.getTokenDecimals()),
+  });
+  if (!validated.valid) {
+    throw new Error(`Quote delivery price validation failed: ${validated.error.message}`);
+  }
+
+  // Get quote from route
+  const validatedParams: NttExecutorRoute.ValidatedParams = validated.params as NttExecutorRoute.ValidatedParams;
+  const routeQuote = await routeInstance.fetchExecutorQuote(transferRequest, validatedParams);
+
   // Increase price by the specified percentage to avoid underfunding
-  price = price + (price * BigInt(priceIncreasePercentage)) / BigInt(100);
+  const price = (routeQuote.estimatedCost * BigInt(priceIncreasePercentage)) / BigInt(100);
 
   if (returnInDIMO) {
     // Check if source chain is Polygon, as Uniswap price queries are only supported on Polygon
@@ -247,7 +268,7 @@ export async function checkNttTransferStatus(
   }
 
   const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Mainnet";
-  const wh = await wormhole(wormholeEnv as Network, [evm, solana]);
+  const wh = new Wormhole(wormholeEnv as Network, [evm.Platform, solana.Platform]);
 
   try {
     // Try to fetch the VAA without specifying the payload type
