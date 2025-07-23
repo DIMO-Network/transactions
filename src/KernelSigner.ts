@@ -493,16 +493,7 @@ export class KernelSigner {
       },
       userOperation: {
         estimateFeesPerGas: async ({ bundlerClient }) => {
-          const gasPrices = await getUserOperationGasPrice(bundlerClient);
-          const maxFeeIncrease =
-            gasPrices.maxFeePerGas * (BigInt(this.config.feeBoostConfig.maxFeePerGasPercent) / BigInt(100));
-          const maxPriorityFeeIncrease =
-            gasPrices.maxFeePerGas * (BigInt(this.config.feeBoostConfig.maxPriorityFeePerGasPercent) / BigInt(100));
-
-          return {
-            maxFeePerGas: maxFeeIncrease + gasPrices.maxFeePerGas,
-            maxPriorityFeePerGas: maxPriorityFeeIncrease + gasPrices.maxPriorityFeePerGas,
-          };
+          return getUserOperationGasPrice(bundlerClient);
         },
       },
     });
