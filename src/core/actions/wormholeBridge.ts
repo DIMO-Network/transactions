@@ -1,5 +1,5 @@
-import { encodeFunctionData, type Hex } from "viem";
-import { Wormhole, chainToChainId, VAA, Network, routes, amount } from "@wormhole-foundation/sdk";
+import { type Hex } from "viem";
+import { Wormhole, VAA, Network, routes, amount, AccountAddress, toUniversal, UniversalAddress } from "@wormhole-foundation/sdk";
 import { NttExecutorRoute, nttExecutorRoute } from "@wormhole-foundation/sdk-route-ntt";
 import { KernelAccountClient } from "@zerodev/sdk";
 import { Percent } from "@uniswap/sdk-core";
@@ -8,27 +8,26 @@ import solana from "@wormhole-foundation/sdk/platforms/solana";
 import "@wormhole-foundation/sdk-evm-ntt";
 import "@wormhole-foundation/sdk-solana-ntt";
 
-import { addressToBytes32 } from ":core/utils/utils.js";
+// import { addressToBytes32 } from ":core/utils/utils.js";
 import { convertToExecutorConfig } from ":core/utils/wormhole.js";
 import { getDIMOPriceFromUniswapV3 } from ":core/utils/priceOracle.js";
 import { swapToExactPOL } from ":core/swap/swapAndWithdraw.js";
-import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
+import { ENVIRONMENT } from ":core/types/dimo.js";
 import type { Call } from ":core/types/common.js";
 import type { SupportedWormholeNetworks, SupportedRelayingWormholeNetworks, BridgeInitiateArgs, ChainRpcConfig } from ":core/types/wormhole.js";
-import { DINC_ADDRESS } from ":core/constants/dimo.js";
-import { APPROVE_TOKENS, NTT_TRANSFER } from ":core/constants/methods.js";
-import { abiWormholeNttManager } from ":core/abis/index.js";
+// import { DINC_ADDRESS } from ":core/constants/dimo.js";
+// import { APPROVE_TOKENS, NTT_TRANSFER } from ":core/constants/methods.js";
+// import { abiWormholeNttManager } from ":core/abis/index.js";
 import {
-  CHAIN_ABI_MAPPING,
   ENV_MAPPING,
   UNISWAP_ARGS_MAPPING,
 } from ":core/constants/mappings.js";
 import {
   WORMHOLE_ENV_MAPPING,
   WORMHOLE_CHAIN_MAPPING,
-  WORMHOLE_NTT_CONTRACTS,
-  WORMHOLE_TRANSCEIVER_INSTRUCTIONS,
+  WORMHOLE_NTT_CONTRACTS
 } from ":core/constants/wormholeMappings.js";
+import { NttWithExecutor } from "@wormhole-foundation/sdk-definitions-ntt";
 
 /**
  * Initiates a bridging operation for transferring tokens across different chains using Wormhole.
@@ -63,7 +62,7 @@ export async function initiateBridging(
       throw new Error("Development environment is not supported yet for bridging operations");
     }
 
-    const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
+    // const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
     const sourceNttManagerAddress = WORMHOLE_NTT_CONTRACTS[args.sourceChain]?.manager;
     const transactions: Array<Call> = [];
 
@@ -72,7 +71,6 @@ export async function initiateBridging(
     }
 
     let transferCallValue = BigInt(0);
-    let transceiverInstructions = WORMHOLE_TRANSCEIVER_INSTRUCTIONS.notRelayed;
 
     if (args.isRelayed) {
       const uniswapArgs = UNISWAP_ARGS_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD];
@@ -109,44 +107,51 @@ export async function initiateBridging(
 
       // Add swap transactions to the beginning of the transaction array
       transactions.push(...swapTransactions);
-
-      transceiverInstructions = WORMHOLE_TRANSCEIVER_INSTRUCTIONS.relayed;
     }
-
-    // Add token approval for the bridge
-    const approveCall = {
-      to: contracts[ContractType.DIMO_TOKEN].address,
-      value: BigInt(0),
-      data: encodeFunctionData({
-        abi: contracts[ContractType.DIMO_TOKEN].abi,
-        functionName: APPROVE_TOKENS,
-        args: [sourceNttManagerAddress, args.amount],
-      }),
-    };
-    transactions.push(approveCall);
 
     if (!client.account?.address) {
       throw new Error("Client account address is not available");
     }
 
-    // Add the bridge transfer call
-    const transferCall = {
-      to: sourceNttManagerAddress as Hex,
-      value: transferCallValue,
-      data: encodeFunctionData({
-        abi: abiWormholeNttManager,
-        functionName: NTT_TRANSFER,
-        args: [
-          args.amount,
-          chainToChainId(WORMHOLE_CHAIN_MAPPING[args.destinationChain]),
-          addressToBytes32(args.recipientAddress),
-          addressToBytes32(DINC_ADDRESS), // Refund excess fees
-          false,
-          transceiverInstructions,
-        ],
-      }),
-    };
-    transactions.push(transferCall);
+    // Add token approval for the bridge
+    // const approveCall = {
+    //   to: contracts[ContractType.DIMO_TOKEN].address,
+    //   value: BigInt(0),
+    //   data: encodeFunctionData({
+    //     abi: contracts[ContractType.DIMO_TOKEN].abi,
+    //     functionName: APPROVE_TOKENS,
+    //     args: [sourceNttManagerAddress, args.amount],
+    //   }),
+    // };
+    // transactions.push(approveCall);
+
+    // // Add the bridge transfer call
+    // const transferCall = {
+    //   to: sourceNttManagerAddress as Hex,
+    //   value: transferCallValue,
+    //   data: encodeFunctionData({
+    //     abi: abiWormholeNttManager,
+    //     functionName: NTT_TRANSFER,
+    //     args: [
+    //       args.amount,
+    //       chainToChainId(WORMHOLE_CHAIN_MAPPING[args.destinationChain]),
+    //       addressToBytes32(args.recipientAddress),
+    //       addressToBytes32(DINC_ADDRESS), // Refund excess fees
+    //       false,
+    //       transceiverInstructions,
+    //     ],
+    //   }),
+    // };
+    // transactions.push(transferCall);
+
+    const wormholeTransferTxs = await generateWormholeTransferTransactions(
+      args,
+      toUniversal(WORMHOLE_CHAIN_MAPPING[args.sourceChain], client.account.address),
+      Wormhole.chainAddress(WORMHOLE_CHAIN_MAPPING[args.destinationChain], args.recipientAddress),
+      environment
+    )
+
+    transactions.push(...wormholeTransferTxs);
 
     return await client.account!.encodeCalls(transactions);
   } catch (error) {
@@ -183,42 +188,13 @@ export async function quoteDeliveryPrice(
 ): Promise<bigint> {
   const mappedSourceChain = WORMHOLE_CHAIN_MAPPING[sourceChain];
 
-  // Validate that we have an RPC URL for the source chain
-  if (!rpcConfig[mappedSourceChain as keyof ChainRpcConfig]) {
-    throw new Error(`No RPC URL provided for ${mappedSourceChain}`);
-  }
-
-  const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Mainnet";
-  const wh = new Wormhole(wormholeEnv as Network, [evm.Platform, solana.Platform], {
-    chains: rpcConfig,
-  });
-
-  const srcChain = wh.getChain(mappedSourceChain);
-  const destChain = wh.getChain(WORMHOLE_CHAIN_MAPPING[destinationChain]);
-
-  const srcNtt = await srcChain.getProtocol("Ntt", {
-    ntt: WORMHOLE_NTT_CONTRACTS[sourceChain],
-  });
-
-  const executorRoute = nttExecutorRoute(convertToExecutorConfig(WORMHOLE_NTT_CONTRACTS));
-  const routeInstance = new executorRoute(wh);
-
-  const transferRequest = await routes.RouteTransferRequest.create(wh, {
-    source: Wormhole.tokenId(srcChain.chain, WORMHOLE_NTT_CONTRACTS[sourceChain]!.token),
-    destination: Wormhole.tokenId(destChain.chain, WORMHOLE_NTT_CONTRACTS[destinationChain]!.token),
-  });
-
-  // Validate parameters
-  const validated = await routeInstance.validate(transferRequest, {
-    amount: amount.fmt(amountTokens, await srcNtt.getTokenDecimals()),
-  });
-  if (!validated.valid) {
-    throw new Error(`Quote delivery price validation failed: ${validated.error.message}`);
-  }
-
-  // Get quote from route
-  const validatedParams: NttExecutorRoute.ValidatedParams = validated.params as NttExecutorRoute.ValidatedParams;
-  const routeQuote = await routeInstance.fetchExecutorQuote(transferRequest, validatedParams);
+  const routeQuote = await getRouteQuote(
+    sourceChain,
+    destinationChain,
+    environment,
+    rpcConfig,
+    amountTokens
+  )
 
   // Increase price by the specified percentage to avoid underfunding
   const price = (routeQuote.estimatedCost * BigInt(priceIncreasePercentage)) / BigInt(100);
@@ -287,4 +263,118 @@ export async function checkNttTransferStatus(
     console.error("Error checking NTT transfer status:", error);
     return { status: "Error", vaa: null };
   }
+}
+
+/**
+ * Generates a series of transactions required for a Wormhole NTT transfer.
+ * 
+ * This function uses the Wormhole SDK to create all necessary transactions for transferring
+ * tokens across chains. It processes the generator pattern used by the Wormhole SDK's transfer
+ * method and converts the results into a format compatible with the DIMO transaction system.
+ *
+ * @param args - The parameters for the bridging operation
+ * @param signer - The account address that will sign the transactions
+ * @param destinationAddress - The recipient address on the destination chain
+ * @param environment - The environment to use (prod, dev, etc.). Defaults to "prod"
+ * @returns A Promise resolving to an array of Call objects representing the transactions
+ * @throws Error if there are issues generating the transfer transactions
+ */
+async function generateWormholeTransferTransactions(
+  args: BridgeInitiateArgs,
+  signer: UniversalAddress,
+  destinationAddress: AccountAddress<any>,
+  environment: string = "prod"
+): Promise<Call[]> {
+  try {
+    const mappedSourceChain = WORMHOLE_CHAIN_MAPPING[args.sourceChain];
+
+    // Initialize Wormhole SDK with the appropriate environment and RPC configuration
+    const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Mainnet";
+    const wormhole = new Wormhole(wormholeEnv as Network, [evm.Platform, solana.Platform], {
+      chains: args.rpcConfig,
+    });
+
+    // Get the source chain and its NTT protocols
+    const sourceChain = wormhole.getChain(mappedSourceChain);
+    const sourceNtt = await sourceChain.getProtocol("Ntt", {
+      ntt: WORMHOLE_NTT_CONTRACTS[args.sourceChain],
+    });
+    const sourceNttExecutor = await sourceChain.getProtocol("NttWithExecutor", {
+      ntt: WORMHOLE_NTT_CONTRACTS[args.sourceChain],
+    });
+
+    // Get the route quote for the transfer
+    const routeQuote = await getRouteQuote(
+      args.sourceChain as SupportedRelayingWormholeNetworks,
+      args.destinationChain,
+      environment,
+      args.rpcConfig as ChainRpcConfig,
+      args.amount
+    );
+
+    // Create a generator function for the transfer
+    const transferGenerator = () =>
+      sourceNttExecutor.transfer(signer, destinationAddress, args.amount, routeQuote, sourceNtt);
+
+    // Process the generator to collect all transactions
+    const transactions: Call[] = [];
+
+    for await (const tx of transferGenerator()) {
+      if(tx.transaction) {
+        transactions.push({
+          to: tx.transaction.to,
+          data: tx.transaction.data,
+          value: tx.transaction.value ?? BigInt(0)
+        });
+      }
+    }
+
+    return transactions;
+  } catch (error) {
+    console.error("Error generating Wormhole transfer transactions:", error);
+    throw new Error(`Failed to generate Wormhole transfer transactions: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+async function getRouteQuote(
+  sourceChain: SupportedRelayingWormholeNetworks,
+  destinationChain: SupportedWormholeNetworks,
+  environment: string = "prod",
+  rpcConfig: ChainRpcConfig,
+  amountTokens: bigint
+): Promise<NttWithExecutor.Quote> {
+  const mappedSourceChain = WORMHOLE_CHAIN_MAPPING[sourceChain];
+
+  const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Mainnet";
+  const wh = new Wormhole(wormholeEnv as Network, [evm.Platform, solana.Platform], {
+    chains: rpcConfig,
+  });
+
+  const srcChain = wh.getChain(mappedSourceChain);
+  const destChain = wh.getChain(WORMHOLE_CHAIN_MAPPING[destinationChain]);
+
+  const srcNtt = await srcChain.getProtocol("Ntt", {
+    ntt: WORMHOLE_NTT_CONTRACTS[sourceChain],
+  });
+
+  const executorRoute = nttExecutorRoute(convertToExecutorConfig(WORMHOLE_NTT_CONTRACTS));
+  const routeInstance = new executorRoute(wh);
+
+  const transferRequest = await routes.RouteTransferRequest.create(wh, {
+    source: Wormhole.tokenId(srcChain.chain, WORMHOLE_NTT_CONTRACTS[sourceChain]!.token),
+    destination: Wormhole.tokenId(destChain.chain, WORMHOLE_NTT_CONTRACTS[destinationChain]!.token),
+  });
+
+  // Validate parameters
+  const validated = await routeInstance.validate(transferRequest, {
+    amount: amount.fmt(amountTokens, await srcNtt.getTokenDecimals()),
+  });
+  if (!validated.valid) {
+    throw new Error(`Quote delivery price validation failed: ${validated.error.message}`);
+  }
+
+  // Get quote from route
+  const validatedParams: NttExecutorRoute.ValidatedParams = validated.params as NttExecutorRoute.ValidatedParams;
+
+  return await routeInstance.fetchExecutorQuote(transferRequest, validatedParams);
 }
