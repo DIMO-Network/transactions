@@ -1,6 +1,6 @@
 import { type Hex } from "viem";
 import { TransactionDescription } from "ethers";
-import { Wormhole, VAA, Network, routes, amount, AccountAddress, toUniversal, UniversalAddress } from "@wormhole-foundation/sdk";
+import { Wormhole, Network, routes, amount, AccountAddress, toUniversal, UniversalAddress } from "@wormhole-foundation/sdk";
 import { NttExecutorRoute, nttExecutorRoute } from "@wormhole-foundation/sdk-route-ntt";
 import { KernelAccountClient } from "@zerodev/sdk";
 import { Percent } from "@uniswap/sdk-core";
@@ -9,15 +9,20 @@ import solana from "@wormhole-foundation/sdk/platforms/solana";
 import "@wormhole-foundation/sdk-evm-ntt";
 import "@wormhole-foundation/sdk-solana-ntt";
 
-// import { addressToBytes32 } from ":core/utils/utils.js";
-import { convertToExecutorConfig } from ":core/utils/wormhole/helpers.js";
+import { WormholeScanAPI } from ':core/utils/wormhole/api-client.js';
+import { convertToExecutorConfig, getOperationStatus, isWormholeErrorResponse } from ":core/utils/wormhole/helpers.js";
 import { getDIMOPriceFromUniswapV3 } from ":core/utils/priceOracle.js";
 import { swapToExactPOL } from ":core/swap/swapAndWithdraw.js";
 import { ENVIRONMENT } from ":core/types/dimo.js";
 import type { Call } from ":core/types/common.js";
-import type { SupportedWormholeNetworks, SupportedRelayingWormholeNetworks, BridgeInitiateArgs, ChainRpcConfig } from ":core/types/wormhole.js";
-// import { APPROVE_TOKENS, NTT_TRANSFER } from ":core/constants/methods.js";
-// import { abiWormholeNttManager } from ":core/abis/index.js";
+import {
+  type SupportedWormholeNetworks,
+  type SupportedRelayingWormholeNetworks,
+  type BridgeInitiateArgs,
+  type ChainRpcConfig,
+  type Vaa,
+  type BaseWormholeResponse
+} from ":core/types/wormhole.js";
 import {
   ENV_MAPPING,
   UNISWAP_ARGS_MAPPING,
@@ -135,8 +140,6 @@ export async function initiateBridging(
       transactions.push(...wormholeTransferTxs);
     }
 
-    console.log(transactions)
-
     return await client.account!.encodeCalls(transactions);
   } catch (error) {
     console.error("Error in initiateBridging:", error);
@@ -210,46 +213,77 @@ export async function quoteDeliveryPrice(
 /**
  * Checks the status of a Non-Transferable Token (NTT) transfer using Wormhole.
  *
- * This function attempts to fetch the Verified Action Approval (VAA) for a given transaction ID.
- * The presence of a VAA indicates that the transfer has been completed.
+ * This function queries the WormholeScan API to retrieve information about a specific
+ * transaction and determine its current status. It handles various error conditions
+ * and provides detailed information about the transfer operation.
  *
- * @param txid - The transaction ID of the NTT transfer to check.
- * @param environment - The environment to use for the status check. Defaults to "prod".
- * @param timeoutMs - The timeout in milliseconds for the VAA fetch operation. Defaults to 30000 (30 seconds).
+ * @param txid - The transaction ID (hash) of the NTT transfer to check
+ * @param environment - The environment to use for the status check (e.g., "prod", "dev")
+ *                      Defaults to "prod" if not specified
  * @returns A Promise that resolves to an object containing:
- *          - status: A string indicating the transfer status ("Completed", "In Progress", or "Error").
- *          - vaa: The VAA object if the transfer is completed, or null otherwise.
+ *          - status: A string indicating the transfer status
+ *            - 'Completed': The operation has reached its destination chain
+ *            - 'Emitted': The operation has a VAA but hasn't reached the destination chain
+ *            - 'In Progress': The operation has been initiation in the source chain, but no VAA yet
+ *            - 'Unknown': The operation doesn't have enough information to determine its status
+ *          - vaa: The VAA object if the transfer is completed, or undefined
+ *          - error: Error details if the status check failed, or undefined if successful
  */
 export async function checkNttTransferStatus(
   txid: string,
-  environment: string = "prod",
-  timeoutMs: number = 30000
-): Promise<{ status: string; vaa: VAA | null }> {
-  if (environment === "dev" || environment === "development") {
-    throw new Error("Development environment is not supported yet for bridging operations");
-  }
-
-  const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Mainnet";
-  const wh = new Wormhole(wormholeEnv as Network, [evm.Platform, solana.Platform]);
-
+  environment: string = "prod"
+): Promise<{ status: string; vaa?: Vaa | undefined; error?: any }> {
   try {
-    // Try to fetch the VAA without specifying the payload type
-    const vaa = await wh.getVaa(txid, "Uint8Array", timeoutMs);
+    const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Mainnet";
 
-    if (vaa) {
-      return { status: "Completed", vaa };
-    } else {
-      // If no VAA is found, the transfer is still in progress
-      return { status: "In Progress", vaa: null };
+    const wormholeScanApi = new WormholeScanAPI(wormholeEnv !== "Mainnet");
+    const response = await wormholeScanApi.get(`/operations?txHash=${txid}`) as BaseWormholeResponse;
+
+    // Check if the response indicates an error
+    if (isWormholeErrorResponse(response)) {
+      return {
+        status: "Error",
+        error: {
+          code: response.code,
+          message: response.message,
+          details: response.details
+        }
+      };
     }
-  } catch (error) {
-    // Check if the error is related to the payload type
-    if (error instanceof Error && error.message.includes("No layout registered for payload type")) {
-      // If it's a payload type error, assume the transfer is completed
-      return { status: "Completed", vaa: null };
+
+    // Check if operations array exists and has at least one item
+    if (!response.operations || response.operations.length === 0) {
+      return {
+        status: "Error",
+        error: {
+          message: "No operations found for the provided transaction hash"
+        }
+      };
     }
+
+    const operation = response.operations[0]
+
+    const overallStatus = getOperationStatus(operation);
+
+    return { status: overallStatus, vaa: operation.vaa };
+
+  } catch (error: any) {
     console.error("Error checking NTT transfer status:", error);
-    return { status: "Error", vaa: null };
+
+    // Check if the error has a response property (axios error)
+    if (error.response && error.response.data) {
+      return {
+        status: "Error",
+        error: error.response.data
+      };
+    }
+
+    return {
+      status: "Error",
+      error: {
+        message: error.message || "Unknown error occurred while checking transfer status"
+      }
+    };
   }
 }
 

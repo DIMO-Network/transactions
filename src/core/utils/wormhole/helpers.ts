@@ -1,5 +1,5 @@
 import { Chain } from "@wormhole-foundation/sdk";
-import { NttContracts } from ":core/types/wormhole.js";
+import { BaseWormholeResponse, NttContracts, WormholeErrorResponse, type Operation } from ":core/types/wormhole.js";
 import { NttExecutorRoute } from "@wormhole-foundation/sdk-route-ntt";
 
 /**
@@ -64,4 +64,30 @@ export function convertToExecutorConfig(nttContracts: NttContracts): NttExecutor
       }
     }
   };
+}
+
+/**
+ * Determines the status of a Wormhole operation based on its properties.
+ *
+ * @param operation - The Wormhole operation object to evaluate
+ * @returns A string representing the current status of the operation:
+ *   - 'Completed': The operation has reached its destination chain
+ *   - 'Emitted': The operation has a VAA (Verified Action Approvals) but hasn't reached the destination chain
+ *   - 'In Progress': The operation has been initiation in the source chain, but no VAA yet
+ *   - 'Unknown': The operation doesn't have enough information to determine its status
+ */
+export function getOperationStatus(operation: Operation): string {
+  if (operation.targetChain) {
+    return 'Completed';
+  } else if (operation.vaa) {
+    return 'Emitted';
+  } else if (operation.sourceChain) {
+    return 'In Progress';
+  } else {
+    return 'Unknown';
+  }
+}
+
+export function isWormholeErrorResponse(response: BaseWormholeResponse): response is WormholeErrorResponse {
+  return response.code !== undefined && response.message !== undefined;
 }
