@@ -69,6 +69,9 @@ export async function initiateBridging(
     if (!sourceNttManagerAddress) {
       throw new Error(`No NTT manager address found for ${args.sourceChain}`);
     }
+    if (!client.account?.address) {
+      throw new Error("Client account address is not available");
+    }
 
     let transferCallValue = BigInt(0);
 
@@ -107,10 +110,24 @@ export async function initiateBridging(
 
       // Add swap transactions to the beginning of the transaction array
       transactions.push(...swapTransactions);
-    }
 
-    if (!client.account?.address) {
-      throw new Error("Client account address is not available");
+      const wormholeTransferTxs = await generateWormholeRelayedTransferTransactions(
+        args,
+        toUniversal(WORMHOLE_CHAIN_MAPPING[args.sourceChain], client.account.address),
+        Wormhole.chainAddress(WORMHOLE_CHAIN_MAPPING[args.destinationChain], args.recipientAddress),
+        environment
+      )
+
+      transactions.push(...wormholeTransferTxs);
+    } else {
+      const wormholeTransferTxs = await generateWormholeNonRelayedTransferTransactions(
+        args,
+        toUniversal(WORMHOLE_CHAIN_MAPPING[args.sourceChain], client.account.address),
+        Wormhole.chainAddress(WORMHOLE_CHAIN_MAPPING[args.destinationChain], args.recipientAddress),
+        environment
+      )
+
+      transactions.push(...wormholeTransferTxs);
     }
 
     // Add token approval for the bridge
@@ -144,15 +161,6 @@ export async function initiateBridging(
     // };
     // transactions.push(transferCall);
 
-    const wormholeTransferTxs = await generateWormholeTransferTransactions(
-      args,
-      toUniversal(WORMHOLE_CHAIN_MAPPING[args.sourceChain], client.account.address),
-      Wormhole.chainAddress(WORMHOLE_CHAIN_MAPPING[args.destinationChain], args.recipientAddress),
-      environment
-    )
-
-    transactions.push(...wormholeTransferTxs);
-
     return await client.account!.encodeCalls(transactions);
   } catch (error) {
     console.error("Error in initiateBridging:", error);
@@ -164,15 +172,15 @@ export async function initiateBridging(
  * Quotes the delivery price for a Wormhole NTT transfer between chains.
  *
  * This function calculates the cost of transferring tokens from a source chain to a destination chain
- * using Wormhole's NTT (Non-Transferable Token) protocol. It includes an option to increase the quoted
- * price by a specified percentage to avoid underfunding.
+ * using Wormhole's NTT protocol. It includes an option to increase the quoted price by a specified
+ * percentage to avoid underfunding.
  *
  * @param sourceChain - The chain from which the tokens will be transferred.
  * @param destinationChain - The chain to which the tokens will be transferred.
  * @param environment - The environment to use for the price quote. Defaults to "prod".
  * @param rpcConfig - Configuration object containing RPC URLs for the chains involved.
  * @param amountTokens - The amount of tokens to bridge.
- * @param priceIncreasePercentage - Percentage to increase the quoted delivery price by to avoid underfunding. Defaults to 1%.
+ * @param priceIncreasePercentage - Percentage to increase the quoted delivery price by to avoid underfunding. Defaults to 1%. Must be between 0 and 100.
  * @param returnInDIMO - Whether to return the price in DIMO tokens instead of native tokens. Only works for Polygon source chain. Defaults to false.
  * @returns A Promise resolving to the delivery price as a bigint, either in native tokens or DIMO tokens based on returnInDIMO parameter.
  * @throws Error if the environment is not supported, if no RPC URL is provided for the source chain, or if converting to DIMO is requested for a non-Polygon source chain.
@@ -186,6 +194,10 @@ export async function quoteDeliveryPrice(
   priceIncreasePercentage: number = 1,
   returnInDIMO: boolean = false
 ): Promise<bigint> {
+  if (priceIncreasePercentage < 0 || priceIncreasePercentage > 100) {
+    throw new Error("Price increase percentage must be between 0 and 100");
+  }
+
   const mappedSourceChain = WORMHOLE_CHAIN_MAPPING[sourceChain];
 
   const routeQuote = await getRouteQuote(
@@ -197,7 +209,7 @@ export async function quoteDeliveryPrice(
   )
 
   // Increase price by the specified percentage to avoid underfunding
-  const price = (routeQuote.estimatedCost * BigInt(priceIncreasePercentage)) / BigInt(100);
+  const price = (routeQuote.estimatedCost * BigInt(100 + priceIncreasePercentage)) / BigInt(100);
 
   if (returnInDIMO) {
     // Check if source chain is Polygon, as Uniswap price queries are only supported on Polygon
@@ -266,7 +278,7 @@ export async function checkNttTransferStatus(
 }
 
 /**
- * Generates a series of transactions required for a Wormhole NTT transfer.
+ * Generates a series of transactions required for a non relayed Wormhole NTT transfer.
  * 
  * This function uses the Wormhole SDK to create all necessary transactions for transferring
  * tokens across chains. It processes the generator pattern used by the Wormhole SDK's transfer
@@ -279,7 +291,71 @@ export async function checkNttTransferStatus(
  * @returns A Promise resolving to an array of Call objects representing the transactions
  * @throws Error if there are issues generating the transfer transactions
  */
-async function generateWormholeTransferTransactions(
+async function generateWormholeNonRelayedTransferTransactions(
+  args: BridgeInitiateArgs,
+  signer: UniversalAddress,
+  destinationAddress: AccountAddress<any>,
+  environment: string = "prod"
+): Promise<Call[]> {
+  try {
+    const mappedSourceChain = WORMHOLE_CHAIN_MAPPING[args.sourceChain];
+
+    // Initialize Wormhole SDK with the appropriate environment and RPC configuration
+    const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Mainnet";
+    const wormhole = new Wormhole(wormholeEnv as Network, [evm.Platform, solana.Platform], {
+      chains: args.rpcConfig,
+    });
+
+    // Get the source chain and its NTT protocols
+    const sourceChain = wormhole.getChain(mappedSourceChain);
+    const sourceNtt = await sourceChain.getProtocol("Ntt", {
+      ntt: WORMHOLE_NTT_CONTRACTS[args.sourceChain],
+    });
+
+    // Create a generator function for the transfer
+    const transferGenerator = () =>
+      sourceNtt.transfer(signer, args.amount, destinationAddress, {
+        queue: true,
+      });
+
+    // Process the generator to collect all transactions
+    const transactions: Call[] = [];
+
+    // TODO Set the refund address, I think I will have to decode the data, change and encode again
+    for await (const tx of transferGenerator()) {
+      console.log(tx)
+      console.log(tx.transaction)
+      if (tx.transaction) {
+        transactions.push({
+          to: tx.transaction.to,
+          data: tx.transaction.data,
+          value: tx.transaction.value ?? BigInt(0)
+        });
+      }
+    }
+
+    return transactions;
+  } catch (error) {
+    console.error("Error generating Wormhole transfer transactions:", error);
+    throw new Error(`Failed to generate Wormhole transfer transactions: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Generates a series of transactions required for a relayed Wormhole NTT transfer.
+ * 
+ * This function uses the Wormhole SDK to create all necessary transactions for transferring
+ * tokens across chains. It processes the generator pattern used by the Wormhole SDK's transfer
+ * method and converts the results into a format compatible with the DIMO transaction system.
+ *
+ * @param args - The parameters for the bridging operation
+ * @param signer - The account address that will sign the transactions
+ * @param destinationAddress - The recipient address on the destination chain
+ * @param environment - The environment to use (prod, dev, etc.). Defaults to "prod"
+ * @returns A Promise resolving to an array of Call objects representing the transactions
+ * @throws Error if there are issues generating the transfer transactions
+ */
+async function generateWormholeRelayedTransferTransactions(
   args: BridgeInitiateArgs,
   signer: UniversalAddress,
   destinationAddress: AccountAddress<any>,
@@ -319,8 +395,11 @@ async function generateWormholeTransferTransactions(
     // Process the generator to collect all transactions
     const transactions: Call[] = [];
 
+    // TODO Set the refund address, I think I will have to decode the data, change and encode again
     for await (const tx of transferGenerator()) {
-      if(tx.transaction) {
+      console.log(tx)
+      console.log(tx.transaction)
+      if (tx.transaction) {
         transactions.push({
           to: tx.transaction.to,
           data: tx.transaction.data,
