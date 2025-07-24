@@ -1,4 +1,5 @@
 import { type Hex } from "viem";
+import { TransactionDescription } from "ethers";
 import { Wormhole, VAA, Network, routes, amount, AccountAddress, toUniversal, UniversalAddress } from "@wormhole-foundation/sdk";
 import { NttExecutorRoute, nttExecutorRoute } from "@wormhole-foundation/sdk-route-ntt";
 import { KernelAccountClient } from "@zerodev/sdk";
@@ -28,7 +29,6 @@ import {
   WORMHOLE_NTT_CONTRACTS
 } from ":core/constants/wormholeMappings.js";
 import { NttWithExecutor } from "@wormhole-foundation/sdk-definitions-ntt";
-import { TransactionDescription } from "ethers";
 
 /**
  * Initiates a bridging operation for transferring tokens across different chains using Wormhole.
@@ -286,7 +286,6 @@ export async function checkNttTransferStatus(
  * This function uses the Wormhole SDK to create all necessary transactions for transferring
  * tokens across chains. It processes the generator pattern used by the Wormhole SDK's transfer
  * method and converts the results into a format compatible with the DIMO transaction system.
- * It also modifies the transfer transaction to set a custom refund address.
  *
  * @param args - The parameters for the bridging operation
  * @param signer - The account address that will sign the transactions
@@ -325,71 +324,13 @@ async function generateWormholeNonRelayedTransferTransactions(
     // Process the generator to collect all transactions
     const transactions: Call[] = [];
 
-    // Import ethers Interface for ABI decoding/encoding
-    const { Interface } = await import("ethers");
-
-    // Define the ABI for the transfer function
-    const transferAbi = [
-      "function transfer(uint256,uint16,bytes32,bytes32,bool,bytes)",
-    ];
-
-    // Create an interface for decoding/encoding
-    const iface = new Interface(transferAbi);
-
-    // Process each transaction from the generator
     for await (const tx of transferGenerator()) {
       if (tx.transaction) {
-        // If this is the transfer transaction (not the approval)
-        if (tx.description === "Ntt.transfer") {
-          try {
-            // Decode the transaction data
-            const decodedData = iface.parseTransaction({ data: tx.transaction.data }) as TransactionDescription;
-
-            // Get the original parameters
-            const amount = decodedData.args[0];
-            const recipientChain = decodedData.args[1];
-            const receiver = decodedData.args[2];
-            const shouldQueue = decodedData.args[4];
-            const transceiverInstructions = decodedData.args[5];
-
-            const refundAddress = toUniversal(
-              WORMHOLE_CHAIN_MAPPING[args.destinationChain],
-              REFUND_ADDRESS_MAPPING[args.destinationChain]
-            ).toUint8Array();
-
-            // Re-encode the transaction with the custom refund address
-            const newData = iface.encodeFunctionData("transfer", [
-              amount,
-              recipientChain,
-              receiver,
-              refundAddress, // Custom refund address
-              shouldQueue,
-              transceiverInstructions
-            ]) as Hex;
-
-            // Add the modified transaction
-            transactions.push({
-              to: tx.transaction.to,
-              data: newData,
-              value: tx.transaction.value ?? BigInt(0)
-            });
-          } catch (error) {
-            console.error("Error modifying transfer transaction:", error);
-            // If decoding fails, use the original transaction
-            transactions.push({
-              to: tx.transaction.to,
-              data: tx.transaction.data,
-              value: tx.transaction.value ?? BigInt(0)
-            });
-          }
-        } else {
-          // For non-transfer transactions (like approvals), use as-is
-          transactions.push({
-            to: tx.transaction.to,
-            data: tx.transaction.data,
-            value: tx.transaction.value ?? BigInt(0)
-          });
-        }
+        transactions.push({
+          to: tx.transaction.to,
+          data: tx.transaction.data,
+          value: tx.transaction.value ?? BigInt(0)
+        });
       }
     }
 
@@ -406,6 +347,7 @@ async function generateWormholeNonRelayedTransferTransactions(
  * This function uses the Wormhole SDK to create all necessary transactions for transferring
  * tokens across chains. It processes the generator pattern used by the Wormhole SDK's transfer
  * method and converts the results into a format compatible with the DIMO transaction system.
+ * It also modifies the transfer transaction to set a custom refund address.
  *
  * @param args - The parameters for the bridging operation
  * @param signer - The account address that will sign the transactions
