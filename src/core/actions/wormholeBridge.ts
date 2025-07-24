@@ -15,7 +15,6 @@ import { swapToExactPOL } from ":core/swap/swapAndWithdraw.js";
 import { ENVIRONMENT } from ":core/types/dimo.js";
 import type { Call } from ":core/types/common.js";
 import type { SupportedWormholeNetworks, SupportedRelayingWormholeNetworks, BridgeInitiateArgs, ChainRpcConfig } from ":core/types/wormhole.js";
-// import { DINC_ADDRESS } from ":core/constants/dimo.js";
 // import { APPROVE_TOKENS, NTT_TRANSFER } from ":core/constants/methods.js";
 // import { abiWormholeNttManager } from ":core/abis/index.js";
 import {
@@ -23,11 +22,13 @@ import {
   UNISWAP_ARGS_MAPPING,
 } from ":core/constants/mappings.js";
 import {
+  REFUND_ADDRESS_MAPPING,
   WORMHOLE_ENV_MAPPING,
   WORMHOLE_CHAIN_MAPPING,
   WORMHOLE_NTT_CONTRACTS
 } from ":core/constants/wormholeMappings.js";
 import { NttWithExecutor } from "@wormhole-foundation/sdk-definitions-ntt";
+import { TransactionDescription } from "ethers";
 
 /**
  * Initiates a bridging operation for transferring tokens across different chains using Wormhole.
@@ -161,6 +162,8 @@ export async function initiateBridging(
     // };
     // transactions.push(transferCall);
 
+    console.log(transactions)
+
     return await client.account!.encodeCalls(transactions);
   } catch (error) {
     console.error("Error in initiateBridging:", error);
@@ -283,6 +286,7 @@ export async function checkNttTransferStatus(
  * This function uses the Wormhole SDK to create all necessary transactions for transferring
  * tokens across chains. It processes the generator pattern used by the Wormhole SDK's transfer
  * method and converts the results into a format compatible with the DIMO transaction system.
+ * It also modifies the transfer transaction to set a custom refund address.
  *
  * @param args - The parameters for the bridging operation
  * @param signer - The account address that will sign the transactions
@@ -321,16 +325,71 @@ async function generateWormholeNonRelayedTransferTransactions(
     // Process the generator to collect all transactions
     const transactions: Call[] = [];
 
-    // TODO Set the refund address, I think I will have to decode the data, change and encode again
+    // Import ethers Interface for ABI decoding/encoding
+    const { Interface } = await import("ethers");
+
+    // Define the ABI for the transfer function
+    const transferAbi = [
+      "function transfer(uint256,uint16,bytes32,bytes32,bool,bytes)",
+    ];
+
+    // Create an interface for decoding/encoding
+    const iface = new Interface(transferAbi);
+
+    // Process each transaction from the generator
     for await (const tx of transferGenerator()) {
-      console.log(tx)
-      console.log(tx.transaction)
       if (tx.transaction) {
-        transactions.push({
-          to: tx.transaction.to,
-          data: tx.transaction.data,
-          value: tx.transaction.value ?? BigInt(0)
-        });
+        // If this is the transfer transaction (not the approval)
+        if (tx.description === "Ntt.transfer") {
+          try {
+            // Decode the transaction data
+            const decodedData = iface.parseTransaction({ data: tx.transaction.data }) as TransactionDescription;
+
+            // Get the original parameters
+            const amount = decodedData.args[0];
+            const recipientChain = decodedData.args[1];
+            const receiver = decodedData.args[2];
+            const shouldQueue = decodedData.args[4];
+            const transceiverInstructions = decodedData.args[5];
+
+            const refundAddress = toUniversal(
+              WORMHOLE_CHAIN_MAPPING[args.destinationChain],
+              REFUND_ADDRESS_MAPPING[args.destinationChain]
+            ).toUint8Array();
+
+            // Re-encode the transaction with the custom refund address
+            const newData = iface.encodeFunctionData("transfer", [
+              amount,
+              recipientChain,
+              receiver,
+              refundAddress, // Custom refund address
+              shouldQueue,
+              transceiverInstructions
+            ]) as Hex;
+
+            // Add the modified transaction
+            transactions.push({
+              to: tx.transaction.to,
+              data: newData,
+              value: tx.transaction.value ?? BigInt(0)
+            });
+          } catch (error) {
+            console.error("Error modifying transfer transaction:", error);
+            // If decoding fails, use the original transaction
+            transactions.push({
+              to: tx.transaction.to,
+              data: tx.transaction.data,
+              value: tx.transaction.value ?? BigInt(0)
+            });
+          }
+        } else {
+          // For non-transfer transactions (like approvals), use as-is
+          transactions.push({
+            to: tx.transaction.to,
+            data: tx.transaction.data,
+            value: tx.transaction.value ?? BigInt(0)
+          });
+        }
       }
     }
 
@@ -395,16 +454,82 @@ async function generateWormholeRelayedTransferTransactions(
     // Process the generator to collect all transactions
     const transactions: Call[] = [];
 
-    // TODO Set the refund address, I think I will have to decode the data, change and encode again
+    // Import ethers Interface for ABI decoding/encoding
+    const { Interface } = await import("ethers");
+
+    // Define the ABI for the transfer function
+    const transferAbi = [
+      "function transfer(address nttManager, uint256 amount, uint16 recipientChain, bytes32 recipientAddress, bytes32 refundAddress, bytes encodedInstructions, (uint256 value, address refundAddress, bytes signedQuote, bytes instructions) executorArgs, (uint16 dbps, address payee) feeArgs) external payable returns (uint64 msgId)",
+    ];
+
+    // Create an interface for decoding/encoding
+    const iface = new Interface(transferAbi);
+
+    // Process each transaction from the generator
     for await (const tx of transferGenerator()) {
-      console.log(tx)
-      console.log(tx.transaction)
       if (tx.transaction) {
-        transactions.push({
-          to: tx.transaction.to,
-          data: tx.transaction.data,
-          value: tx.transaction.value ?? BigInt(0)
-        });
+        // If this is the transfer transaction (not the approval)
+        if (tx.description === "NttWithExecutor.transfer") {
+          try {
+            // Decode the transaction data
+            const decodedData = iface.parseTransaction({ data: tx.transaction.data }) as TransactionDescription;
+
+            // Get the original parameters
+            const nttManager = decodedData.args[0];
+            const amount = decodedData.args[1];
+            const recipientChain = decodedData.args[2];
+            const recipientAddress = decodedData.args[3];
+            const encodedInstructions = decodedData.args[5];
+            const executorArgs = decodedData.args[6];
+            const feeARgs = decodedData.args[7];
+
+            const refundAddress = toUniversal(
+              WORMHOLE_CHAIN_MAPPING[args.destinationChain],
+              REFUND_ADDRESS_MAPPING[args.destinationChain]
+            ).toUint8Array();
+
+            const newExecutorArgs = [
+              executorArgs[0],
+              REFUND_ADDRESS_MAPPING[args.sourceChain],
+              executorArgs[2],
+              executorArgs[3] 
+            ];
+
+            // Re-encode the transaction with the custom refund address
+            const newData = iface.encodeFunctionData("transfer", [
+              nttManager,
+              amount,
+              recipientChain,
+              recipientAddress,
+              refundAddress, // Custom refund address
+              encodedInstructions,
+              newExecutorArgs,
+              feeARgs
+            ]) as Hex;
+
+            // Add the modified transaction
+            transactions.push({
+              to: tx.transaction.to,
+              data: newData,
+              value: tx.transaction.value ?? BigInt(0)
+            });
+          } catch (error) {
+            console.error("Error modifying transfer transaction:", error);
+            // If decoding fails, use the original transaction
+            transactions.push({
+              to: tx.transaction.to,
+              data: tx.transaction.data,
+              value: tx.transaction.value ?? BigInt(0)
+            });
+          }
+        } else {
+          // For non-transfer transactions (like approvals), use as-is
+          transactions.push({
+            to: tx.transaction.to,
+            data: tx.transaction.data,
+            value: tx.transaction.value ?? BigInt(0)
+          });
+        }
       }
     }
 

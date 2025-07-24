@@ -1,7 +1,13 @@
-import { NttContracts, SupportedWormholeNetworks } from ":core/types/wormhole.js";
 import { Network, Chain } from "@wormhole-foundation/sdk";
 
 import * as contractAddrs from ":core/constants/contractAddrs.js";
+import { NttContracts, SupportedWormholeNetworks } from ":core/types/wormhole.js";
+import {
+  REFUND_EVM_ADDRESS_PROD,
+  REFUND_EVM_ADDRESS_DEV,
+  REFUND_SOLANA_ADDRESS_PROD,
+  REFUND_SOLANA_ADDRESS_DEV
+} from ":core/constants/dimo.js";
 
 export const WORMHOLE_ENV_MAPPING = new Map<string, Network>([
   ["production", "Mainnet"],
@@ -13,6 +19,23 @@ export const WORMHOLE_ENV_MAPPING = new Map<string, Network>([
   ["development", "Testnet"],
   ["dev", "Testnet"],
 ]);
+
+// Mapping of networks to their refund addresses based on environment
+export const REFUND_ADDRESS_MAPPING: Record<SupportedWormholeNetworks, string> = {
+  Ethereum: REFUND_EVM_ADDRESS_PROD,
+  Polygon: REFUND_EVM_ADDRESS_PROD,
+  Base: REFUND_EVM_ADDRESS_PROD,
+  Solana: REFUND_SOLANA_ADDRESS_PROD,
+  Sepolia: REFUND_EVM_ADDRESS_DEV,
+  BaseSepolia: REFUND_EVM_ADDRESS_DEV,
+  PolygonSepolia: REFUND_EVM_ADDRESS_DEV,
+  Amoy: REFUND_EVM_ADDRESS_DEV,
+  SolanaTestnet: REFUND_SOLANA_ADDRESS_DEV,
+  EthereumTest: REFUND_EVM_ADDRESS_DEV,
+  PolygonTest: REFUND_EVM_ADDRESS_DEV,
+  BaseTest: REFUND_EVM_ADDRESS_DEV,
+  SolanaTest: REFUND_SOLANA_ADDRESS_DEV,
+};
 
 export const WORMHOLE_CHAIN_MAPPING: Record<SupportedWormholeNetworks, Chain> = {
   Ethereum: "Ethereum",
