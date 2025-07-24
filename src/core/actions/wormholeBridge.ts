@@ -10,7 +10,7 @@ import "@wormhole-foundation/sdk-evm-ntt";
 import "@wormhole-foundation/sdk-solana-ntt";
 
 // import { addressToBytes32 } from ":core/utils/utils.js";
-import { convertToExecutorConfig } from ":core/utils/wormhole.js";
+import { convertToExecutorConfig } from ":core/utils/wormhole/helpers.js";
 import { getDIMOPriceFromUniswapV3 } from ":core/utils/priceOracle.js";
 import { swapToExactPOL } from ":core/swap/swapAndWithdraw.js";
 import { ENVIRONMENT } from ":core/types/dimo.js";
@@ -261,7 +261,7 @@ export async function checkNttTransferStatus(
  * method and converts the results into a format compatible with the DIMO transaction system.
  *
  * @param args - The parameters for the bridging operation
- * @param signer - The account address that will sign the transactions
+ * @param signer - The universal address of the account that will sign the transactions
  * @param destinationAddress - The recipient address on the destination chain
  * @param environment - The environment to use (prod, dev, etc.). Defaults to "prod"
  * @returns A Promise resolving to an array of Call objects representing the transactions
@@ -318,16 +318,18 @@ async function generateWormholeNonRelayedTransferTransactions(
  * Generates a series of transactions required for a relayed Wormhole NTT transfer.
  * 
  * This function uses the Wormhole SDK to create all necessary transactions for transferring
- * tokens across chains. It processes the generator pattern used by the Wormhole SDK's transfer
- * method and converts the results into a format compatible with the DIMO transaction system.
- * It also modifies the transfer transaction to set a custom refund address.
+ * tokens across chains with automatic relaying. It processes the generator pattern used by 
+ * the Wormhole SDK's transfer method, modifies the transfer transaction to set custom refund 
+ * addresses, and adjusts the transaction value based on the provided parameters.
  *
- * @param args - The parameters for the bridging operation
- * @param signer - The account address that will sign the transactions
+ * @param args - The parameters for the bridging operation including source/destination chains and amount
+ * @param signer - The universal address of the account that will sign the transactions
  * @param destinationAddress - The recipient address on the destination chain
  * @param environment - The environment to use (prod, dev, etc.). Defaults to "prod"
- * @returns A Promise resolving to an array of Call objects representing the transactions
- * @throws Error if there are issues generating the transfer transactions
+ * @param msgValue - Optional pre-calculated value to send with the transaction. If null, will be calculated based on quote
+ * @param priceIncreasePercentage - Percentage to increase the quoted delivery price by to avoid underfunding. Defaults to 1%. Must be between 0 and 100.
+ * @returns A Promise resolving to an array of Call objects representing the transactions to be executed
+ * @throws Error if there are issues generating or modifying the transfer transactions
  */
 async function generateWormholeRelayedTransferTransactions(
   args: BridgeInitiateArgs,
@@ -425,6 +427,10 @@ async function generateWormholeRelayedTransferTransactions(
             ]) as Hex;
 
             if (!msgValue) {
+              if (priceIncreasePercentage < 0 || priceIncreasePercentage > 100) {
+                throw new Error("Price increase percentage must be between 0 and 100");
+              }
+
               msgValue = (tx.transaction.value * BigInt(100 + priceIncreasePercentage)) / BigInt(100);
             }
 
