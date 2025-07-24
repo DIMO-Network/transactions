@@ -74,49 +74,53 @@ export async function initiateBridging(
       throw new Error("Client account address is not available");
     }
 
-    let transferCallValue = BigInt(0);
-
     if (args.isRelayed) {
-      const uniswapArgs = UNISWAP_ARGS_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD];
+      let transferSendValue = null;
 
-      // Calculate the delivery price in native tokens
-      transferCallValue = await quoteDeliveryPrice(
-        args.sourceChain as SupportedRelayingWormholeNetworks,
-        args.destinationChain,
-        environment,
-        args.rpcConfig,
-        args.amount,
-        args.priceIncreasePercentage
-      );
+      if (args.payWithDimo) {
+        const uniswapArgs = UNISWAP_ARGS_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD];
 
-      const mappedSourceChain = WORMHOLE_CHAIN_MAPPING[args.sourceChain];
-      const rpcUrl = args.rpcConfig[mappedSourceChain as keyof ChainRpcConfig]?.rpc;
-      if (!rpcUrl) {
-        throw new Error(`No RPC URL available for ${mappedSourceChain}`);
+        // Calculate the delivery price in native tokens
+        transferSendValue = await quoteDeliveryPrice(
+          args.sourceChain as SupportedRelayingWormholeNetworks,
+          args.destinationChain,
+          environment,
+          args.rpcConfig,
+          args.amount,
+          args.priceIncreasePercentage ?? 0
+        );
+
+        const mappedSourceChain = WORMHOLE_CHAIN_MAPPING[args.sourceChain];
+        const rpcUrl = args.rpcConfig[mappedSourceChain as keyof ChainRpcConfig]?.rpc;
+        if (!rpcUrl) {
+          throw new Error(`No RPC URL available for ${mappedSourceChain}`);
+        }
+
+        // Swap DIMO to exact POL amount needed for the delivery fee
+        const swapTransactions = await swapToExactPOL(
+          uniswapArgs.dimoToken,
+          transferSendValue,
+          uniswapArgs.poolFee,
+          {
+            recipient: client.account?.address as Hex,
+            slippageTolerance: new Percent(args.swapOptions?.slippageTolerance || 100, 10_000), // Default 1% slippage tolerance
+            deadline: args.swapOptions?.deadline || Math.floor(Date.now() / 1000) + 900, // Default 15 minutes
+          },
+          rpcUrl,
+          true // Include approval for max uint256 (will reset to 0 after)
+        );
+
+        // Add swap transactions to the beginning of the transaction array
+        transactions.push(...swapTransactions);
       }
-
-      // Swap DIMO to exact POL amount needed for the delivery fee
-      const swapTransactions = await swapToExactPOL(
-        uniswapArgs.dimoToken,
-        transferCallValue,
-        uniswapArgs.poolFee,
-        {
-          recipient: client.account?.address as Hex,
-          slippageTolerance: new Percent(args.swapOptions?.slippageTolerance || 100, 10_000), // Default 1% slippage tolerance
-          deadline: args.swapOptions?.deadline || Math.floor(Date.now() / 1000) + 900, // Default 15 minutes
-        },
-        rpcUrl,
-        true // Include approval for max uint256 (will reset to 0 after)
-      );
-
-      // Add swap transactions to the beginning of the transaction array
-      transactions.push(...swapTransactions);
 
       const wormholeTransferTxs = await generateWormholeRelayedTransferTransactions(
         args,
         toUniversal(WORMHOLE_CHAIN_MAPPING[args.sourceChain], client.account.address),
         Wormhole.chainAddress(WORMHOLE_CHAIN_MAPPING[args.destinationChain], args.recipientAddress),
-        environment
+        environment,
+        transferSendValue,
+        args.priceIncreasePercentage
       )
 
       transactions.push(...wormholeTransferTxs);
@@ -130,37 +134,6 @@ export async function initiateBridging(
 
       transactions.push(...wormholeTransferTxs);
     }
-
-    // Add token approval for the bridge
-    // const approveCall = {
-    //   to: contracts[ContractType.DIMO_TOKEN].address,
-    //   value: BigInt(0),
-    //   data: encodeFunctionData({
-    //     abi: contracts[ContractType.DIMO_TOKEN].abi,
-    //     functionName: APPROVE_TOKENS,
-    //     args: [sourceNttManagerAddress, args.amount],
-    //   }),
-    // };
-    // transactions.push(approveCall);
-
-    // // Add the bridge transfer call
-    // const transferCall = {
-    //   to: sourceNttManagerAddress as Hex,
-    //   value: transferCallValue,
-    //   data: encodeFunctionData({
-    //     abi: abiWormholeNttManager,
-    //     functionName: NTT_TRANSFER,
-    //     args: [
-    //       args.amount,
-    //       chainToChainId(WORMHOLE_CHAIN_MAPPING[args.destinationChain]),
-    //       addressToBytes32(args.recipientAddress),
-    //       addressToBytes32(DINC_ADDRESS), // Refund excess fees
-    //       false,
-    //       transceiverInstructions,
-    //     ],
-    //   }),
-    // };
-    // transactions.push(transferCall);
 
     console.log(transactions)
 
@@ -360,7 +333,9 @@ async function generateWormholeRelayedTransferTransactions(
   args: BridgeInitiateArgs,
   signer: UniversalAddress,
   destinationAddress: AccountAddress<any>,
-  environment: string = "prod"
+  environment: string = "prod",
+  msgValue: bigint | null = null,
+  priceIncreasePercentage: number = 1
 ): Promise<Call[]> {
   try {
     const mappedSourceChain = WORMHOLE_CHAIN_MAPPING[args.sourceChain];
@@ -434,7 +409,7 @@ async function generateWormholeRelayedTransferTransactions(
               executorArgs[0],
               REFUND_ADDRESS_MAPPING[args.sourceChain],
               executorArgs[2],
-              executorArgs[3] 
+              executorArgs[3]
             ];
 
             // Re-encode the transaction with the custom refund address
@@ -449,11 +424,15 @@ async function generateWormholeRelayedTransferTransactions(
               feeARgs
             ]) as Hex;
 
+            if (!msgValue) {
+              msgValue = (tx.transaction.value * BigInt(100 + priceIncreasePercentage)) / BigInt(100);
+            }
+
             // Add the modified transaction
             transactions.push({
               to: tx.transaction.to,
               data: newData,
-              value: tx.transaction.value ?? BigInt(0)
+              value: msgValue ?? tx.transaction.value ?? BigInt(0)
             });
           } catch (error) {
             console.error("Error modifying transfer transaction:", error);

@@ -58,6 +58,7 @@ type NonRelayedBridgeArgs = BaseBridgeInitiateArgs & {
 type RelayedBridgeArgs = BaseBridgeInitiateArgs & {
   isRelayed: true;
   rpcConfig: ChainRpcConfig; // Required for relayed transfers
+  payWithDimo: boolean;
 };
 
 // Combined type
