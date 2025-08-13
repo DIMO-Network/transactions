@@ -68,7 +68,6 @@ export async function initiateBridging(
       throw new Error("Development environment is not supported yet for bridging operations");
     }
 
-    // const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
     const sourceNttManagerAddress = WORMHOLE_NTT_CONTRACTS[args.sourceChain]?.manager;
     const transactions: Array<Call> = [];
 
@@ -169,12 +168,21 @@ export async function quoteDeliveryPrice(
   destinationChain: SupportedWormholeNetworks,
   environment: string = "prod",
   rpcConfig: ChainRpcConfig,
-  amountTokens: bigint,
+  amountTokens: bigint = BigInt(1e18),
   priceIncreasePercentage: number = 1,
   returnInDIMO: boolean = false
 ): Promise<bigint> {
   if (priceIncreasePercentage < 0 || priceIncreasePercentage > 100) {
     throw new Error("Price increase percentage must be between 0 and 100");
+  }
+
+  // Apply a minimum 5% increase for Solana destination chains
+  let effectivePriceIncreasePercentage = priceIncreasePercentage;
+  if (["Solana", "SolanaTestnet", "SolanaTest"].includes(destinationChain)) {
+    // Only apply the 5% minimum if the user's specified percentage is less than 5%
+    if (priceIncreasePercentage < 5) {
+      effectivePriceIncreasePercentage = 5;
+    }
   }
 
   const mappedSourceChain = WORMHOLE_CHAIN_MAPPING[sourceChain];
@@ -187,8 +195,8 @@ export async function quoteDeliveryPrice(
     amountTokens
   )
 
-  // Increase price by the specified percentage to avoid underfunding
-  const price = (routeQuote.estimatedCost * BigInt(100 + priceIncreasePercentage)) / BigInt(100);
+  // Increase price by the effective percentage to avoid underfunding
+  const price = (routeQuote.estimatedCost * BigInt(100 + effectivePriceIncreasePercentage)) / BigInt(100);
 
   if (returnInDIMO) {
     // Check if source chain is Polygon, as Uniswap price queries are only supported on Polygon
