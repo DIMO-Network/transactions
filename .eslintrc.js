@@ -1,6 +1,5 @@
 module.exports = {
   root: true,
-  extends: ["preact"],
   settings: {
     react: {
       pragma: "h",
