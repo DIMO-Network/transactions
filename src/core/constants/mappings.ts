@@ -53,6 +53,7 @@ export const WORMHOLE_CHAIN_MAPPING: Record<SupportedWormholeNetworks, "Ethereum
   Ethereum: "Ethereum",
   Polygon: "Polygon",
   Base: "Base",
+  Solana: "Solana",
   EthereumTest: "Ethereum",
   PolygonTest: "Polygon",
   BaseTest: "Base",
@@ -236,6 +237,11 @@ export const WORMHOLE_NTT_CONTRACTS: NttContracts = {
     token: contractAddrs.BASE_DIMO_TOKEN_ADDRESS,
     manager: contractAddrs.BASE_WORMHOLE_NTT_MANAGER_ADDRESS,
     transceiver: { wormhole: contractAddrs.BASE_WORMHOLE_TRANSCEIVER_ADDRESS },
+  },
+  Solana: {
+    token: contractAddrs.SOLANA_DIMO_TOKEN_ADDRESS,
+    manager: contractAddrs.SOLANA_WORMHOLE_NTT_MANAGER_ADDRESS,
+    transceiver: { wormhole: contractAddrs.SOLANA_WORMHOLE_TRANSCEIVER_ADDRESS },
   },
   EthereumTest: {
     token: contractAddrs.ETHEREUM_TEST_DIMO_TOKEN_ADDRESS,
