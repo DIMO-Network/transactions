@@ -4,8 +4,7 @@ export type MintVehicleWithDeviceDefinition = {
   manufacturerNode: BigInt;
   owner: `0x${string}`;
   deviceDefinitionID: string;
-  attributeInfo: { attribute: string; info: string }[];
-  sacdInput: { grantee: `0x${string}`; permissions: BigInt; expiration: BigInt; source: string };
+  attributeInfo: { attribute: string; info: string }[];  
 };
 
 export type VehiclePermissionDescription = {
