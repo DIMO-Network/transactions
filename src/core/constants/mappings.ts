@@ -3,9 +3,7 @@ import { Chain, polygon, polygonAmoy } from "viem/chains";
 import { Token } from "@uniswap/sdk-core";
 
 import { API_BY_ENV, AllChainInfos, ContractType, DIMO_APIs, ENVIRONMENT } from ":core/types/dimo.js";
-import { NttContracts, SupportedWormholeNetworks } from ":core/types/wormhole.js";
 import { UniswapMappingArgs } from ":core/types/uniswap.js";
-import { Network } from "@wormhole-foundation/sdk";
 import {
   abiCredits,
   abiForwarder,
@@ -37,28 +35,6 @@ export const ENV_MAPPING = new Map<string, ENVIRONMENT>([
   ["development", ENVIRONMENT.DEV],
   ["dev", ENVIRONMENT.DEV],
 ]);
-
-export const WORMHOLE_ENV_MAPPING = new Map<string, Network>([
-  ["production", "Mainnet"],
-  ["prod", "Mainnet"],
-
-  ["production_test", "Mainnet"],
-  ["prod_test", "Mainnet"],
-
-  ["development", "Testnet"],
-  ["dev", "Testnet"],
-]);
-
-export const WORMHOLE_CHAIN_MAPPING: Record<SupportedWormholeNetworks, "Ethereum" | "Polygon" | "Base" | "Solana"> = {
-  Ethereum: "Ethereum",
-  Polygon: "Polygon",
-  Base: "Base",
-  Solana: "Solana",
-  EthereumTest: "Ethereum",
-  PolygonTest: "Polygon",
-  BaseTest: "Base",
-  SolanaTest: "Solana",
-};
 
 export const ENV_TO_API_MAPPING: API_BY_ENV = {
   [ENVIRONMENT.PROD]: {
@@ -220,54 +196,6 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
       },
     },
   },
-};
-
-export const WORMHOLE_NTT_CONTRACTS: NttContracts = {
-  Ethereum: {
-    token: contractAddrs.ETHEREUM_DIMO_TOKEN_ADDRESS,
-    manager: contractAddrs.ETHEREUM_WORMHOLE_NTT_MANAGER_ADDRESS,
-    transceiver: { wormhole: contractAddrs.ETHEREUM_WORMHOLE_TRANSCEIVER_ADDRESS },
-  },
-  Polygon: {
-    token: contractAddrs.POLYGON_DIMO_TOKEN_ADDRESS,
-    manager: contractAddrs.POLYGON_WORMHOLE_NTT_MANAGER_ADDRESS,
-    transceiver: { wormhole: contractAddrs.POLYGON_WORMHOLE_TRANSCEIVER_ADDRESS },
-  },
-  Base: {
-    token: contractAddrs.BASE_DIMO_TOKEN_ADDRESS,
-    manager: contractAddrs.BASE_WORMHOLE_NTT_MANAGER_ADDRESS,
-    transceiver: { wormhole: contractAddrs.BASE_WORMHOLE_TRANSCEIVER_ADDRESS },
-  },
-  Solana: {
-    token: contractAddrs.SOLANA_DIMO_TOKEN_ADDRESS,
-    manager: contractAddrs.SOLANA_WORMHOLE_NTT_MANAGER_ADDRESS,
-    transceiver: { wormhole: contractAddrs.SOLANA_WORMHOLE_TRANSCEIVER_ADDRESS },
-  },
-  EthereumTest: {
-    token: contractAddrs.ETHEREUM_TEST_DIMO_TOKEN_ADDRESS,
-    manager: contractAddrs.ETHEREUM_TEST_WORMHOLE_NTT_MANAGER_ADDRESS,
-    transceiver: { wormhole: contractAddrs.ETHEREUM_TEST_WORMHOLE_TRANSCEIVER_ADDRESS },
-  },
-  PolygonTest: {
-    token: contractAddrs.POLYGON_TEST_DIMO_TOKEN_ADDRESS,
-    manager: contractAddrs.POLYGON_TEST_WORMHOLE_NTT_MANAGER_ADDRESS,
-    transceiver: { wormhole: contractAddrs.POLYGON_TEST_WORMHOLE_TRANSCEIVER_ADDRESS },
-  },
-  BaseTest: {
-    token: contractAddrs.BASE_TEST_DIMO_TOKEN_ADDRESS,
-    manager: contractAddrs.BASE_TEST_WORMHOLE_NTT_MANAGER_ADDRESS,
-    transceiver: { wormhole: contractAddrs.BASE_TEST_WORMHOLE_TRANSCEIVER_ADDRESS },
-  },
-  SolanaTest: {
-    token: contractAddrs.SOLANA_TEST_DIMO_TOKEN_ADDRESS,
-    manager: "",
-    transceiver: { wormhole: "" },
-  },
-};
-
-export const WORMHOLE_TRANSCEIVER_INSTRUCTIONS = {
-  relayed: "0x01000100",
-  notRelayed: "0x01000101",
 };
 
 export const UNISWAP_ARGS_MAPPING: UniswapMappingArgs = {
