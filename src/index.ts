@@ -47,6 +47,5 @@ export {
 } from "./core/utils/utils.js";
 export { KernelSigner } from "./KernelSigner.js";
 export { AccountSigner } from "./AccountSigner.js";
-export type { FeeBoostConfig } from "./core/types/dimo.js";
 export { initiateBridging, quoteDeliveryPrice, checkNttTransferStatus } from "./core/actions/wormholeBridge.js";
 export type { BridgeInitiateArgs, ChainRpcConfig } from "./core/types/wormhole.js";

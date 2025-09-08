@@ -1,6 +1,6 @@
 import { pad, isAddress } from "viem";
 import { MAX_PERMISSION_INDEX, Permission, VehiclePermissionDescription } from ":core/types/args.js";
-import { AccountConfig, KernelConfig, OptionalArgs, _accountConfig, _kernelConfig } from ":core/types/dimo.js";
+import { AccountConfig, KernelConfig, _accountConfig, _kernelConfig } from ":core/types/dimo.js";
 import { KERNEL_V3_1, getEntryPoint } from "@zerodev/sdk/constants";
 
 export const newKernelConfig = (args: KernelConfig): KernelConfig => {
@@ -49,14 +49,6 @@ export const newKernelConfig = (args: KernelConfig): KernelConfig => {
     args.defaultPermissions = defaultPerms;
   }
 
-  if (args.feeBoostConfig == undefined) {
-    const feeBoostConfig = {
-      maxFeePerGasPercent: 0,
-      maxPriorityFeePerGasPercent: 0,
-    };
-    args.feeBoostConfig = feeBoostConfig;
-  }
-
   return {
     rpcUrl: args.rpcUrl,
     bundlerUrl: args.bundlerUrl,
@@ -71,8 +63,7 @@ export const newKernelConfig = (args: KernelConfig): KernelConfig => {
     useWalletSession: args.useWalletSession,
     sessionTimeoutSeconds: args.sessionTimeoutSeconds,
     usePrivateKey: args.usePrivateKey,
-    defaultPermissions: args.defaultPermissions,
-    feeBoostConfig: args.feeBoostConfig,
+    defaultPermissions: args.defaultPermissions
   };
 };
 
@@ -94,19 +85,6 @@ export const newAccountConfig = (args: AccountConfig): _accountConfig => {
     account: args.account,
     environment: args.environment,
   };
-};
-
-export const unpackOptionalArgs = (optionalArgs?: OptionalArgs): OptionalArgs => {
-  if (optionalArgs == undefined) {
-    return {
-      feeBoostConfig: {
-        maxFeePerGasPercent: 0,
-        maxPriorityFeePerGasPercent: 0,
-      },
-    };
-  }
-
-  return optionalArgs;
 };
 
 export const getPermissionsValue = (permissions: Permission[]): bigint => {

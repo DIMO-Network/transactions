@@ -23,7 +23,7 @@ export function mintVehicleCallData(
   return encodeFunctionData({
     abi: contracts[ContractType.DIMO_REGISTRY].abi,
     functionName: MINT_VEHICLE_WITH_DEVICE_DEFINITION,
-    args: [args.manufacturerNode, args.owner, args.deviceDefinitionID, args.attributeInfo, args.sacdInput],
+    args: [args.manufacturerNode, args.owner, args.deviceDefinitionID, args.attributeInfo],
   });
 }
 
@@ -40,7 +40,7 @@ export const mintVehicleWithDeviceDefinition = async (
       data: encodeFunctionData({
         abi: contracts[ContractType.DIMO_REGISTRY].abi,
         functionName: MINT_VEHICLE_WITH_DEVICE_DEFINITION,
-        args: [args.manufacturerNode, args.owner, args.deviceDefinitionID, args.attributeInfo, args.sacdInput],
+        args: [args.manufacturerNode, args.owner, args.deviceDefinitionID, args.attributeInfo],
       }),
     },
   ]);
@@ -59,7 +59,7 @@ export const mintVehicleWithDeviceDefinitionBatch = async (
       data: encodeFunctionData({
         abi: contracts[ContractType.DIMO_REGISTRY].abi,
         functionName: MINT_VEHICLE_WITH_DEVICE_DEFINITION,
-        args: [arg.manufacturerNode, arg.owner, arg.deviceDefinitionID, arg.attributeInfo, arg.sacdInput],
+        args: [arg.manufacturerNode, arg.owner, arg.deviceDefinitionID, arg.attributeInfo],
       }),
     };
   });
@@ -79,7 +79,7 @@ export const mintVehicleWithDeviceDefinitionFromAccount = async (
     address: contracts[ContractType.DIMO_REGISTRY].address,
     abi: contracts[ContractType.DIMO_REGISTRY].abi,
     functionName: MINT_VEHICLE_WITH_DEVICE_DEFINITION,
-    args: [args.manufacturerNode, args.owner, args.deviceDefinitionID, args.attributeInfo, args.sacdInput],
+    args: [args.manufacturerNode, args.owner, args.deviceDefinitionID, args.attributeInfo],
     account: walletClient.account,
   });
 
