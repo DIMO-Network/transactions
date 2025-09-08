@@ -64,6 +64,12 @@ export type PairAftermarketDevice = {
   aftermarketDeviceNode: BigInt;
 };
 
+export type PairAftermarketDeviceWithAdSig = {
+  vehicleNode: BigInt;
+  aftermarketDeviceNode: BigInt;
+  aftermarketDeviceSig: `0x${string}`;
+};
+
 export type UnPairAftermarketDevice = {
   vehicleNode: BigInt;
   aftermarketDeviceNode: BigInt;

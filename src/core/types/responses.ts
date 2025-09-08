@@ -13,16 +13,14 @@ export type TypeHashResponse = {
       version: string;
       chainId: number;
       verifyingContract: `0x${string}`;
-    };
-    types: {
-      ClaimAftermarketDeviceSign: {
-        name: string;
-        type: string;
-      }[];
-    };
-    message: {
-      aftermarketDeviceNode: bigint;
-      owner: `0x${string}`;
-    };
+    },
+    types: Record<
+      string,
+      {
+        name: string,
+        type: string
+      }[]
+    >,
+    message: Record<string, bigint | `0x${string}`>
   };
 };

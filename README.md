@@ -114,6 +114,7 @@ A few key terms to keep in mind:
 - sendDIMOTokens
 - claimAftermarketDevice
 - pairAftermarketDevice
+- pairAftermarketDeviceWithAdSig
 - claimAndPairAftermarketDevice
 - burnVehicle
 - transferVehicleAndAftermarketDevices
