@@ -4,6 +4,7 @@ export const TRANSFER_VEHICLE_AND_AFTERMARKET_DEVICE_IDS = "transferVehicleAndAf
 export const CLAIM_AFTERMARKET_DEVICE = "claimAftermarketDevice";
 export const UNPAIR_AFTERMARKET_DEVICE = "unpairAftermarketDevice";
 export const PAIR_AFTERMARKET_DEVICE = "pairAftermarketDevice";
+export const PAIR_AFTERMARKET_DEVICE_WITH_AD_SIG = "pairAftermarketDeviceWithAdSig";
 export const SET_PERMISSIONS_SACD = "setPermissions";
 export const SEND_DIMO_TOKENS = "transfer";
 export const APPROVE_TOKENS = "approve";

@@ -37,6 +37,7 @@ import {
   DetachVehicle,
   MintVehicleWithDeviceDefinition,
   PairAftermarketDevice,
+  PairAftermarketDeviceWithAdSig,
   PermissionsSACDTemplateInputs,
   SendDIMOTokens,
   SetVehiclePermissions,
@@ -52,7 +53,7 @@ import type { BridgeInitiateArgs } from ":core/types/wormhole.js";
 import { claimAftermarketDevice, claimAftermarketDeviceTypeHash } from ":core/actions/claimAftermarketDevice.js";
 import { TypeHashResponse } from ":core/types/responses.js";
 import { sendDIMOTokens } from ":core/actions/sendDIMOTokens.js";
-import { pairAftermarketDevice } from ":core/actions/pairAftermarketDevice.js";
+import { pairAftermarketDevice, pairAftermarketDeviceTypeHash, pairAftermarketDeviceWithAdSig } from ":core/actions/pairAftermarketDevice.js";
 import { TurnkeyClient } from "@turnkey/http";
 import { polygon } from "viem/chains";
 import { burnVehicle, burnVehicleBatch } from ":core/actions/burnVehicle.js";
@@ -667,6 +668,10 @@ export class KernelSigner {
     } as TransactionReturnType;
   }
 
+  public pairAftermarketDeviceTypeHash(aftermarketDeviceNode: bigint, vehicleNode: bigint): TypeHashResponse {
+    return pairAftermarketDeviceTypeHash(aftermarketDeviceNode, vehicleNode, this.config.environment);
+  }
+
   public async pairAftermarketDevice(
     args: PairAftermarketDevice,
     waitForReceipt: boolean = true,
@@ -674,6 +679,27 @@ export class KernelSigner {
     const client = await this.getActiveClient();
 
     const pairADCallData = await pairAftermarketDevice(args, client, this.config.environment);
+    const userOpHash = await this._sendUserOperation(client, pairADCallData);
+    if (waitForReceipt) {
+      const client = await this.getActiveClient();
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
+      });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    } as TransactionReturnType;
+  }
+
+  public async pairAftermarketDeviceWithAdSig(
+    args: PairAftermarketDeviceWithAdSig,
+    waitForReceipt: boolean = true,
+  ): Promise<TransactionReturnType> {
+    const client = await this.getActiveClient();
+
+    const pairADCallData = await pairAftermarketDeviceWithAdSig(args, client, this.config.environment);
     const userOpHash = await this._sendUserOperation(client, pairADCallData);
     if (waitForReceipt) {
       const client = await this.getActiveClient();
@@ -1070,7 +1096,7 @@ export class KernelSigner {
     const template = await generatePermissionsSACDTemplate(args);
     const templateStr = JSON.stringify(template);
     const signature = await this.signChallenge(templateStr);
-   template.signature = signature;
+    template.signature = signature;
     return template;
   }
 

@@ -1488,6 +1488,29 @@ export const abiRegistry: Abi = [
   {
     inputs: [
       {
+        internalType: "uint256",
+        name: "aftermarketDeviceNode",
+        type: "uint256"
+      },
+      {
+        internalType: "uint256",
+        name: "vehicleNode",
+        type: "uint256"
+      },
+      {
+        internalType: "bytes",
+        name: "aftermarketDeviceSig",
+        type: "bytes"
+      }
+    ],
+    name: "pairAftermarketDeviceWithAdSig",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
+  {
+    inputs: [
+      {
         internalType: "uint256[]",
         name: "aftermarketDeviceNodeList",
         type: "uint256[]",

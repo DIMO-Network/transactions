@@ -36,7 +36,13 @@ export {
   claimAftermarketDevice,
   claimAftermarketDeviceTypeHash,
 } from "./core/actions/claimAftermarketDevice.js";
-export { pairAftermarketDeviceCallData, pairAftermarketDevice } from "./core/actions/pairAftermarketDevice.js";
+export {
+  pairAftermarketDeviceCallData,
+  pairAftermarketDevice,
+  pairAftermarketDeviceTypeHash,
+  pairAftermarketDeviceWithAdSigCallData,
+  pairAftermarketDeviceWithAdSig
+} from "./core/actions/pairAftermarketDevice.js";
 export { unpairAftermarketDeviceCallData, unpairAftermarketDevice } from "./core/actions/unpairAftermarketDevice.js";
 export {
   newAccountConfig,
