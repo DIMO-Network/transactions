@@ -6,8 +6,6 @@ import { KernelAccountClient } from "@zerodev/sdk";
 import { Percent } from "@uniswap/sdk-core";
 import evm from "@wormhole-foundation/sdk/platforms/evm";
 import solana from "@wormhole-foundation/sdk/platforms/solana";
-import "@wormhole-foundation/sdk-evm-ntt";
-import "@wormhole-foundation/sdk-solana-ntt";
 
 import { WormholeScanAPI } from ':core/utils/wormhole/api-client.js';
 import { convertToExecutorConfig, getOperationStatus, isWormholeErrorResponse } from ":core/utils/wormhole/helpers.js";

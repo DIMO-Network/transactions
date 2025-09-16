@@ -179,3 +179,7 @@ npm pack
 ```bash
 npm publish
 ```
+
+### Testing before publishing
+
+[yalc](https://www.npmjs.com/package/yalc) is a better and recommended package to test the sdk integration in other projects instead of `npm link`

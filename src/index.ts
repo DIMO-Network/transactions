@@ -53,5 +53,18 @@ export {
 } from "./core/utils/utils.js";
 export { KernelSigner } from "./KernelSigner.js";
 export { AccountSigner } from "./AccountSigner.js";
+
+import { registerProtocol } from "@wormhole-foundation/sdk";
+import { EvmNtt, EvmNttWithExecutor } from "@wormhole-foundation/sdk-evm-ntt";
+import { SolanaNtt, SolanaNttWithExecutor } from "@wormhole-foundation/sdk-solana-ntt";
+import { _platform as _evmPlatform } from "@wormhole-foundation/sdk-evm";
+import { _platform as _solanaPlatform} from "@wormhole-foundation/sdk-solana";
+
+// Registers the Native Token Transfer (NTT) protocol for EVM and Solana platforms
+registerProtocol(_evmPlatform, "Ntt", EvmNtt);
+registerProtocol(_evmPlatform, "NttWithExecutor", EvmNttWithExecutor);
+registerProtocol(_solanaPlatform, "Ntt", SolanaNtt);
+registerProtocol(_solanaPlatform, "NttWithExecutor", SolanaNttWithExecutor);
+
 export { initiateBridging, quoteDeliveryPrice, checkNttTransferStatus } from "./core/actions/wormholeBridge.js";
 export type { BridgeInitiateArgs, ChainRpcConfig } from "./core/types/wormhole.js";
