@@ -78,13 +78,13 @@ export async function initiateBridging(
     }
 
     if (args.isRelayed) {
-      let transferSendValue = null;
+      let routeQuote = null;
 
       if (args.payWithDimo) {
         const uniswapArgs = UNISWAP_ARGS_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD];
 
-        // Calculate the delivery price in native tokens
-        transferSendValue = await quoteDeliveryPrice(
+        // Get the route quote to estimate the delivery price
+        routeQuote = await getRouteQuote(
           args.sourceChain as SupportedRelayingWormholeNetworks,
           args.destinationChain,
           environment,
@@ -102,7 +102,7 @@ export async function initiateBridging(
         // Swap DIMO to exact POL amount needed for the delivery fee
         const swapTransactions = await swapToExactPOL(
           uniswapArgs.dimoToken,
-          transferSendValue,
+          routeQuote.estimatedCost,
           uniswapArgs.poolFee,
           {
             recipient: client.account?.address as Hex,
@@ -122,7 +122,7 @@ export async function initiateBridging(
         toUniversal(WORMHOLE_CHAIN_MAPPING[args.sourceChain], client.account.address),
         Wormhole.chainAddress(WORMHOLE_CHAIN_MAPPING[args.destinationChain], args.recipientAddress),
         environment,
-        args.priceIncreasePercentage
+        routeQuote
       )
 
       transactions.push(...wormholeTransferTxs);
@@ -363,7 +363,7 @@ export async function generateWormholeRelayedTransferTransactions(
   signer: UniversalAddress,
   destinationAddress: AccountAddress<any>,
   environment: string = "prod",
-  priceIncreasePercentage: number = 1
+  preCalculatedQuote?: NttWithExecutor.Quote | null
 ): Promise<Call[]> {
   try {
     const mappedSourceChain = WORMHOLE_CHAIN_MAPPING[args.sourceChain];
@@ -383,16 +383,19 @@ export async function generateWormholeRelayedTransferTransactions(
       ntt: WORMHOLE_NTT_CONTRACTS[args.sourceChain],
     });
 
-    // Get the route quote for the transfer
-    let routeQuote = await getRouteQuote(
-      args.sourceChain as SupportedRelayingWormholeNetworks,
-      args.destinationChain,
-      environment,
-      args.rpcConfig as ChainRpcConfig,
-      args.amount,
-      priceIncreasePercentage
-    );
-    
+    // Use pre-calculated quote if available, otherwise calculate it
+    let routeQuote = preCalculatedQuote;
+    if (!routeQuote) {
+      routeQuote = await getRouteQuote(
+        args.sourceChain as SupportedRelayingWormholeNetworks,
+        args.destinationChain,
+        environment,
+        args.rpcConfig as ChainRpcConfig,
+        args.amount,
+        args.priceIncreasePercentage
+      );
+    }
+
     // Create a generator function for the transfer
     const transferGenerator = () =>
       sourceNttExecutor.transfer(signer, destinationAddress, args.amount, routeQuote, sourceNtt);
@@ -525,7 +528,7 @@ async function getRouteQuote(
   });
   const executorConfig = convertToExecutorConfig(WORMHOLE_NTT_CONTRACTS)
 
-  if (priceIncreasePercentage != 0) {
+  if (priceIncreasePercentage && priceIncreasePercentage != 0) {
     if (priceIncreasePercentage < 0 || priceIncreasePercentage > 100) {
       throw new Error("Price increase percentage must be between 0 and 100");
     }
