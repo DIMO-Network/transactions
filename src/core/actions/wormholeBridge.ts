@@ -486,6 +486,22 @@ export async function generateWormholeRelayedTransferTransactions(
   }
 }
 
+/**
+ * Generates a route quote for a Wormhole NTT transfer with executor support.
+ *
+ * This function creates a quote for transferring tokens between chains using Wormhole's NTT protocol
+ * with executor capabilities. It handles price adjustments, validates transfer parameters, and applies
+ * special handling for Solana destination chains to ensure adequate gas coverage.
+ *
+ * @param sourceChain - The source chain from which tokens will be transferred
+ * @param destinationChain - The destination chain to which tokens will be transferred
+ * @param environment - The environment to use for the quote (e.g., "prod", "dev"). Defaults to "prod"
+ * @param rpcConfig - Configuration object containing RPC URLs for the chains involved in the transfer
+ * @param amountTokens - The amount of tokens to transfer, specified as a bigint in the token's base units
+ * @param priceIncreasePercentage - Percentage to increase the quoted delivery price by to avoid underfunding. Defaults to 1%. Must be between 0 and 100. For Solana destinations, a minimum increase may be applied automatically
+ * @returns A Promise resolving to an NttWithExecutor.Quote object containing the transfer quote details including estimated costs and execution parameters
+ * @throws Error if the price increase percentage is invalid, if quote validation fails, or if there are issues with the Wormhole SDK operations
+ */
 async function getRouteQuote(
   sourceChain: SupportedRelayingWormholeNetworks,
   destinationChain: SupportedWormholeNetworks,
