@@ -125,3 +125,5 @@ export const WORMHOLE_TRANSCEIVER_INSTRUCTIONS = {
   relayed: "0x01000100",
   notRelayed: "0x01000101",
 };
+
+export const WORMHOLE_QUOTE_INCREASE_PERCENTAGE = 5

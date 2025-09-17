@@ -29,7 +29,8 @@ import {
   REFUND_ADDRESS_MAPPING,
   WORMHOLE_ENV_MAPPING,
   WORMHOLE_CHAIN_MAPPING,
-  WORMHOLE_NTT_CONTRACTS
+  WORMHOLE_NTT_CONTRACTS,
+  WORMHOLE_QUOTE_INCREASE_PERCENTAGE
 } from ":core/constants/wormholeMappings.js";
 import { NttWithExecutor } from "@wormhole-foundation/sdk-definitions-ntt";
 
@@ -46,7 +47,7 @@ import { NttWithExecutor } from "@wormhole-foundation/sdk-definitions-ntt";
  * @param args.amount - The amount of tokens to bridge
  * @param args.recipientAddress - The address that will receive the tokens on the destination chain
  * @param args.isRelayed - Whether the transfer should be automatically relayed (requires paying a delivery fee)
- * @param args.priceIncreasePercentage - Percentage to increase the quoted delivery price by to avoid underfunding
+ * @param args.priceIncreasePercentage - Percentage to increase the quoted delivery price by to avoid underfunding. Defaults to 1%. Must be between 0 and 100.
  * @param args.swapOptions - Options for the token swap when paying relay fees
  * @param args.swapOptions.slippageTolerance - Maximum slippage allowed for the swap (in basis points)
  * @param args.swapOptions.deadline - Deadline for the swap transaction (in seconds since epoch)
@@ -121,7 +122,6 @@ export async function initiateBridging(
         toUniversal(WORMHOLE_CHAIN_MAPPING[args.sourceChain], client.account.address),
         Wormhole.chainAddress(WORMHOLE_CHAIN_MAPPING[args.destinationChain], args.recipientAddress),
         environment,
-        transferSendValue,
         args.priceIncreasePercentage
       )
 
@@ -170,19 +170,6 @@ export async function quoteDeliveryPrice(
   priceIncreasePercentage: number = 1,
   returnInDIMO: boolean = false
 ): Promise<bigint> {
-  if (priceIncreasePercentage < 0 || priceIncreasePercentage > 100) {
-    throw new Error("Price increase percentage must be between 0 and 100");
-  }
-
-  // Apply a minimum 5% increase for Solana destination chains
-  let effectivePriceIncreasePercentage = priceIncreasePercentage;
-  if (["Solana", "SolanaTestnet", "SolanaTest"].includes(destinationChain)) {
-    // Only apply the 5% minimum if the user's specified percentage is less than 5%
-    if (priceIncreasePercentage < 5) {
-      effectivePriceIncreasePercentage = 5;
-    }
-  }
-
   const mappedSourceChain = WORMHOLE_CHAIN_MAPPING[sourceChain];
 
   const routeQuote = await getRouteQuote(
@@ -190,11 +177,11 @@ export async function quoteDeliveryPrice(
     destinationChain,
     environment,
     rpcConfig,
-    amountTokens
+    amountTokens,
+    priceIncreasePercentage // Increase price by the effective percentage to avoid underfunding
   )
 
-  // Increase price by the effective percentage to avoid underfunding
-  const price = (routeQuote.estimatedCost * BigInt(100 + effectivePriceIncreasePercentage)) / BigInt(100);
+  const price = routeQuote.estimatedCost;
 
   if (returnInDIMO) {
     // Check if source chain is Polygon, as Uniswap price queries are only supported on Polygon
@@ -371,12 +358,11 @@ async function generateWormholeNonRelayedTransferTransactions(
  * @returns A Promise resolving to an array of Call objects representing the transactions to be executed
  * @throws Error if there are issues generating or modifying the transfer transactions
  */
-async function generateWormholeRelayedTransferTransactions(
+export async function generateWormholeRelayedTransferTransactions(
   args: BridgeInitiateArgs,
   signer: UniversalAddress,
   destinationAddress: AccountAddress<any>,
   environment: string = "prod",
-  msgValue: bigint | null = null,
   priceIncreasePercentage: number = 1
 ): Promise<Call[]> {
   try {
@@ -398,14 +384,15 @@ async function generateWormholeRelayedTransferTransactions(
     });
 
     // Get the route quote for the transfer
-    const routeQuote = await getRouteQuote(
+    let routeQuote = await getRouteQuote(
       args.sourceChain as SupportedRelayingWormholeNetworks,
       args.destinationChain,
       environment,
       args.rpcConfig as ChainRpcConfig,
-      args.amount
+      args.amount,
+      priceIncreasePercentage
     );
-
+    
     // Create a generator function for the transfer
     const transferGenerator = () =>
       sourceNttExecutor.transfer(signer, destinationAddress, args.amount, routeQuote, sourceNtt);
@@ -440,7 +427,7 @@ async function generateWormholeRelayedTransferTransactions(
             const recipientAddress = decodedData.args[3];
             const encodedInstructions = decodedData.args[5];
             const executorArgs = decodedData.args[6];
-            const feeARgs = decodedData.args[7];
+            const feeArgs = decodedData.args[7];
 
             const refundAddress = toUniversal(
               WORMHOLE_CHAIN_MAPPING[args.destinationChain],
@@ -463,22 +450,14 @@ async function generateWormholeRelayedTransferTransactions(
               refundAddress, // Custom refund address
               encodedInstructions,
               newExecutorArgs,
-              feeARgs
+              feeArgs
             ]) as Hex;
-
-            if (!msgValue) {
-              if (priceIncreasePercentage < 0 || priceIncreasePercentage > 100) {
-                throw new Error("Price increase percentage must be between 0 and 100");
-              }
-
-              msgValue = (tx.transaction.value * BigInt(100 + priceIncreasePercentage)) / BigInt(100);
-            }
 
             // Add the modified transaction
             transactions.push({
               to: tx.transaction.to,
               data: newData,
-              value: msgValue ?? tx.transaction.value ?? BigInt(0)
+              value: tx.transaction.value ?? BigInt(0)
             });
           } catch (error) {
             console.error("Error modifying transfer transaction:", error);
@@ -512,7 +491,8 @@ async function getRouteQuote(
   destinationChain: SupportedWormholeNetworks,
   environment: string = "prod",
   rpcConfig: ChainRpcConfig,
-  amountTokens: bigint
+  amountTokens: bigint,
+  priceIncreasePercentage: number = 1
 ): Promise<NttWithExecutor.Quote> {
   const mappedSourceChain = WORMHOLE_CHAIN_MAPPING[sourceChain];
 
@@ -527,8 +507,43 @@ async function getRouteQuote(
   const srcNtt = await srcChain.getProtocol("Ntt", {
     ntt: WORMHOLE_NTT_CONTRACTS[sourceChain],
   });
+  const executorConfig = convertToExecutorConfig(WORMHOLE_NTT_CONTRACTS)
 
-  const executorRoute = nttExecutorRoute(convertToExecutorConfig(WORMHOLE_NTT_CONTRACTS));
+  if (priceIncreasePercentage != 0) {
+    if (priceIncreasePercentage < 0 || priceIncreasePercentage > 100) {
+      throw new Error("Price increase percentage must be between 0 and 100");
+    }
+
+    // Apply a minimum WORMHOLE_QUOTE_INCREASE_PERCENTAGE increase for Solana destination chains
+    let effectivePriceIncreasePercentage = priceIncreasePercentage;
+    if (["Solana", "SolanaTestnet", "SolanaTest"].includes(destinationChain)) {
+      // Only apply the WORMHOLE_QUOTE_INCREASE_PERCENTAGE minimum 
+      // if the user's specified percentage is less than WORMHOLE_QUOTE_INCREASE_PERCENTAGE
+      if (priceIncreasePercentage < WORMHOLE_QUOTE_INCREASE_PERCENTAGE) {
+        effectivePriceIncreasePercentage = WORMHOLE_QUOTE_INCREASE_PERCENTAGE;
+      }
+    }
+
+    const dstNtt = await destChain.getProtocol("NttWithExecutor", {
+      ntt: WORMHOLE_NTT_CONTRACTS[destinationChain],
+    });
+    let { msgValue } = await dstNtt.estimateMsgValueAndGasLimit(undefined)
+
+    msgValue = (msgValue * BigInt(100 + effectivePriceIncreasePercentage)) / BigInt(100);
+
+    executorConfig.referrerFee = {
+      feeDbps: BigInt(0), // No referrer fee
+      perTokenOverrides: {
+        [destinationChain]: {
+          [WORMHOLE_NTT_CONTRACTS[destinationChain]?.token || ""]: {
+            msgValue: msgValue,
+          }
+        }
+      }
+    };
+  }
+
+  const executorRoute = nttExecutorRoute(executorConfig);
   const routeInstance = new executorRoute(wh);
 
   const transferRequest = await routes.RouteTransferRequest.create(wh, {
