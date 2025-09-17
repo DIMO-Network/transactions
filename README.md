@@ -177,7 +177,7 @@ npm pack
 5. Publish the new version to npm:
 
 ```bash
-npm publish
+npm publish --tag latest
 ```
 
 ### Testing before publishing
