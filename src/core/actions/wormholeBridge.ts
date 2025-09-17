@@ -363,7 +363,8 @@ export async function generateWormholeRelayedTransferTransactions(
   signer: UniversalAddress,
   destinationAddress: AccountAddress<any>,
   environment: string = "prod",
-  preCalculatedQuote?: NttWithExecutor.Quote | null
+  preCalculatedQuote?: NttWithExecutor.Quote | null,
+  customRefundAddress: boolean = false
 ): Promise<Call[]> {
   try {
     const mappedSourceChain = WORMHOLE_CHAIN_MAPPING[args.sourceChain];
@@ -403,58 +404,13 @@ export async function generateWormholeRelayedTransferTransactions(
     // Process the generator to collect all transactions
     const transactions: Call[] = [];
 
-    // Import ethers Interface for ABI decoding/encoding
-    const { Interface } = await import("ethers");
-
-    // Define the ABI for the transfer function
-    const transferAbi = [
-      "function transfer(address nttManager, uint256 amount, uint16 recipientChain, bytes32 recipientAddress, bytes32 refundAddress, bytes encodedInstructions, (uint256 value, address refundAddress, bytes signedQuote, bytes instructions) executorArgs, (uint16 dbps, address payee) feeArgs) external payable returns (uint64 msgId)",
-    ];
-
-    // Create an interface for decoding/encoding
-    const iface = new Interface(transferAbi);
-
     // Process each transaction from the generator
     for await (const tx of transferGenerator()) {
       if (tx.transaction) {
         // If this is the transfer transaction (not the approval)
-        if (tx.description === "NttWithExecutor.transfer") {
+        if (customRefundAddress && tx.description === "NttWithExecutor.transfer") {
           try {
-            // Decode the transaction data
-            const decodedData = iface.parseTransaction({ data: tx.transaction.data }) as TransactionDescription;
-
-            // Get the original parameters
-            const nttManager = decodedData.args[0];
-            const amount = decodedData.args[1];
-            const recipientChain = decodedData.args[2];
-            const recipientAddress = decodedData.args[3];
-            const encodedInstructions = decodedData.args[5];
-            const executorArgs = decodedData.args[6];
-            const feeArgs = decodedData.args[7];
-
-            const refundAddress = toUniversal(
-              WORMHOLE_CHAIN_MAPPING[args.destinationChain],
-              REFUND_ADDRESS_MAPPING[args.destinationChain]
-            ).toUint8Array();
-
-            const newExecutorArgs = [
-              executorArgs[0],
-              REFUND_ADDRESS_MAPPING[args.sourceChain],
-              executorArgs[2],
-              executorArgs[3]
-            ];
-
-            // Re-encode the transaction with the custom refund address
-            const newData = iface.encodeFunctionData("transfer", [
-              nttManager,
-              amount,
-              recipientChain,
-              recipientAddress,
-              refundAddress, // Custom refund address
-              encodedInstructions,
-              newExecutorArgs,
-              feeArgs
-            ]) as Hex;
+            const newData = await setCustomRefundAddress(args, tx)
 
             // Add the modified transaction
             transactions.push({
@@ -582,4 +538,68 @@ async function getRouteQuote(
   const validatedParams: NttExecutorRoute.ValidatedParams = validated.params as NttExecutorRoute.ValidatedParams;
 
   return await routeInstance.fetchExecutorQuote(transferRequest, validatedParams);
+}
+
+/**
+ * Modifies a Wormhole NTT transfer transaction to use custom refund addresses.
+ *
+ * This function decodes an existing transfer transaction, extracts its parameters, and re-encodes
+ * it with custom refund addresses for both the source and destination chains. The refund addresses
+ * are retrieved from predefined mappings and ensure that any failed or excess funds are returned
+ * to the appropriate addresses rather than the default transaction sender.
+ *
+ * @param args - The bridging operation parameters containing source and destination chain information
+ * @param tx - The transaction object containing the original transfer transaction data to be modified
+ * @returns A Promise resolving to the re-encoded transaction data as a hex string with custom refund addresses applied
+ * @throws Error if the transaction data cannot be decoded or if the ABI encoding fails
+ */
+async function setCustomRefundAddress(args: BridgeInitiateArgs, tx: any): Promise<Hex> {
+  // Import ethers Interface for ABI decoding/encoding
+  const { Interface } = await import("ethers");
+
+  // Define the ABI for the transfer function
+  const transferAbi = [
+    "function transfer(address nttManager, uint256 amount, uint16 recipientChain, bytes32 recipientAddress, bytes32 refundAddress, bytes encodedInstructions, (uint256 value, address refundAddress, bytes signedQuote, bytes instructions) executorArgs, (uint16 dbps, address payee) feeArgs) external payable returns (uint64 msgId)",
+  ];
+
+  // Create an interface for decoding/encoding
+  const iface = new Interface(transferAbi);
+
+  // Decode the transaction data
+  const decodedData = iface.parseTransaction({ data: tx.transaction.data }) as TransactionDescription;
+
+  // Get the original parameters
+  const nttManager = decodedData.args[0];
+  const amount = decodedData.args[1];
+  const recipientChain = decodedData.args[2];
+  const recipientAddress = decodedData.args[3];
+  const encodedInstructions = decodedData.args[5];
+  const executorArgs = decodedData.args[6];
+  const feeArgs = decodedData.args[7];
+
+  const refundAddress = toUniversal(
+    WORMHOLE_CHAIN_MAPPING[args.destinationChain],
+    REFUND_ADDRESS_MAPPING[args.destinationChain]
+  ).toUint8Array();
+
+  const newExecutorArgs = [
+    executorArgs[0],
+    REFUND_ADDRESS_MAPPING[args.sourceChain],
+    executorArgs[2],
+    executorArgs[3]
+  ];
+
+  // Re-encode the transaction with the custom refund address
+  const newData = iface.encodeFunctionData("transfer", [
+    nttManager,
+    amount,
+    recipientChain,
+    recipientAddress,
+    refundAddress, // Custom refund address
+    encodedInstructions,
+    newExecutorArgs,
+    feeArgs
+  ]) as Hex;
+
+  return newData
 }
