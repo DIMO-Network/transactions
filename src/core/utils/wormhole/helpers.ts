@@ -1,6 +1,7 @@
 import { Chain } from "@wormhole-foundation/sdk";
-import { BaseWormholeResponse, NttContracts, WormholeErrorResponse, type Operation } from ":core/types/wormhole.js";
 import { NttExecutorRoute } from "@wormhole-foundation/sdk-route-ntt";
+
+import { BaseWormholeResponse, NttContracts, type Operation, WormholeErrorResponse } from ":core/types/wormhole.js";
 
 /**
  * Converts NttContracts to NttExecutorRoute.Config format.
@@ -51,7 +52,7 @@ export function convertToExecutorConfig(nttContracts: NttContracts): NttExecutor
         })),
       };
       // Add quoter if it exists
-      if ('quoter' in contracts! && contracts!.quoter) {
+      if ("quoter" in contracts! && contracts!.quoter) {
         (executorToken as any).quoter = contracts!.quoter;
       }
       return executorToken;
@@ -60,9 +61,9 @@ export function convertToExecutorConfig(nttContracts: NttContracts): NttExecutor
   return {
     ntt: {
       tokens: {
-        [tokenName]: tokens
-      }
-    }
+        [tokenName]: tokens,
+      },
+    },
   };
 }
 
@@ -78,13 +79,13 @@ export function convertToExecutorConfig(nttContracts: NttContracts): NttExecutor
  */
 export function getOperationStatus(operation: Operation): string {
   if (operation.targetChain) {
-    return 'Completed';
+    return "Completed";
   } else if (operation.vaa) {
-    return 'Emitted';
+    return "Emitted";
   } else if (operation.sourceChain) {
-    return 'In Progress';
+    return "In Progress";
   } else {
-    return 'Unknown';
+    return "Unknown";
   }
 }
 

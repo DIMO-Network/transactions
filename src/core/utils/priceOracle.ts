@@ -1,8 +1,8 @@
 import { createPublicClient, http, parseAbi } from "viem";
 import { polygon } from "viem/chains";
 
-import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
+import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 
 /**
  * Retrieves the current price of DIMO tokens from a Uniswap V3 pool.
