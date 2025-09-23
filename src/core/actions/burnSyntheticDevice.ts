@@ -1,9 +1,10 @@
-import { encodeFunctionData } from "viem";
-import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
-import { BURN_SYNTHETIC_DEVICE } from ":core/constants/methods.js";
 import { KernelAccountClient } from "@zerodev/sdk";
+import { encodeFunctionData } from "viem";
+
 import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
+import { BURN_SYNTHETIC_DEVICE } from ":core/constants/methods.js";
 import { BurnSyntheticDevice } from ":core/types/args.js";
+import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 
 export function burnSyntheticDeviceCallData(args: BurnSyntheticDevice, environment: string = "prod"): `0x${string}` {
   const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;

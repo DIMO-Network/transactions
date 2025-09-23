@@ -1,5 +1,6 @@
-import { encodeFunctionData } from "viem";
 import { KernelAccountClient } from "@zerodev/sdk";
+import { encodeFunctionData } from "viem";
+
 import { TransactionData } from ":core/types/args.js";
 
 export const executeTransaction = async (

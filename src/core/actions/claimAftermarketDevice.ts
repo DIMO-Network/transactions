@@ -1,21 +1,22 @@
-import { encodeFunctionData } from "viem";
-import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
-import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING } from ":core/constants/mappings.js";
 import { KernelAccountClient } from "@zerodev/sdk";
-import { CLAIM_AFTERMARKET_DEVICE } from ":core/constants/methods.js";
-import { ClaimAftermarketDevice } from ":core/types/args.js";
-import { polygon } from "viem/chains";
 import { ethers } from "ethers";
-import { TypeHashResponse } from ":core/types/responses.js";
+import { encodeFunctionData } from "viem";
+import { polygon } from "viem/chains";
+
 import {
-  ClaimAftermarketDeviceSign,
   AftermarketDeviceNode,
-  Owner,
-  SolidityTypeUint256,
-  SolidityTypeAddress,
+  ClaimAftermarketDeviceSign,
   DIMODomain,
   DIMODomainVersion,
+  Owner,
+  SolidityTypeAddress,
+  SolidityTypeUint256,
 } from ":core/constants/dimo.js";
+import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING } from ":core/constants/mappings.js";
+import { CLAIM_AFTERMARKET_DEVICE } from ":core/constants/methods.js";
+import { ClaimAftermarketDevice } from ":core/types/args.js";
+import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
+import { TypeHashResponse } from ":core/types/responses.js";
 
 export const claimAftermarketDeviceTypeHash = (
   aftermarketDeviceNode: bigint,

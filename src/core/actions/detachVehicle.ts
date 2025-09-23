@@ -1,8 +1,9 @@
-import { DetachVehicle } from ":core/types/args.js";
 import { KernelAccountClient } from "@zerodev/sdk";
-import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
-import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 import { encodeFunctionData } from "viem";
+
+import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
+import { DetachVehicle } from ":core/types/args.js";
+import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 
 export async function detachVehicle(
   args: DetachVehicle,

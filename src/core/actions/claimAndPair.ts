@@ -1,9 +1,10 @@
-import { encodeFunctionData } from "viem";
-import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
-import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
 import { KernelAccountClient } from "@zerodev/sdk";
+import { encodeFunctionData } from "viem";
+
+import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
 import { CLAIM_AFTERMARKET_DEVICE, PAIR_AFTERMARKET_DEVICE } from ":core/constants/methods.js";
 import { ClaimAftermarketDevice, PairAftermarketDevice } from ":core/types/args.js";
+import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 
 export const claimAndPairDevice = async (
   args: ClaimAftermarketDevice & PairAftermarketDevice,
