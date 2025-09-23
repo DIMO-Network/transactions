@@ -1,28 +1,29 @@
-import { AccountConfig, ContractToMapping, ENVIRONMENT, _accountConfig } from ":core/types/dimo.js";
 import {
   Account,
   Address,
   Chain,
+  createPublicClient,
+  createWalletClient,
+  http,
   ParseAccount,
   PublicClient,
   RpcSchema,
   Transport,
   WalletClient,
-  createPublicClient,
-  createWalletClient,
-  http,
 } from "viem";
+import { polygon } from "viem/chains";
+
+import { mintVehicleWithDeviceDefinitionFromAccount } from ":core/actions/mintVehicleWithDeviceDefinition.js";
+import { safeTransferVehicleID } from ":core/actions/safeTransferVehicles.js";
+import { sendDIMOTokensFromAccount } from ":core/actions/sendDIMOTokens.js";
+import { transferVehicleAndAftermarketDeviceIDsFromAccount } from ":core/actions/transferVehicleAndADs.js";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING } from ":core/constants/mappings.js";
 import {
   MintVehicleWithDeviceDefinition,
   SendDIMOTokens,
   TransferVehicleAndAftermarketDeviceIDs,
 } from ":core/types/args.js";
-import { sendDIMOTokensFromAccount } from ":core/actions/sendDIMOTokens.js";
-import { polygon } from "viem/chains";
-import { transferVehicleAndAftermarketDeviceIDsFromAccount } from ":core/actions/transferVehicleAndADs.js";
-import { safeTransferVehicleID } from ":core/actions/safeTransferVehicles.js";
-import { mintVehicleWithDeviceDefinitionFromAccount } from ":core/actions/mintVehicleWithDeviceDefinition.js";
+import { _accountConfig, AccountConfig, ContractToMapping, ENVIRONMENT } from ":core/types/dimo.js";
 
 export class AccountSigner {
   config: _accountConfig;
@@ -72,7 +73,7 @@ export class AccountSigner {
   public async transferVehicleID(args: {
     from: `0x${string}`;
     to: `0x${string}`;
-    vehicleId: BigInt;
+    vehicleId: bigint;
   }): Promise<`0x${string}`> {
     const txResult = safeTransferVehicleID(args, this.walletClient, this.publicClient, this.config.environment);
     return txResult;
