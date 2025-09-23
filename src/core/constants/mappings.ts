@@ -1,9 +1,7 @@
+import { Token } from "@uniswap/sdk-core";
 import { Abi, zeroAddress } from "viem";
 import { Chain, polygon, polygonAmoy } from "viem/chains";
-import { Token } from "@uniswap/sdk-core";
 
-import { API_BY_ENV, AllChainInfos, ContractType, DIMO_APIs, ENVIRONMENT } from ":core/types/dimo.js";
-import { UniswapMappingArgs } from ":core/types/uniswap.js";
 import {
   abiCredits,
   abiForwarder,
@@ -12,12 +10,13 @@ import {
   abiStaking,
   abiStakingDev,
   abiToken,
-  abiVehicleId,
   abiUniswapV3Pool,
+  abiVehicleId,
 } from ":core/abis/index.js";
-
 import * as contractAddrs from ":core/constants/contractAddrs.js";
 import * as uniswapConsts from ":core/constants/uniswapConstants.js";
+import { AllChainInfos, API_BY_ENV, ContractType, DIMO_APIs, ENVIRONMENT } from ":core/types/dimo.js";
+import { UniswapMappingArgs } from ":core/types/uniswap.js";
 
 export const ENV_NETWORK_MAPPING = new Map<ENVIRONMENT, Chain>([
   [ENVIRONMENT.PROD, polygon],

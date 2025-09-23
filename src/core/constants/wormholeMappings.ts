@@ -1,13 +1,13 @@
-import { Network, Chain } from "@wormhole-foundation/sdk";
+import { Chain, Network } from "@wormhole-foundation/sdk";
 
 import * as contractAddrs from ":core/constants/contractAddrs.js";
-import { NttContracts, SupportedWormholeNetworks } from ":core/types/wormhole.js";
 import {
-  REFUND_EVM_ADDRESS_PROD,
   REFUND_EVM_ADDRESS_DEV,
+  REFUND_EVM_ADDRESS_PROD,
+  REFUND_SOLANA_ADDRESS_DEV,
   REFUND_SOLANA_ADDRESS_PROD,
-  REFUND_SOLANA_ADDRESS_DEV
 } from ":core/constants/dimo.js";
+import { NttContracts, SupportedWormholeNetworks } from ":core/types/wormhole.js";
 
 export const WORMHOLE_ENV_MAPPING = new Map<string, Network>([
   ["production", "Mainnet"],
@@ -126,4 +126,4 @@ export const WORMHOLE_TRANSCEIVER_INSTRUCTIONS = {
   notRelayed: "0x01000101",
 };
 
-export const WORMHOLE_QUOTE_INCREASE_PERCENTAGE = 5
+export const WORMHOLE_QUOTE_INCREASE_PERCENTAGE = 5;
