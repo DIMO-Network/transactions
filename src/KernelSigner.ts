@@ -1,31 +1,51 @@
+import { ApiKeyStamper } from "@turnkey/api-key-stamper";
+import { decryptCredentialBundle, generateP256KeyPair, getPublicKey } from "@turnkey/crypto";
+import { uint8ArrayToHexString } from "@turnkey/encoding";
+import { TurnkeyClient } from "@turnkey/http";
+import { createAccount } from "@turnkey/viem";
+import { getKernelAddressFromECDSA, signerToEcdsaValidator } from "@zerodev/ecdsa-validator";
 import {
-  ContractToMapping,
-  DIMO_APIs,
-  ENVIRONMENT,
-  KernelConfig,
-  TransactionReturnType,
-  _kernelConfig,
-  SACDTemplate,
-} from ":core/types/dimo.js";
-import { Chain, Client, PublicClient, RpcSchema, Transport, createPublicClient, http } from "viem";
-import {
-  KernelAccountClient,
   createKernelAccount,
   createKernelAccountClient,
   createZeroDevPaymasterClient,
   getUserOperationGasPrice,
+  KernelAccountClient,
 } from "@zerodev/sdk";
+import { Chain, Client, createPublicClient, http, PublicClient, RpcSchema, Transport } from "viem";
 import type { BundlerClient, SmartAccount } from "viem/account-abstraction";
+import { createBundlerClient } from "viem/account-abstraction";
+import { privateKeyToAccount } from "viem/accounts";
+import { polygon } from "viem/chains";
+
+import { addStake } from ":core/actions/addStake.js";
+import { attachVehicle } from ":core/actions/attachVehicle.js";
+import { burnSyntheticDevice, burnSyntheticDeviceBatch } from ":core/actions/burnSyntheticDevice.js";
+import { burnVehicle, burnVehicleBatch } from ":core/actions/burnVehicle.js";
+import { claimAftermarketDevice, claimAftermarketDeviceTypeHash } from ":core/actions/claimAftermarketDevice.js";
+import { claimAndPairDevice } from ":core/actions/claimAndPair.js";
+import { detachVehicle } from ":core/actions/detachVehicle.js";
+import { executeTransaction, executeTransactionBatch } from ":core/actions/executeTransaction.js";
 import {
   mintVehicleWithDeviceDefinition,
   mintVehicleWithDeviceDefinitionBatch,
 } from ":core/actions/mintVehicleWithDeviceDefinition.js";
+import {
+  pairAftermarketDevice,
+  pairAftermarketDeviceTypeHash,
+  pairAftermarketDeviceWithAdSig,
+} from ":core/actions/pairAftermarketDevice.js";
+import { sendDIMOTokens } from ":core/actions/sendDIMOTokens.js";
 import {
   generatePermissionsSACDTemplate,
   setVehiclePermissions,
   setVehiclePermissionsBatch,
   setVehiclePermissionsBulk,
 } from ":core/actions/setPermissionsSACD.js";
+import { transferVehicleAndAftermarketDeviceIDs } from ":core/actions/transferVehicleAndADs.js";
+import { unpairAftermarketDevice } from ":core/actions/unpairAftermarketDevice.js";
+import { upgradeStake } from ":core/actions/upgradeStake.js";
+import { withdrawStake } from ":core/actions/withdrawStake.js";
+import { initiateBridging } from ":core/actions/wormholeBridge.js";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING, ENV_TO_API_MAPPING } from ":core/constants/mappings.js";
 import {
   AddStake,
@@ -38,6 +58,7 @@ import {
   MintVehicleWithDeviceDefinition,
   PairAftermarketDevice,
   PairAftermarketDeviceWithAdSig,
+  Permission,
   PermissionsSACDTemplateInputs,
   SendDIMOTokens,
   SetVehiclePermissions,
@@ -47,35 +68,19 @@ import {
   UnPairAftermarketDevice,
   UpgradeStake,
   WithdrawStake,
-  Permission,
 } from ":core/types/args.js";
-import type { BridgeInitiateArgs } from ":core/types/wormhole.js";
-import { claimAftermarketDevice, claimAftermarketDeviceTypeHash } from ":core/actions/claimAftermarketDevice.js";
+import {
+  _kernelConfig,
+  ContractToMapping,
+  DIMO_APIs,
+  ENVIRONMENT,
+  KernelConfig,
+  SACDTemplate,
+  TransactionReturnType,
+} from ":core/types/dimo.js";
 import { TypeHashResponse } from ":core/types/responses.js";
-import { sendDIMOTokens } from ":core/actions/sendDIMOTokens.js";
-import { pairAftermarketDevice, pairAftermarketDeviceTypeHash, pairAftermarketDeviceWithAdSig } from ":core/actions/pairAftermarketDevice.js";
-import { TurnkeyClient } from "@turnkey/http";
-import { polygon } from "viem/chains";
-import { burnVehicle, burnVehicleBatch } from ":core/actions/burnVehicle.js";
-import { burnSyntheticDevice, burnSyntheticDeviceBatch } from ":core/actions/burnSyntheticDevice.js";
-import { createAccount } from "@turnkey/viem";
-import { getKernelAddressFromECDSA, signerToEcdsaValidator } from "@zerodev/ecdsa-validator";
-import { privateKeyToAccount } from "viem/accounts";
-import { transferVehicleAndAftermarketDeviceIDs } from ":core/actions/transferVehicleAndADs.js";
-import { unpairAftermarketDevice } from ":core/actions/unpairAftermarketDevice.js";
-import { ApiKeyStamper } from "@turnkey/api-key-stamper";
-import { generateP256KeyPair, decryptBundle, getPublicKey } from "@turnkey/crypto";
-import { uint8ArrayToHexString, uint8ArrayFromHexString } from "@turnkey/encoding";
-import { claimAndPairDevice } from ":core/actions/claimAndPair.js";
-import { executeTransaction, executeTransactionBatch } from ":core/actions/executeTransaction.js";
-import { createBundlerClient } from "viem/account-abstraction";
-import { getPermissionsValue, getPermissionsArray } from ":core/utils/utils.js";
-import { addStake } from ":core/actions/addStake.js";
-import { withdrawStake } from ":core/actions/withdrawStake.js";
-import { upgradeStake } from ":core/actions/upgradeStake.js";
-import { attachVehicle } from ":core/actions/attachVehicle.js";
-import { detachVehicle } from ":core/actions/detachVehicle.js";
-import { initiateBridging } from ":core/actions/wormholeBridge.js";
+import type { BridgeInitiateArgs } from ":core/types/wormhole.js";
+import { getPermissionsArray, getPermissionsValue } from ":core/utils/utils.js";
 
 export class KernelSigner {
   config: _kernelConfig;
@@ -257,10 +262,9 @@ export class KernelSigner {
     });
 
     const bundle = sessionData.activity.result.createReadWriteSessionResultV2?.credentialBundle;
-    const decryptedBundle = decryptBundle(bundle!, key.privateKey);
-    const privateKey = uint8ArrayToHexString(decryptedBundle);
+    const privateKey = decryptCredentialBundle(bundle!, key.privateKey);
     const apiStamper = new ApiKeyStamper({
-      apiPublicKey: uint8ArrayToHexString(getPublicKey(uint8ArrayFromHexString(privateKey), true)),
+      apiPublicKey: uint8ArrayToHexString(getPublicKey(privateKey, true)),
       apiPrivateKey: privateKey,
     });
 
@@ -331,10 +335,9 @@ export class KernelSigner {
     });
 
     const bundle = sessionData.activity.result.createReadWriteSessionResultV2?.credentialBundle;
-    const decryptedBundle = decryptBundle(bundle!, key.privateKey);
-    const privateKey = uint8ArrayToHexString(decryptedBundle);
+    const privateKey = decryptCredentialBundle(bundle!, key.privateKey);
     const apiStamper = new ApiKeyStamper({
-      apiPublicKey: uint8ArrayToHexString(getPublicKey(uint8ArrayFromHexString(privateKey), true)),
+      apiPublicKey: uint8ArrayToHexString(getPublicKey(privateKey, true)),
       apiPrivateKey: privateKey,
     });
 
@@ -391,10 +394,9 @@ export class KernelSigner {
     });
 
     const bundle = sessionData.activity.result.createReadWriteSessionResultV2?.credentialBundle;
-    const decryptedBundle = decryptBundle(bundle!, key.privateKey);
-    const privateKey = uint8ArrayToHexString(decryptedBundle);
+    const privateKey = decryptCredentialBundle(bundle!, key.privateKey);
     const apiStamper = new ApiKeyStamper({
-      apiPublicKey: uint8ArrayToHexString(getPublicKey(uint8ArrayFromHexString(privateKey), true)),
+      apiPublicKey: uint8ArrayToHexString(getPublicKey(privateKey, true)),
       apiPrivateKey: privateKey,
     });
 
@@ -452,7 +454,7 @@ export class KernelSigner {
     walletAddress: `0x${string}`
   ): Promise<KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema>> {
     const localAccount = await createAccount({
-      // @ts-ignore
+      // @ts-expect-error - turnkeyClient type mismatch with createAccount expected client type
       client: turnkeyClient,
       organizationId: subOrganizationId,
       signWith: walletAddress,
@@ -540,7 +542,7 @@ export class KernelSigner {
 
   public async mintVehicleWithDeviceDefinition(
     args: MintVehicleWithDeviceDefinition | MintVehicleWithDeviceDefinition[],
-    waitForReceipt: boolean = true,
+    waitForReceipt: boolean = true
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     let mintVehicleCallData: `0x${string}`;
@@ -570,7 +572,7 @@ export class KernelSigner {
 
   public async setVehiclePermissions(
     args: SetVehiclePermissions | SetVehiclePermissions[],
-    waitForReceipt: boolean = true,
+    waitForReceipt: boolean = true
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     let setVehiclePermissionsCallData: `0x${string}`;
@@ -600,7 +602,7 @@ export class KernelSigner {
 
   public async setVehiclePermissionsBulk(
     args: SetVehiclePermissionsBulk,
-    waitForReceipt: boolean = true,
+    waitForReceipt: boolean = true
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const setVehiclePermissionsBulkCallData = await setVehiclePermissionsBulk(args, client, this.config.environment);
@@ -620,10 +622,7 @@ export class KernelSigner {
     } as TransactionReturnType;
   }
 
-  public async sendDIMOTokens(
-    args: SendDIMOTokens,
-    waitForReceipt: boolean = true,
-  ): Promise<TransactionReturnType> {
+  public async sendDIMOTokens(args: SendDIMOTokens, waitForReceipt: boolean = true): Promise<TransactionReturnType> {
     const client = await this.getPasskeyClient();
 
     const sendDIMOTokensCallData = await sendDIMOTokens(args, client, this.config.environment);
@@ -648,7 +647,7 @@ export class KernelSigner {
 
   public async claimAftermarketDevice(
     args: ClaimAftermarketDevice,
-    waitForReceipt: boolean = true,
+    waitForReceipt: boolean = true
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
@@ -674,7 +673,7 @@ export class KernelSigner {
 
   public async pairAftermarketDevice(
     args: PairAftermarketDevice,
-    waitForReceipt: boolean = true,
+    waitForReceipt: boolean = true
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
@@ -695,7 +694,7 @@ export class KernelSigner {
 
   public async pairAftermarketDeviceWithAdSig(
     args: PairAftermarketDeviceWithAdSig,
-    waitForReceipt: boolean = true,
+    waitForReceipt: boolean = true
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
@@ -716,7 +715,7 @@ export class KernelSigner {
 
   public async claimAndPairAftermarketDevice(
     args: ClaimAftermarketDevice & PairAftermarketDevice,
-    waitForReceipt: boolean = true,
+    waitForReceipt: boolean = true
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
@@ -738,7 +737,7 @@ export class KernelSigner {
 
   public async burnVehicle(
     args: BurnVehicle | BurnVehicle[],
-    waitForReceipt: boolean = true,
+    waitForReceipt: boolean = true
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
@@ -769,7 +768,7 @@ export class KernelSigner {
 
   public async burnSyntheticDevice(
     args: BurnSyntheticDevice | BurnSyntheticDevice[],
-    waitForReceipt: boolean = true,
+    waitForReceipt: boolean = true
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
@@ -800,7 +799,7 @@ export class KernelSigner {
 
   public async transferVehicleAndAftermarketDevices(
     args: TransferVehicleAndAftermarketDeviceIDs,
-    waitForReceipt: boolean = true,
+    waitForReceipt: boolean = true
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
 
@@ -822,7 +821,7 @@ export class KernelSigner {
 
   public async unpairAftermarketDevice(
     args: UnPairAftermarketDevice,
-    waitForReceipt: boolean = true,
+    waitForReceipt: boolean = true
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const unpairADCallData = await unpairAftermarketDevice(args, client, this.config.environment);
@@ -842,10 +841,7 @@ export class KernelSigner {
     } as TransactionReturnType;
   }
 
-  public async addStake(
-    args: AddStake,
-    waitForReceipt: boolean = true,
-  ): Promise<TransactionReturnType> {
+  public async addStake(args: AddStake, waitForReceipt: boolean = true): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const addStakeCallData = await addStake(args, client, this.config.environment);
     const userOpHash = await this._sendUserOperation(client, addStakeCallData);
@@ -861,10 +857,7 @@ export class KernelSigner {
     } as TransactionReturnType;
   }
 
-  public async withdrawStake(
-    args: WithdrawStake,
-    waitForReceipt: boolean = true,
-  ): Promise<TransactionReturnType> {
+  public async withdrawStake(args: WithdrawStake, waitForReceipt: boolean = true): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const addStakeCallData = await withdrawStake(args, client, this.config.environment);
     const userOpHash = await this._sendUserOperation(client, addStakeCallData);
@@ -880,10 +873,7 @@ export class KernelSigner {
     } as TransactionReturnType;
   }
 
-  public async upgradeStake(
-    args: UpgradeStake,
-    waitForReceipt: boolean = true,
-  ): Promise<TransactionReturnType> {
+  public async upgradeStake(args: UpgradeStake, waitForReceipt: boolean = true): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const upgradeStakeCallData = await upgradeStake(args, client, this.config.environment);
     const userOpHash = await this._sendUserOperation(client, upgradeStakeCallData);
@@ -902,7 +892,7 @@ export class KernelSigner {
 
   public async attachVehicleToStake(
     args: AttachVehicle,
-    waitForReceipt: boolean = true,
+    waitForReceipt: boolean = true
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const upgradeStakeCallData = await attachVehicle(args, client, this.config.environment);
@@ -922,7 +912,7 @@ export class KernelSigner {
 
   public async detachVehicleFromStake(
     args: DetachVehicle,
-    waitForReceipt: boolean = true,
+    waitForReceipt: boolean = true
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const upgradeStakeCallData = await detachVehicle(args, client, this.config.environment);
@@ -942,7 +932,7 @@ export class KernelSigner {
 
   public async initiateBridging(
     args: BridgeInitiateArgs,
-    waitForReceipt: boolean = true,
+    waitForReceipt: boolean = true
   ): Promise<TransactionReturnType> {
     const client = await this.getActiveClient();
     const initiateBridgingCallData = await initiateBridging(args, client, this.config.environment);
@@ -1100,7 +1090,9 @@ export class KernelSigner {
     return template;
   }
 
-  public async signAndUploadSACDAgreement(args: PermissionsSACDTemplateInputs): Promise<{ success: boolean; cid: string }> {
+  public async signAndUploadSACDAgreement(
+    args: PermissionsSACDTemplateInputs
+  ): Promise<{ success: boolean; cid: string }> {
     const signedSACD = await this.signSACDPermissionTemplate(args);
 
     try {
@@ -1171,7 +1163,7 @@ export class KernelSigner {
 
   public async executeTransaction(
     args: TransactionInput,
-    waitForReceipt: boolean = true,
+    waitForReceipt: boolean = true
   ): Promise<TransactionReturnType> {
     let client = await this.getActiveClient();
     if (args.requireSignature) {
