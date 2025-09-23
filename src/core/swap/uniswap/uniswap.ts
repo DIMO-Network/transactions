@@ -1,6 +1,7 @@
 import { Currency, CurrencyAmount, Token, TradeType } from "@uniswap/sdk-core";
 import { Pool, Route, SwapOptions, SwapQuoter, SwapRouter, Trade } from "@uniswap/v3-sdk";
 import { ethers } from "ethers-v5";
+import { decodeAbiParameters } from "viem";
 
 import { getPoolInfo } from "./pool.js";
 import {
@@ -94,5 +95,5 @@ async function getOutputQuote(
     data: calldata,
   });
 
-  return ethers.AbiCoder.defaultAbiCoder().decode(["uint256"], quoteCallReturnData)[0];
+  return decodeAbiParameters([{ type: "uint256" }], quoteCallReturnData as `0x${string}`)[0];
 }
