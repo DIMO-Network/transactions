@@ -1,18 +1,14 @@
 import { Token } from "@uniswap/sdk-core";
 import IUniswapV3PoolABI from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json" with { type: "json" };
 import { computePoolAddress } from "@uniswap/v3-sdk";
-import { ethers } from "ethers-v5";
-import type { Hex } from "viem";
+import { createPublicClient, http, type Hex } from "viem";
 
 import { PoolInfo, PoolParam } from ":core/types/uniswap.js";
 
 export async function getPoolInfoByAddress(poolAddress: Hex, rpcUrl: string, params?: PoolParam[]): Promise<PoolInfo> {
-  const provider = new ethers.JsonRpcProvider(rpcUrl);
-  if (!provider) {
-    throw new Error("No provider");
-  }
-
-  const poolContract = new ethers.Contract(poolAddress, IUniswapV3PoolABI.abi, provider);
+  const client = createPublicClient({
+    transport: http(rpcUrl),
+  });
 
   // Determine which parameters to fetch based on the params argument
   const fetchToken0 = !params || params.includes(PoolParam.TOKEN0);
@@ -24,12 +20,12 @@ export async function getPoolInfoByAddress(poolAddress: Hex, rpcUrl: string, par
 
   // Create an array of promises for the parameters we need to fetch
   const promises = [];
-  if (fetchToken0) promises.push(poolContract.token0());
-  if (fetchToken1) promises.push(poolContract.token1());
-  if (fetchFee) promises.push(poolContract.fee());
-  if (fetchTickSpacing) promises.push(poolContract.tickSpacing());
-  if (fetchLiquidity) promises.push(poolContract.liquidity());
-  if (fetchSlot0) promises.push(poolContract.slot0());
+  if (fetchToken0) promises.push(client.readContract({ address: poolAddress, abi: IUniswapV3PoolABI.abi, functionName: "token0" }));
+  if (fetchToken1) promises.push(client.readContract({ address: poolAddress, abi: IUniswapV3PoolABI.abi, functionName: "token1" }));
+  if (fetchFee) promises.push(client.readContract({ address: poolAddress, abi: IUniswapV3PoolABI.abi, functionName: "fee" }));
+  if (fetchTickSpacing) promises.push(client.readContract({ address: poolAddress, abi: IUniswapV3PoolABI.abi, functionName: "tickSpacing" }));
+  if (fetchLiquidity) promises.push(client.readContract({ address: poolAddress, abi: IUniswapV3PoolABI.abi, functionName: "liquidity" }));
+  if (fetchSlot0) promises.push(client.readContract({ address: poolAddress, abi: IUniswapV3PoolABI.abi, functionName: "slot0" }));
 
   // Execute all promises in parallel
   const results = await Promise.all(promises);
@@ -40,13 +36,13 @@ export async function getPoolInfoByAddress(poolAddress: Hex, rpcUrl: string, par
   // Populate the result object based on which parameters were fetched
   let resultIndex = 0;
 
-  if (fetchToken0) poolInfo.token0 = results[resultIndex++];
-  if (fetchToken1) poolInfo.token1 = results[resultIndex++];
-  if (fetchFee) poolInfo.fee = results[resultIndex++];
-  if (fetchTickSpacing) poolInfo.tickSpacing = results[resultIndex++];
-  if (fetchLiquidity) poolInfo.liquidity = results[resultIndex++];
+  if (fetchToken0) poolInfo.token0 = results[resultIndex++] as string;
+  if (fetchToken1) poolInfo.token1 = results[resultIndex++] as string;
+  if (fetchFee) poolInfo.fee = results[resultIndex++] as number;
+  if (fetchTickSpacing) poolInfo.tickSpacing = results[resultIndex++] as number;
+  if (fetchLiquidity) poolInfo.liquidity = results[resultIndex++] as bigint;
   if (fetchSlot0) {
-    const slot0 = results[resultIndex++];
+    const slot0 = results[resultIndex++] as [bigint, number];
     if (!params || params.includes(PoolParam.SQRT_PRICE_X96)) poolInfo.sqrtPriceX96 = slot0[0];
     if (!params || params.includes(PoolParam.TICK)) poolInfo.tick = slot0[1];
   }
@@ -62,11 +58,9 @@ export async function getPoolInfo(
   rpcUrl: string,
   params?: PoolParam[]
 ): Promise<PoolInfo> {
-  const provider = new ethers.JsonRpcProvider(rpcUrl);
-
-  if (!provider) {
-    throw new Error("No provider");
-  }
+  const client = createPublicClient({
+    transport: http(rpcUrl),
+  });
 
   const currentPoolAddress = computePoolAddress({
     factoryAddress,
@@ -74,8 +68,6 @@ export async function getPoolInfo(
     tokenB,
     fee: poolFee,
   });
-
-  const poolContract = new ethers.Contract(currentPoolAddress, IUniswapV3PoolABI.abi, provider);
 
   // Determine which parameters to fetch based on the params argument
   // token0 and token1 are derived from tokenA and tokenB, and fee is provided as poolFee
@@ -85,9 +77,9 @@ export async function getPoolInfo(
 
   // Create an array of promises for the parameters we need to fetch
   const promises = [];
-  if (fetchTickSpacing) promises.push(poolContract.tickSpacing());
-  if (fetchLiquidity) promises.push(poolContract.liquidity());
-  if (fetchSlot0) promises.push(poolContract.slot0());
+  if (fetchTickSpacing) promises.push(client.readContract({ address: currentPoolAddress as `0x${string}`, abi: IUniswapV3PoolABI.abi, functionName: "tickSpacing" }));
+  if (fetchLiquidity) promises.push(client.readContract({ address: currentPoolAddress as `0x${string}`, abi: IUniswapV3PoolABI.abi, functionName: "liquidity" }));
+  if (fetchSlot0) promises.push(client.readContract({ address: currentPoolAddress as `0x${string}`, abi: IUniswapV3PoolABI.abi, functionName: "slot0" }));
 
   // Execute all promises in parallel
   const results = await Promise.all(promises);
@@ -103,10 +95,10 @@ export async function getPoolInfo(
   // Populate the result object based on which parameters were fetched
   let resultIndex = 0;
 
-  if (fetchTickSpacing) poolInfo.tickSpacing = results[resultIndex++];
-  if (fetchLiquidity) poolInfo.liquidity = results[resultIndex++];
+  if (fetchTickSpacing) poolInfo.tickSpacing = results[resultIndex++] as number;
+  if (fetchLiquidity) poolInfo.liquidity = results[resultIndex++] as bigint;
   if (fetchSlot0) {
-    const slot0 = results[resultIndex++];
+    const slot0 = results[resultIndex++] as [bigint, number];
     if (!params || params.includes(PoolParam.SQRT_PRICE_X96)) poolInfo.sqrtPriceX96 = slot0[0];
     if (!params || params.includes(PoolParam.TICK)) poolInfo.tick = slot0[1];
   }
