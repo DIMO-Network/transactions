@@ -1,12 +1,13 @@
+import { Token } from "@uniswap/sdk-core";
 import IUniswapV3PoolABI from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json" with { type: "json" };
 import { computePoolAddress } from "@uniswap/v3-sdk";
-import { Token } from "@uniswap/sdk-core";
 import { ethers } from "ethers-v5";
 import type { Hex } from "viem";
+
 import { PoolInfo, PoolParam } from ":core/types/uniswap.js";
 
 export async function getPoolInfoByAddress(poolAddress: Hex, rpcUrl: string, params?: PoolParam[]): Promise<PoolInfo> {
-  const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+  const provider = new ethers.JsonRpcProvider(rpcUrl);
   if (!provider) {
     throw new Error("No provider");
   }
@@ -61,7 +62,7 @@ export async function getPoolInfo(
   rpcUrl: string,
   params?: PoolParam[]
 ): Promise<PoolInfo> {
-  const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+  const provider = new ethers.JsonRpcProvider(rpcUrl);
 
   if (!provider) {
     throw new Error("No provider");

@@ -1,14 +1,13 @@
 import { Currency, CurrencyAmount, Token, TradeType } from "@uniswap/sdk-core";
 import { Pool, Route, SwapOptions, SwapQuoter, SwapRouter, Trade } from "@uniswap/v3-sdk";
-import { ethers, BigNumber } from "ethers-v5";
-
-import { TokenTrade, SwapParams, PoolInfo, PoolParam } from ":core/types/uniswap.js";
-import {
-  POLYGON_QUOTER_CONTRACT_ADDRESS,
-  POLYGON_POOL_FACTORY_CONTRACT_ADDRESS,
-} from ":core/constants/contractAddrs.js";
+import { ethers } from "ethers-v5";
 
 import { getPoolInfo } from "./pool.js";
+import {
+  POLYGON_POOL_FACTORY_CONTRACT_ADDRESS,
+  POLYGON_QUOTER_CONTRACT_ADDRESS,
+} from ":core/constants/contractAddrs.js";
+import { PoolInfo, PoolParam, SwapParams, TokenTrade } from ":core/types/uniswap.js";
 
 export async function getSwapCalldata(
   swapParams: SwapParams,
@@ -74,11 +73,11 @@ async function createTrade(swapParams: SwapParams, rpcUrl: string): Promise<Toke
 async function getOutputQuote(
   route: Route<Currency, Currency>,
   token: Token,
-  amount: BigNumber,
+  amount: bigint,
   tradeType: TradeType,
   rpcUrl: string
 ) {
-  const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+  const provider = new ethers.JsonRpcProvider(rpcUrl);
 
   if (!provider) {
     throw new Error("Provider required to get pool state");
@@ -95,5 +94,5 @@ async function getOutputQuote(
     data: calldata,
   });
 
-  return ethers.utils.defaultAbiCoder.decode(["uint256"], quoteCallReturnData)[0];
+  return ethers.AbiCoder.defaultAbiCoder().decode(["uint256"], quoteCallReturnData)[0];
 }
