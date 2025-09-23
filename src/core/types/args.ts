@@ -1,52 +1,52 @@
 import { Abi } from "viem";
 
 export type MintVehicleWithDeviceDefinition = {
-  manufacturerNode: BigInt;
+  manufacturerNode: bigint;
   owner: `0x${string}`;
   deviceDefinitionID: string;
-  attributeInfo: { attribute: string; info: string }[];  
+  attributeInfo: { attribute: string; info: string }[];
 };
 
 export type VehiclePermissionDescription = {
   driverID: string;
   appID: string;
   appName: string;
-  expiration: BigInt;
+  expiration: bigint;
   permissionArray: string[];
   effectiveAt: string;
 };
 
 export type SetVehiclePermissions = {
-  tokenId: BigInt;
+  tokenId: bigint;
   grantee: `0x${string}`;
   permissions: Permission[];
-  expiration: BigInt;
+  expiration: bigint;
   source: string;
 };
 
 export type SetVehiclePermissionsBulk = {
-  tokenIds: BigInt[];
+  tokenIds: bigint[];
   grantee: `0x${string}`;
   permissions: Permission[];
-  expiration: BigInt;
+  expiration: bigint;
   source: string;
 };
 
 export type SetPermissionsSACD = {
   asset: `0x${string}`;
-  tokenId: BigInt;
+  tokenId: bigint;
   grantee: `0x${string}`;
   permissions: Permission[];
-  expiration: BigInt;
+  expiration: bigint;
   source: string;
 };
 
 export type BurnVehicle = {
-  tokenId: BigInt;
+  tokenId: bigint;
 };
 
 export type BurnSyntheticDevice = {
-  tokenId: BigInt;
+  tokenId: bigint;
 };
 
 export type SendDIMOTokens = {
@@ -55,24 +55,24 @@ export type SendDIMOTokens = {
 };
 
 export type ClaimAftermarketDevice = {
-  aftermarketDeviceNode: BigInt;
+  aftermarketDeviceNode: bigint;
   aftermarketDeviceSig: `0x${string}`;
 };
 
 export type PairAftermarketDevice = {
-  vehicleNode: BigInt;
-  aftermarketDeviceNode: BigInt;
+  vehicleNode: bigint;
+  aftermarketDeviceNode: bigint;
 };
 
 export type PairAftermarketDeviceWithAdSig = {
-  vehicleNode: BigInt;
-  aftermarketDeviceNode: BigInt;
+  vehicleNode: bigint;
+  aftermarketDeviceNode: bigint;
   aftermarketDeviceSig: `0x${string}`;
 };
 
 export type UnPairAftermarketDevice = {
-  vehicleNode: BigInt;
-  aftermarketDeviceNode: BigInt;
+  vehicleNode: bigint;
+  aftermarketDeviceNode: bigint;
 };
 
 export type ConnectPrivateKeyParams = {
@@ -97,11 +97,10 @@ export type ClientConfigDimo = {
 };
 
 export type TransferVehicleAndAftermarketDeviceIDs = {
-  vehicleIds: BigInt[];
-  aftermarketDeviceIds: BigInt[];
+  vehicleIds: bigint[];
+  aftermarketDeviceIds: bigint[];
   to: `0x${string}`;
 };
-
 
 export const MAX_PERMISSION_INDEX = 8; // Maximum number of permissions that can be granted in a single SACD template
 
@@ -122,7 +121,7 @@ export type PermissionsSACDTemplateInputs = {
   asset: `did:${string}`;
   permissions: Permission[];
   attachments: { name: string; description: string; contentType: string; url: string }[];
-  expiration: BigInt;
+  expiration: bigint;
 };
 
 export type DeriveKernelAddress = {
@@ -133,7 +132,7 @@ export type DeriveKernelAddress = {
 
 export type TransactionData = {
   address: `0x${string}`;
-  value?: BigInt;
+  value?: bigint;
   abi: Abi;
   functionName: string;
   args: any[];
@@ -145,27 +144,27 @@ export type TransactionInput = {
 };
 
 export type AddStake = {
-  tokenId: BigInt;
+  tokenId: bigint;
   amount: number;
   level: number;
 };
 
 export type WithdrawStake = {
-  stakeId: BigInt;
+  stakeId: bigint;
 };
 
 export type UpgradeStake = {
-  stakeId: BigInt;
+  stakeId: bigint;
   level: number;
-  vehicleId: BigInt;
+  vehicleId: bigint;
   amountDiff: number;
 };
 
 export type AttachVehicle = {
-  stakeId: BigInt;
-  vehicleId: BigInt;
+  stakeId: bigint;
+  vehicleId: bigint;
 };
 
 export type DetachVehicle = {
-  vehicleId: BigInt;
+  vehicleId: bigint;
 };

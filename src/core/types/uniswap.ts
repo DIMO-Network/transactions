@@ -1,6 +1,5 @@
 import { Token, TradeType } from "@uniswap/sdk-core";
 import { Trade } from "@uniswap/v3-sdk";
-import { ethers, BigNumber } from "ethers-v5";
 
 import { ENVIRONMENT } from ":core/types/dimo.js";
 
@@ -9,7 +8,7 @@ export type TokenTrade = Trade<Token, Token, TradeType>;
 export type SwapParams = {
   tokenIn: Token;
   tokenOut: Token;
-  amount: BigNumber;
+  amount: bigint;
   poolFee: number;
   tradeType: TradeType;
 };
@@ -27,8 +26,8 @@ export interface PoolInfo {
   token1?: string;
   fee?: number;
   tickSpacing?: number;
-  liquidity?: ethers.BigNumber;
-  sqrtPriceX96?: ethers.BigNumber;
+  liquidity?: bigint;
+  sqrtPriceX96?: bigint;
   tick?: number;
 }
 

@@ -1,6 +1,6 @@
 export type VehicleNodeMintedWithDeviceDefinition = {
-  manufacturerId: BigInt;
-  vehicleId: BigInt;
+  manufacturerId: bigint;
+  vehicleId: bigint;
   owner: `0x${string}`;
   deviceDefinitionId: string;
 };
@@ -13,14 +13,14 @@ export type TypeHashResponse = {
       version: string;
       chainId: number;
       verifyingContract: `0x${string}`;
-    },
+    };
     types: Record<
       string,
       {
-        name: string,
-        type: string
+        name: string;
+        type: string;
       }[]
-    >,
-    message: Record<string, bigint | `0x${string}`>
+    >;
+    message: Record<string, bigint | `0x${string}`>;
   };
 };

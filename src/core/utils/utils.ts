@@ -1,7 +1,8 @@
-import { pad, isAddress } from "viem";
+import { getEntryPoint, KERNEL_V3_1 } from "@zerodev/sdk/constants";
+import { isAddress, pad } from "viem";
+
 import { MAX_PERMISSION_INDEX, Permission, VehiclePermissionDescription } from ":core/types/args.js";
-import { AccountConfig, KernelConfig, _accountConfig, _kernelConfig } from ":core/types/dimo.js";
-import { KERNEL_V3_1, getEntryPoint } from "@zerodev/sdk/constants";
+import { _accountConfig, AccountConfig, KernelConfig } from ":core/types/dimo.js";
 
 export const newKernelConfig = (args: KernelConfig): KernelConfig => {
   if (args.rpcUrl == undefined) {
@@ -63,7 +64,7 @@ export const newKernelConfig = (args: KernelConfig): KernelConfig => {
     useWalletSession: args.useWalletSession,
     sessionTimeoutSeconds: args.sessionTimeoutSeconds,
     usePrivateKey: args.usePrivateKey,
-    defaultPermissions: args.defaultPermissions
+    defaultPermissions: args.defaultPermissions,
   };
 };
 
@@ -89,16 +90,16 @@ export const newAccountConfig = (args: AccountConfig): _accountConfig => {
 
 export const getPermissionsValue = (permissions: Permission[]): bigint => {
   const present = new Set(permissions);
-  const allPermissions = Object.values(Permission).filter(p => typeof p === 'number') as number[];
+  const allPermissions = Object.values(Permission).filter((p) => typeof p === "number") as number[];
   allPermissions.sort((a, b) => a - b);
 
-  const encodedPermissions = allPermissions.map(p => present.has(p) ? '11' : '00').reverse();
+  const encodedPermissions = allPermissions.map((p) => (present.has(p) ? "11" : "00")).reverse();
 
   return BigInt(`0b${encodedPermissions.join("")}00`);
 };
 
 export const getPermissionsArray = (permissionValue: bigint): Permission[] => {
-  const bin = permissionValue.toString(2).padStart(18, '0');
+  const bin = permissionValue.toString(2).padStart(18, "0");
   const bits = bin.slice(0, -2);
 
   const permissions: Permission[] = [];
@@ -107,20 +108,18 @@ export const getPermissionsArray = (permissionValue: bigint): Permission[] => {
     const chunk = bits.slice(i, i + 2);
     const indexFromEnd = i / 2;
     const permissionEnumValue = MAX_PERMISSION_INDEX - indexFromEnd;
-    if (chunk === '11') {
+    if (chunk === "11") {
       permissions.push(permissionEnumValue as Permission);
     }
   }
 
   return permissions.reverse();
-}
-
+};
 
 export const sacdDescription = (args: VehiclePermissionDescription): string => {
   const description = `By proceeding, you will grant data access and control functions to ${args.appName} effective as of ${args.effectiveAt} until ${new Date(Number(args.expiration) * 1000).toISOString()}. Permissions being granted: ${args.permissionArray.join("; ")} Driver ID: ${args.driverID} App ID: ${args.appID} DIMO Platform, version 1.0.`;
   return description;
 };
-
 
 // | APPROX LOCATION | RAW DATA | STREAMS | CREDENTIALS | ALLTIME_LOCATION | CURRENT_LOCATION | COMMANDS | NONLOCATION_TELEMETRY | ZERO-PADDED |
 // |-----------------|----------|---------|-------------|------------------|------------------|----------|-----------------------|-------------|

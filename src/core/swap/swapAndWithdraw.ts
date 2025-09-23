@@ -1,13 +1,12 @@
-import { Address, maxInt256, Hex } from "viem";
-import { BigNumber } from "ethers-v5";
 import { Token, TradeType } from "@uniswap/sdk-core";
 import type { SwapOptions } from "@uniswap/v3-sdk";
+import { Address, Hex, maxInt256 } from "viem";
 
-import type { Call } from ":core/types/common.js";
-import { getSwapCalldata } from ":core/swap/uniswap/uniswap.js";
-import { createTokenApprovalTransaction, createWMATICWithdrawTransaction } from ":core/utils/tokens.js";
 import { POLYGON_SWAP_ROUTER_ADDRESS } from ":core/constants/contractAddrs.js";
 import { WMATIC_TOKEN } from ":core/constants/uniswapConstants.js";
+import { getSwapCalldata } from ":core/swap/uniswap/uniswap.js";
+import type { Call } from ":core/types/common.js";
+import { createTokenApprovalTransaction, createWMATICWithdrawTransaction } from ":core/utils/tokens.js";
 
 /**
  * Generates transaction data for swapping tokens to WMATIC and then withdrawing to POL
@@ -45,7 +44,7 @@ export async function swapToExactPOL(
     {
       tokenIn: tokenIn,
       tokenOut: WMATIC_TOKEN,
-      amount: BigNumber.from(exactOutputAmount.toString()),
+      amount: BigInt(exactOutputAmount.toString()),
       poolFee: poolFee,
       tradeType: TradeType.EXACT_OUTPUT,
     },

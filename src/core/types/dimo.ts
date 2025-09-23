@@ -143,7 +143,7 @@ interface CloudEventSACDAgreement {
   extensions: {
     [key: string]: unknown;
   };
-};
+}
 
 interface PaymentSACDAgreement {
   type: "payment";
@@ -167,9 +167,9 @@ interface PaymentSACDAgreement {
     invoicing: {
       invoiceFrequency: "one-time" | "recurring";
       invoiceRecipient: string;
-    }
+    };
   };
-};
+}
 
 interface PermissionSACDAgreement {
   type: "permission";
@@ -184,7 +184,7 @@ interface PermissionSACDAgreement {
   extensions?: {
     [key: string]: unknown;
   };
-};
+}
 
 // Union type for SACD agreements, this way we can have different types of agreements in the same SACD and will rise type errors if the structure is not correct
 type SACDAgreement = CloudEventSACDAgreement | PaymentSACDAgreement | PermissionSACDAgreement;

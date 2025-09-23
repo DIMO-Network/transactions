@@ -1,6 +1,6 @@
-import { encodeFunctionData } from "viem";
-import { ContractToMapping, ContractType, ENVIRONMENT, SACDTemplate } from ":core/types/dimo.js";
 import { KernelAccountClient } from "@zerodev/sdk";
+import { encodeFunctionData } from "viem";
+
 import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
 import { SET_PERMISSIONS_SACD } from ":core/constants/methods.js";
 import {
@@ -10,6 +10,7 @@ import {
   SetVehiclePermissions,
   SetVehiclePermissionsBulk,
 } from ":core/types/args.js";
+import { ContractToMapping, ContractType, ENVIRONMENT, SACDTemplate } from ":core/types/dimo.js";
 import { getPermissionsValue } from ":core/utils/utils.js";
 
 export async function setVehiclePermissions(
@@ -83,7 +84,7 @@ export async function setVehiclePermissionsBatch(
           arg.grantee,
           permissionValue,
           arg.expiration,
-          arg.source
+          arg.source,
         ],
       }),
     };
@@ -97,7 +98,6 @@ export async function setPermissionsSACD(
   client: KernelAccountClient,
   contracts: ContractToMapping
 ): Promise<`0x${string}`> {
-
   const permissionValue = getPermissionsValue(args.permissions);
 
   return await client.account!.encodeCalls([
@@ -107,14 +107,7 @@ export async function setPermissionsSACD(
       data: encodeFunctionData({
         abi: contracts[ContractType.DIMO_SACD].abi,
         functionName: SET_PERMISSIONS_SACD,
-        args: [
-          args.asset,
-          args.tokenId,
-          args.grantee,
-          permissionValue,
-          args.expiration,
-          args.source
-        ],
+        args: [args.asset, args.tokenId, args.grantee, permissionValue, args.expiration, args.source],
       }),
     },
   ]);
@@ -126,14 +119,7 @@ export function sacdCallData(args: SetPermissionsSACD, environment: string = "pr
   return encodeFunctionData({
     abi: contracts[ContractType.DIMO_SACD].abi,
     functionName: SET_PERMISSIONS_SACD,
-    args: [
-      args.asset,
-      args.tokenId,
-      args.grantee,
-      permissionValue,
-      args.expiration,
-      args.source
-    ],
+    args: [args.asset, args.tokenId, args.grantee, permissionValue, args.expiration, args.source],
   });
 }
 

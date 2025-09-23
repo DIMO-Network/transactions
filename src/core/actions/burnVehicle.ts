@@ -1,9 +1,10 @@
-import { encodeFunctionData } from "viem";
-import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
-import { BURN_VEHICLE } from ":core/constants/methods.js";
 import { KernelAccountClient } from "@zerodev/sdk";
+import { encodeFunctionData } from "viem";
+
 import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
+import { BURN_VEHICLE } from ":core/constants/methods.js";
 import { BurnVehicle } from ":core/types/args.js";
+import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 
 export function burnVehicleCallData(args: BurnVehicle, environment: string = "prod"): `0x${string}` {
   const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;

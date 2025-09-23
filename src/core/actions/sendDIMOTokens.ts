@@ -1,21 +1,22 @@
+import { KernelAccountClient } from "@zerodev/sdk";
 import {
   Account,
   Address,
   Chain,
+  encodeFunctionData,
   ParseAccount,
   PublicClient,
   RpcSchema,
   TransactionRequest,
   Transport,
   WalletClient,
-  encodeFunctionData,
 } from "viem";
-import { ContractType, ENVIRONMENT, _kernelConfig } from ":core/types/dimo.js";
-import { SEND_DIMO_TOKENS } from ":core/constants/methods.js";
-import { KernelAccountClient } from "@zerodev/sdk";
-import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING } from ":core/constants/mappings.js";
-import { SendDIMOTokens } from ":core/types/args.js";
 import { polygon } from "viem/chains";
+
+import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING } from ":core/constants/mappings.js";
+import { SEND_DIMO_TOKENS } from ":core/constants/methods.js";
+import { SendDIMOTokens } from ":core/types/args.js";
+import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 
 export function sendDIMOTokensCallData(args: SendDIMOTokens, environment: string = "prod"): `0x${string}` {
   const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;

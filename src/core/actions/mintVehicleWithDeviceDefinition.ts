@@ -1,19 +1,20 @@
+import { KernelAccountClient } from "@zerodev/sdk";
 import {
   Account,
   Address,
   Chain,
+  encodeFunctionData,
   ParseAccount,
   PublicClient,
   RpcSchema,
   Transport,
   WalletClient,
-  encodeFunctionData,
 } from "viem";
-import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
+
 import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
-import { KernelAccountClient } from "@zerodev/sdk";
 import { MINT_VEHICLE_WITH_DEVICE_DEFINITION } from ":core/constants/methods.js";
 import { MintVehicleWithDeviceDefinition } from ":core/types/args.js";
+import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 
 export function mintVehicleCallData(
   args: MintVehicleWithDeviceDefinition,

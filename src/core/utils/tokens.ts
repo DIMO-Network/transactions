@@ -1,8 +1,8 @@
-import { encodeFunctionData, Address, maxInt256, erc20Abi } from "viem";
+import { Address, encodeFunctionData, erc20Abi, maxInt256 } from "viem";
 
-import type { Call } from ":core/types/common.js";
 import { abiWmatic } from ":core/abis/index.js";
 import { POLYGON_SWAP_ROUTER_ADDRESS } from ":core/constants/contractAddrs.js";
+import type { Call } from ":core/types/common.js";
 
 /**
  * Creates a transaction object to withdraw POL from WMATIC
