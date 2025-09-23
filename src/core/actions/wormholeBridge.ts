@@ -580,20 +580,20 @@ async function setCustomRefundAddress(args: BridgeInitiateArgs, tx: any): Promis
             { name: "value", type: "uint256" },
             { name: "refundAddress", type: "address" },
             { name: "signedQuote", type: "bytes" },
-            { name: "instructions", type: "bytes" }
-          ]
+            { name: "instructions", type: "bytes" },
+          ],
         },
         {
           name: "feeArgs",
           type: "tuple",
           components: [
             { name: "dbps", type: "uint16" },
-            { name: "payee", type: "address" }
-          ]
-        }
+            { name: "payee", type: "address" },
+          ],
+        },
       ],
-      outputs: [{ name: "msgId", type: "uint64" }]
-    }
+      outputs: [{ name: "msgId", type: "uint64" }],
+    },
   ] as const;
 
   // Decode the transaction data

@@ -35,8 +35,6 @@
     "@wormhole-foundation/sdk-solana-ntt": "3.0.0",
     "@zerodev/ecdsa-validator": "^5.4.9",
     "@zerodev/sdk": "^5.5.2",
-    "ethers": "^6.15.0",
-    "ethers-v5": "npm:ethers@^6.15.0",
     "uuid": "^13.0.0",
     "viem": "^2.36.0"
   },
