@@ -1,38 +1,43 @@
-import { type Hex } from "viem";
-import { TransactionDescription } from "ethers";
-import { Wormhole, Network, routes, amount, AccountAddress, toUniversal, UniversalAddress } from "@wormhole-foundation/sdk";
-import { NttExecutorRoute, nttExecutorRoute } from "@wormhole-foundation/sdk-route-ntt";
-import { KernelAccountClient } from "@zerodev/sdk";
 import { Percent } from "@uniswap/sdk-core";
+import {
+  AccountAddress,
+  amount,
+  Network,
+  routes,
+  toUniversal,
+  UniversalAddress,
+  Wormhole,
+} from "@wormhole-foundation/sdk";
 import evm from "@wormhole-foundation/sdk/platforms/evm";
 import solana from "@wormhole-foundation/sdk/platforms/solana";
+import { NttWithExecutor } from "@wormhole-foundation/sdk-definitions-ntt";
+import { NttExecutorRoute, nttExecutorRoute } from "@wormhole-foundation/sdk-route-ntt";
+import { KernelAccountClient } from "@zerodev/sdk";
+import { TransactionDescription } from "ethers";
+import { type Hex } from "viem";
 
-import { WormholeScanAPI } from ':core/utils/wormhole/api-client.js';
-import { convertToExecutorConfig, getOperationStatus, isWormholeErrorResponse } from ":core/utils/wormhole/helpers.js";
-import { getDIMOPriceFromUniswapV3 } from ":core/utils/priceOracle.js";
-import { swapToExactPOL } from ":core/swap/swapAndWithdraw.js";
-import { ENVIRONMENT } from ":core/types/dimo.js";
-import type { Call } from ":core/types/common.js";
-import {
-  type SupportedWormholeNetworks,
-  type SupportedRelayingWormholeNetworks,
-  type BridgeInitiateArgs,
-  type ChainRpcConfig,
-  type Vaa,
-  type BaseWormholeResponse
-} from ":core/types/wormhole.js";
-import {
-  ENV_MAPPING,
-  UNISWAP_ARGS_MAPPING,
-} from ":core/constants/mappings.js";
+import { ENV_MAPPING, UNISWAP_ARGS_MAPPING } from ":core/constants/mappings.js";
 import {
   REFUND_ADDRESS_MAPPING,
-  WORMHOLE_ENV_MAPPING,
   WORMHOLE_CHAIN_MAPPING,
+  WORMHOLE_ENV_MAPPING,
   WORMHOLE_NTT_CONTRACTS,
-  WORMHOLE_QUOTE_INCREASE_PERCENTAGE
+  WORMHOLE_QUOTE_INCREASE_PERCENTAGE,
 } from ":core/constants/wormholeMappings.js";
-import { NttWithExecutor } from "@wormhole-foundation/sdk-definitions-ntt";
+import { swapToExactPOL } from ":core/swap/swapAndWithdraw.js";
+import type { Call } from ":core/types/common.js";
+import { ENVIRONMENT } from ":core/types/dimo.js";
+import {
+  type BaseWormholeResponse,
+  type BridgeInitiateArgs,
+  type ChainRpcConfig,
+  type SupportedRelayingWormholeNetworks,
+  type SupportedWormholeNetworks,
+  type Vaa,
+} from ":core/types/wormhole.js";
+import { getDIMOPriceFromUniswapV3 } from ":core/utils/priceOracle.js";
+import { WormholeScanAPI } from ":core/utils/wormhole/api-client.js";
+import { convertToExecutorConfig, getOperationStatus, isWormholeErrorResponse } from ":core/utils/wormhole/helpers.js";
 
 /**
  * Initiates a bridging operation for transferring tokens across different chains using Wormhole.
@@ -123,7 +128,7 @@ export async function initiateBridging(
         Wormhole.chainAddress(WORMHOLE_CHAIN_MAPPING[args.destinationChain], args.recipientAddress),
         environment,
         routeQuote
-      )
+      );
 
       transactions.push(...wormholeTransferTxs);
     } else {
@@ -132,7 +137,7 @@ export async function initiateBridging(
         toUniversal(WORMHOLE_CHAIN_MAPPING[args.sourceChain], client.account.address),
         Wormhole.chainAddress(WORMHOLE_CHAIN_MAPPING[args.destinationChain], args.recipientAddress),
         environment
-      )
+      );
 
       transactions.push(...wormholeTransferTxs);
     }
@@ -179,7 +184,7 @@ export async function quoteDeliveryPrice(
     rpcConfig,
     amountTokens,
     priceIncreasePercentage // Increase price by the effective percentage to avoid underfunding
-  )
+  );
 
   const price = routeQuote.estimatedCost;
 
@@ -230,7 +235,7 @@ export async function checkNttTransferStatus(
     const wormholeEnv = WORMHOLE_ENV_MAPPING.get(environment) ?? "Mainnet";
 
     const wormholeScanApi = new WormholeScanAPI(wormholeEnv !== "Mainnet");
-    const response = await wormholeScanApi.get(`/operations?txHash=${txid}`) as BaseWormholeResponse;
+    const response = (await wormholeScanApi.get(`/operations?txHash=${txid}`)) as BaseWormholeResponse;
 
     // Check if the response indicates an error
     if (isWormholeErrorResponse(response)) {
@@ -239,8 +244,8 @@ export async function checkNttTransferStatus(
         error: {
           code: response.code,
           message: response.message,
-          details: response.details
-        }
+          details: response.details,
+        },
       };
     }
 
@@ -249,17 +254,16 @@ export async function checkNttTransferStatus(
       return {
         status: "Error",
         error: {
-          message: "No operations found for the provided transaction hash"
-        }
+          message: "No operations found for the provided transaction hash",
+        },
       };
     }
 
-    const operation = response.operations[0]
+    const operation = response.operations[0];
 
     const overallStatus = getOperationStatus(operation);
 
     return { status: overallStatus, vaa: operation.vaa };
-
   } catch (error: any) {
     console.error("Error checking NTT transfer status:", error);
 
@@ -267,22 +271,22 @@ export async function checkNttTransferStatus(
     if (error.response && error.response.data) {
       return {
         status: "Error",
-        error: error.response.data
+        error: error.response.data,
       };
     }
 
     return {
       status: "Error",
       error: {
-        message: error.message || "Unknown error occurred while checking transfer status"
-      }
+        message: error.message || "Unknown error occurred while checking transfer status",
+      },
     };
   }
 }
 
 /**
  * Generates a series of transactions required for a non relayed Wormhole NTT transfer.
- * 
+ *
  * This function uses the Wormhole SDK to create all necessary transactions for transferring
  * tokens across chains. It processes the generator pattern used by the Wormhole SDK's transfer
  * method and converts the results into a format compatible with the DIMO transaction system.
@@ -329,7 +333,7 @@ async function generateWormholeNonRelayedTransferTransactions(
         transactions.push({
           to: tx.transaction.to,
           data: tx.transaction.data,
-          value: tx.transaction.value ?? BigInt(0)
+          value: tx.transaction.value ?? BigInt(0),
         });
       }
     }
@@ -337,16 +341,18 @@ async function generateWormholeNonRelayedTransferTransactions(
     return transactions;
   } catch (error) {
     console.error("Error generating Wormhole transfer transactions:", error);
-    throw new Error(`Failed to generate Wormhole transfer transactions: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Failed to generate Wormhole transfer transactions: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 }
 
 /**
  * Generates a series of transactions required for a relayed Wormhole NTT transfer.
- * 
+ *
  * This function uses the Wormhole SDK to create all necessary transactions for transferring
- * tokens across chains with automatic relaying. It processes the generator pattern used by 
- * the Wormhole SDK's transfer method, modifies the transfer transaction to set custom refund 
+ * tokens across chains with automatic relaying. It processes the generator pattern used by
+ * the Wormhole SDK's transfer method, modifies the transfer transaction to set custom refund
  * addresses, and adjusts the transaction value based on the provided parameters.
  *
  * @param args - The parameters for the bridging operation including source/destination chains and amount
@@ -410,13 +416,13 @@ export async function generateWormholeRelayedTransferTransactions(
         // If this is the transfer transaction (not the approval)
         if (customRefundAddress && tx.description === "NttWithExecutor.transfer") {
           try {
-            const newData = await setCustomRefundAddress(args, tx)
+            const newData = await setCustomRefundAddress(args, tx);
 
             // Add the modified transaction
             transactions.push({
               to: tx.transaction.to,
               data: newData,
-              value: tx.transaction.value ?? BigInt(0)
+              value: tx.transaction.value ?? BigInt(0),
             });
           } catch (error) {
             console.error("Error modifying transfer transaction:", error);
@@ -424,7 +430,7 @@ export async function generateWormholeRelayedTransferTransactions(
             transactions.push({
               to: tx.transaction.to,
               data: tx.transaction.data,
-              value: tx.transaction.value ?? BigInt(0)
+              value: tx.transaction.value ?? BigInt(0),
             });
           }
         } else {
@@ -432,7 +438,7 @@ export async function generateWormholeRelayedTransferTransactions(
           transactions.push({
             to: tx.transaction.to,
             data: tx.transaction.data,
-            value: tx.transaction.value ?? BigInt(0)
+            value: tx.transaction.value ?? BigInt(0),
           });
         }
       }
@@ -441,7 +447,9 @@ export async function generateWormholeRelayedTransferTransactions(
     return transactions;
   } catch (error) {
     console.error("Error generating Wormhole transfer transactions:", error);
-    throw new Error(`Failed to generate Wormhole transfer transactions: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Failed to generate Wormhole transfer transactions: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 }
 
@@ -482,7 +490,7 @@ async function getRouteQuote(
   const srcNtt = await srcChain.getProtocol("Ntt", {
     ntt: WORMHOLE_NTT_CONTRACTS[sourceChain],
   });
-  const executorConfig = convertToExecutorConfig(WORMHOLE_NTT_CONTRACTS)
+  const executorConfig = convertToExecutorConfig(WORMHOLE_NTT_CONTRACTS);
 
   if (priceIncreasePercentage && priceIncreasePercentage != 0) {
     if (priceIncreasePercentage < 0 || priceIncreasePercentage > 100) {
@@ -492,7 +500,7 @@ async function getRouteQuote(
     // Apply a minimum WORMHOLE_QUOTE_INCREASE_PERCENTAGE increase for Solana destination chains
     let effectivePriceIncreasePercentage = priceIncreasePercentage;
     if (["Solana", "SolanaTestnet", "SolanaTest"].includes(destinationChain)) {
-      // Only apply the WORMHOLE_QUOTE_INCREASE_PERCENTAGE minimum 
+      // Only apply the WORMHOLE_QUOTE_INCREASE_PERCENTAGE minimum
       // if the user's specified percentage is less than WORMHOLE_QUOTE_INCREASE_PERCENTAGE
       if (priceIncreasePercentage < WORMHOLE_QUOTE_INCREASE_PERCENTAGE) {
         effectivePriceIncreasePercentage = WORMHOLE_QUOTE_INCREASE_PERCENTAGE;
@@ -502,7 +510,7 @@ async function getRouteQuote(
     const dstNtt = await destChain.getProtocol("NttWithExecutor", {
       ntt: WORMHOLE_NTT_CONTRACTS[destinationChain],
     });
-    let { msgValue } = await dstNtt.estimateMsgValueAndGasLimit(undefined)
+    let { msgValue } = await dstNtt.estimateMsgValueAndGasLimit(undefined);
 
     msgValue = (msgValue * BigInt(100 + effectivePriceIncreasePercentage)) / BigInt(100);
 
@@ -512,9 +520,9 @@ async function getRouteQuote(
         [destinationChain]: {
           [WORMHOLE_NTT_CONTRACTS[destinationChain]?.token || ""]: {
             msgValue: msgValue,
-          }
-        }
-      }
+          },
+        },
+      },
     };
   }
 
@@ -566,7 +574,9 @@ async function setCustomRefundAddress(args: BridgeInitiateArgs, tx: any): Promis
   const iface = new Interface(transferAbi);
 
   // Decode the transaction data
-  const decodedData = iface.parseTransaction({ data: tx.transaction.data }) as TransactionDescription;
+  const decodedData = iface.parseTransaction({
+    data: tx.transaction.data,
+  }) as TransactionDescription;
 
   // Get the original parameters
   const nttManager = decodedData.args[0];
@@ -582,12 +592,7 @@ async function setCustomRefundAddress(args: BridgeInitiateArgs, tx: any): Promis
     REFUND_ADDRESS_MAPPING[args.destinationChain]
   ).toUint8Array();
 
-  const newExecutorArgs = [
-    executorArgs[0],
-    REFUND_ADDRESS_MAPPING[args.sourceChain],
-    executorArgs[2],
-    executorArgs[3]
-  ];
+  const newExecutorArgs = [executorArgs[0], REFUND_ADDRESS_MAPPING[args.sourceChain], executorArgs[2], executorArgs[3]];
 
   // Re-encode the transaction with the custom refund address
   const newData = iface.encodeFunctionData("transfer", [
@@ -598,8 +603,8 @@ async function setCustomRefundAddress(args: BridgeInitiateArgs, tx: any): Promis
     refundAddress, // Custom refund address
     encodedInstructions,
     newExecutorArgs,
-    feeArgs
+    feeArgs,
   ]) as Hex;
 
-  return newData
+  return newData;
 }

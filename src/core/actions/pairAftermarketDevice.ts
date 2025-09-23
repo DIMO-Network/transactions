@@ -1,20 +1,20 @@
-import { ethers } from "ethers";
-import { polygon } from "viem/chains";
-import { encodeFunctionData } from "viem";
 import { KernelAccountClient } from "@zerodev/sdk";
+import { ethers } from "ethers";
+import { encodeFunctionData } from "viem";
+import { polygon } from "viem/chains";
 
-import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
-import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING } from ":core/constants/mappings.js";
-import { PAIR_AFTERMARKET_DEVICE, PAIR_AFTERMARKET_DEVICE_WITH_AD_SIG } from ":core/constants/methods.js";
 import {
-  PairAftermarketDeviceSign,
   AftermarketDeviceNode,
-  VehicleNode,
-  SolidityTypeUint256,
   DIMODomain,
   DIMODomainVersion,
+  PairAftermarketDeviceSign,
+  SolidityTypeUint256,
+  VehicleNode,
 } from ":core/constants/dimo.js";
+import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING } from ":core/constants/mappings.js";
+import { PAIR_AFTERMARKET_DEVICE, PAIR_AFTERMARKET_DEVICE_WITH_AD_SIG } from ":core/constants/methods.js";
 import { PairAftermarketDevice, PairAftermarketDeviceWithAdSig } from ":core/types/args.js";
+import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 import { TypeHashResponse } from ":core/types/responses.js";
 
 export const pairAftermarketDeviceTypeHash = (

@@ -1,23 +1,24 @@
+import { KernelAccountClient } from "@zerodev/sdk";
+import { ethers } from "ethers";
 import {
   Account,
   Address,
   Chain,
+  encodeFunctionData,
   ParseAccount,
   PublicClient,
   RpcSchema,
   TransactionRequest,
   Transport,
   WalletClient,
-  encodeFunctionData,
 } from "viem";
-import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
+import { polygon } from "viem/chains";
+
+import { DIMODomain, DIMODomainVersion } from ":core/constants/dimo.js";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING } from ":core/constants/mappings.js";
-import { KernelAccountClient } from "@zerodev/sdk";
 import { TRANSFER_VEHICLE_AND_AFTERMARKET_DEVICE_IDS } from ":core/constants/methods.js";
 import { TransferVehicleAndAftermarketDeviceIDs } from ":core/types/args.js";
-import { polygon } from "viem/chains";
-import { DIMODomain, DIMODomainVersion } from ":core/constants/dimo.js";
-import { ethers } from "ethers";
+import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 
 export function transferVehicleAndAftermarketDeviceIDsCallData(
   args: TransferVehicleAndAftermarketDeviceIDs,
@@ -123,8 +124,8 @@ export const transferAllTypeHash = (
       }[];
     };
     message: {
-      vehicleIds: BigInt[];
-      aftermarketDeviceIds: BigInt[];
+      vehicleIds: bigint[];
+      aftermarketDeviceIds: bigint[];
       to: `0x${string}`;
     };
   };

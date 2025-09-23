@@ -1,12 +1,13 @@
 import { Account, Address, Chain, ParseAccount, PublicClient, RpcSchema, Transport, WalletClient } from "viem";
-import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
+
 import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
+import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 
 export async function safeTransferVehicleID(
   args: {
     from: `0x${string}`;
     to: `0x${string}`;
-    vehicleId: BigInt;
+    vehicleId: bigint;
   },
   walletClient: WalletClient<Transport, Chain, ParseAccount<Account | Address>, RpcSchema>,
   publicClient: PublicClient,
