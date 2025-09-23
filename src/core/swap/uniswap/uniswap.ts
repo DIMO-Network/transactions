@@ -1,7 +1,6 @@
 import { Currency, CurrencyAmount, Token, TradeType } from "@uniswap/sdk-core";
 import { Pool, Route, SwapOptions, SwapQuoter, SwapRouter, Trade } from "@uniswap/v3-sdk";
-import { ethers } from "ethers-v5";
-import { decodeAbiParameters } from "viem";
+import { createPublicClient, decodeAbiParameters, http } from "viem";
 
 import { getPoolInfo } from "./pool.js";
 import {
@@ -78,11 +77,9 @@ async function getOutputQuote(
   tradeType: TradeType,
   rpcUrl: string
 ) {
-  const provider = new ethers.JsonRpcProvider(rpcUrl);
-
-  if (!provider) {
-    throw new Error("Provider required to get pool state");
-  }
+  const client = createPublicClient({
+    transport: http(rpcUrl),
+  });
 
   const tokenAmount = CurrencyAmount.fromRawAmount(token, amount.toString());
 
@@ -90,10 +87,10 @@ async function getOutputQuote(
     useQuoterV2: true,
   });
 
-  const quoteCallReturnData = await provider.call({
-    to: POLYGON_QUOTER_CONTRACT_ADDRESS,
-    data: calldata,
+  const quoteCallReturnData = await client.call({
+    to: POLYGON_QUOTER_CONTRACT_ADDRESS as `0x${string}`,
+    data: calldata as `0x${string}`,
   });
 
-  return decodeAbiParameters([{ type: "uint256" }], quoteCallReturnData as `0x${string}`)[0];
+  return decodeAbiParameters([{ type: "uint256" }], quoteCallReturnData.data as `0x${string}`)[0];
 }
