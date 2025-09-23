@@ -1,6 +1,5 @@
 import { KernelAccountClient } from "@zerodev/sdk";
-import { ethers } from "ethers";
-import { encodeFunctionData } from "viem";
+import { encodeFunctionData, hashTypedData } from "viem";
 import { polygon } from "viem/chains";
 
 import {
@@ -46,7 +45,12 @@ export const claimAftermarketDeviceTypeHash = (
     owner: owner,
   };
 
-  const hash = ethers.TypedDataEncoder.hash(domain, types, message);
+  const hash = hashTypedData({
+    domain,
+    types,
+    primaryType: ClaimAftermarketDeviceSign,
+    message,
+  });
 
   return { hash, payload: { domain, types, message } };
 };

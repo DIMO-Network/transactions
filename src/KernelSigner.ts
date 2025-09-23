@@ -454,7 +454,6 @@ export class KernelSigner {
     walletAddress: `0x${string}`
   ): Promise<KernelAccountClient<Transport, Chain, SmartAccount, Client, RpcSchema>> {
     const localAccount = await createAccount({
-      // @ts-expect-error - turnkeyClient type mismatch with createAccount expected client type
       client: turnkeyClient,
       organizationId: subOrganizationId,
       signWith: walletAddress,

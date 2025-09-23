@@ -1,10 +1,10 @@
 import { KernelAccountClient } from "@zerodev/sdk";
-import { ethers } from "ethers";
 import {
   Account,
   Address,
   Chain,
   encodeFunctionData,
+  hashTypedData,
   ParseAccount,
   PublicClient,
   RpcSchema,
@@ -155,7 +155,12 @@ export const transferAllTypeHash = (
     to: args.to,
   };
 
-  const hash = ethers.TypedDataEncoder.hash(domain, types, message);
+  const hash = hashTypedData({
+    domain,
+    types,
+    primaryType: "TransferVehicleAndAftermarketDeviceIds",
+    message,
+  });
 
   return { hash, payload: { domain, types, message } };
 };
