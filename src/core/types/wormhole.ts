@@ -22,7 +22,7 @@ export type SupportedRelayingWormholeNetworks =
   | "Solana"
   | "Sepolia"
   | "BaseSepolia"
-  | "SolanaTestnet"
+  | "SolanaTestnet";
 
 export type NttContracts = {
   [key in SupportedWormholeNetworks]?: Ntt.Contracts;
@@ -91,7 +91,7 @@ export interface Operation {
     native: string;
   };
   sequence: string;
-  vaa?: Vaa
+  vaa?: Vaa;
   content: {
     payload: {
       nttManagerMessage: {
