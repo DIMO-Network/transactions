@@ -13,6 +13,7 @@ import {
   abiStakingDev,
   abiToken,
   abiVehicleId,
+  abiSyntheticDeviceId,
   abiUniswapV3Pool,
 } from ":core/abis/index.js";
 
@@ -106,6 +107,10 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
         abi: abiVehicleId,
         address: contractAddrs.AMOY_DIMO_VEHICLE_ID_ADDRESS,
       },
+      [ContractType.DIMO_SYNTHETIC_DEVICE_ID]: {
+        abi: abiSyntheticDeviceId,
+        address: contractAddrs.AMOY_DIMO_SYNTHETIC_DEVICE_ID_ADDRESS,
+      },
       [ContractType.DIMO_TOKEN]: {
         abi: abiToken,
         address: contractAddrs.AMOY_DIMO_TOKEN_ADDRESS,
@@ -142,6 +147,10 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
         abi: abiVehicleId,
         address: contractAddrs.POLYGON_DIMO_VEHICLE_ID_ADDRESS,
       },
+      [ContractType.DIMO_SYNTHETIC_DEVICE_ID]: {
+        abi: abiSyntheticDeviceId,
+        address: contractAddrs.POLYGON_DIMO_SYNTHETIC_DEVICE_ID_ADDRESS,
+      },
       [ContractType.DIMO_TOKEN]: {
         abi: abiToken,
         address: contractAddrs.POLYGON_DIMO_TOKEN_ADDRESS,
@@ -177,6 +186,10 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
       [ContractType.DIMO_VEHICLE_ID]: {
         abi: abiVehicleId,
         address: zeroAddress,
+      },
+      [ContractType.DIMO_SYNTHETIC_DEVICE_ID]: {
+        abi: abiSyntheticDeviceId,
+        address: contractAddrs.POLYGON_DIMO_SYNTHETIC_DEVICE_ID_ADDRESS,
       },
       [ContractType.DIMO_TOKEN]: {
         abi: abiToken,
