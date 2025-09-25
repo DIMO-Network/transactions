@@ -4,7 +4,7 @@ export type MintVehicleWithDeviceDefinition = {
   manufacturerNode: BigInt;
   owner: `0x${string}`;
   deviceDefinitionID: string;
-  attributeInfo: { attribute: string; info: string }[];  
+  attributeInfo: { attribute: string; info: string }[];
 };
 
 export type VehiclePermissionDescription = {
@@ -102,7 +102,6 @@ export type TransferVehicleAndAftermarketDeviceIDs = {
   to: `0x${string}`;
 };
 
-
 export const MAX_PERMISSION_INDEX = 8; // Maximum number of permissions that can be granted in a single SACD template
 
 export enum Permission {
@@ -116,6 +115,13 @@ export enum Permission {
   GetApproximateLocation = 8, // Approximate location
 }
 
+export type CloudEventAgreement = {
+  eventType?: string;
+  source: `0x${string}`;
+  ids: string[];
+  tags: string[];
+};
+
 export type PermissionsSACDTemplateInputs = {
   grantor: `0x${string}`;
   grantee: `0x${string}`;
@@ -123,6 +129,8 @@ export type PermissionsSACDTemplateInputs = {
   permissions: Permission[];
   attachments: { name: string; description: string; contentType: string; url: string }[];
   expiration: BigInt;
+  cloudEventAgreements?: CloudEventAgreement[];
+  dataversion?: string;
 };
 
 export type DeriveKernelAddress = {
