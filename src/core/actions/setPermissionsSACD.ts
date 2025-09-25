@@ -83,7 +83,7 @@ export async function setVehiclePermissionsBatch(
           arg.grantee,
           permissionValue,
           arg.expiration,
-          arg.source
+          arg.source,
         ],
       }),
     };
@@ -97,7 +97,6 @@ export async function setPermissionsSACD(
   client: KernelAccountClient,
   contracts: ContractToMapping
 ): Promise<`0x${string}`> {
-
   const permissionValue = getPermissionsValue(args.permissions);
 
   return await client.account!.encodeCalls([
@@ -107,14 +106,7 @@ export async function setPermissionsSACD(
       data: encodeFunctionData({
         abi: contracts[ContractType.DIMO_SACD].abi,
         functionName: SET_PERMISSIONS_SACD,
-        args: [
-          args.asset,
-          args.tokenId,
-          args.grantee,
-          permissionValue,
-          args.expiration,
-          args.source
-        ],
+        args: [args.asset, args.tokenId, args.grantee, permissionValue, args.expiration, args.source],
       }),
     },
   ]);
@@ -126,14 +118,7 @@ export function sacdCallData(args: SetPermissionsSACD, environment: string = "pr
   return encodeFunctionData({
     abi: contracts[ContractType.DIMO_SACD].abi,
     functionName: SET_PERMISSIONS_SACD,
-    args: [
-      args.asset,
-      args.tokenId,
-      args.grantee,
-      permissionValue,
-      args.expiration,
-      args.source
-    ],
+    args: [args.asset, args.tokenId, args.grantee, permissionValue, args.expiration, args.source],
   });
 }
 
@@ -142,7 +127,7 @@ export const generatePermissionsSACDTemplate = async (args: PermissionsSACDTempl
     throw new Error("SACD inputs are required");
   }
 
-  const { grantor, grantee, asset, permissions, attachments } = args;
+  const { grantor, grantee, asset, permissions, attachments, cloudEventAgreements, dataversion } = args;
   const now = new Date(Date.now());
   const expiration = new Date(Number(args.expiration) * 1000);
 
@@ -150,10 +135,40 @@ export const generatePermissionsSACDTemplate = async (args: PermissionsSACDTempl
     permissions.includes(Permission[key as keyof typeof Permission])
   );
 
+  // Build agreements array starting with permission agreement
+  const agreements: any[] = [
+    {
+      type: "permission",
+      asset: asset,
+      permissions: permissionKeys.map((permission) => ({
+        name: `privilege:${permission}`,
+      })),
+      attachments: attachments,
+      extensions: {},
+    },
+  ];
+
+  // Add cloud event agreements if provided
+  if (cloudEventAgreements && cloudEventAgreements.length > 0) {
+    const cloudEventAgreementObjects = cloudEventAgreements.map((cloudEvent) => ({
+      type: "cloudevent",
+      eventType: cloudEvent.eventType || "dimo.attestation",
+      source: cloudEvent.source,
+      asset: asset,
+      ids: cloudEvent.ids,
+      tags: cloudEvent.tags,
+      effectiveAt: now.toISOString(),
+      expiresAt: expiration.toISOString(),
+    }));
+
+    agreements.push(...cloudEventAgreementObjects);
+  }
+
   const sacd: SACDTemplate = {
     specVersion: "1.0",
     time: now.toISOString(),
     type: "dimo.sacd",
+    dataversion: dataversion || "sacd/v1.0",
     data: {
       grantor: {
         address: grantor,
@@ -164,17 +179,7 @@ export const generatePermissionsSACDTemplate = async (args: PermissionsSACDTempl
       effectiveAt: now.toISOString(),
       expiresAt: expiration.toISOString(),
       additionalDates: {},
-      agreements: [
-        {
-          type: "permission",
-          asset: asset,
-          permissions: permissionKeys.map((permission) => ({
-            name: `privilege:${permission}`,
-          })),
-          attachments: attachments,
-          extensions: {},
-        },
-      ],
+      agreements: agreements,
     },
     signature: "0x", // Placeholder for signature, to be filled in later
   };

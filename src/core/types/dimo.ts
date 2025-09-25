@@ -139,12 +139,13 @@ interface CloudEventSACDAgreement {
   source: `0x${string}`;
   asset: `did:${string}`;
   ids: string[];
+  tags: string[];
   effectiveAt: string;
   expiresAt: string;
   extensions: {
     [key: string]: unknown;
   };
-};
+}
 
 interface PaymentSACDAgreement {
   type: "payment";
@@ -168,9 +169,9 @@ interface PaymentSACDAgreement {
     invoicing: {
       invoiceFrequency: "one-time" | "recurring";
       invoiceRecipient: string;
-    }
+    };
   };
-};
+}
 
 interface PermissionSACDAgreement {
   type: "permission";
@@ -185,7 +186,7 @@ interface PermissionSACDAgreement {
   extensions?: {
     [key: string]: unknown;
   };
-};
+}
 
 // Union type for SACD agreements, this way we can have different types of agreements in the same SACD and will rise type errors if the structure is not correct
 type SACDAgreement = CloudEventSACDAgreement | PaymentSACDAgreement | PermissionSACDAgreement;
@@ -194,6 +195,7 @@ export type SACDTemplate = {
   specVersion: string;
   time: string;
   type: "dimo.sacd";
+  dataversion: string;
   data: {
     grantor: {
       address: `0x${string}`;
