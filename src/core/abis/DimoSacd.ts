@@ -91,6 +91,64 @@ export const abiSacd: Abi = [
     type: "error",
   },
   {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "templateId",
+        type: "uint256",
+      },
+      {
+        internalType: "address",
+        name: "expectedAsset",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "providedAsset",
+        type: "address",
+      },
+    ],
+    name: "TemplateAssetMismatch",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "TemplateContractNotSet",
+    type: "error",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "templateId",
+        type: "uint256",
+      },
+    ],
+    name: "TemplateNotActive",
+    type: "error",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "templateId",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "expectedPermissions",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "providedPermissions",
+        type: "uint256",
+      },
+    ],
+    name: "TemplatePermissionsMismatch",
+    type: "error",
+  },
+  {
     inputs: [],
     name: "UUPSUnauthorizedCallContext",
     type: "error",
@@ -209,6 +267,12 @@ export const abiSacd: Abi = [
         indexed: false,
         internalType: "uint256",
         name: "expiration",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "templateId",
         type: "uint256",
       },
       {
@@ -339,6 +403,52 @@ export const abiSacd: Abi = [
     inputs: [
       {
         internalType: "address",
+        name: "grantor",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "grantee",
+        type: "address",
+      },
+    ],
+    name: "accountPermissionRecords",
+    outputs: [
+      {
+        components: [
+          {
+            internalType: "uint256",
+            name: "permissions",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "expiration",
+            type: "uint256",
+          },
+          {
+            internalType: "string",
+            name: "source",
+        type: "string",
+      },
+          {
+            internalType: "uint256",
+            name: "templateId",
+            type: "uint256"
+          }
+        ],
+        internalType: "struct ISacd.PermissionRecord",
+        name: "permissionRecord",
+        type: "tuple",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
         name: "asset",
         type: "address",
       },
@@ -421,12 +531,46 @@ export const abiSacd: Abi = [
           {
             internalType: "string",
             name: "source",
-            type: "string",
-          },
+        type: "string",
+      },
+          {
+            internalType: "uint256",
+            name: "templateId",
+            type: "uint256"
+          }
         ],
         internalType: "struct ISacd.PermissionRecord",
         name: "permissionRecord",
         type: "tuple",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "grantor",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "grantee",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "permissions",
+        type: "uint256",
+      },
+    ],
+    name: "getAccountPermissions",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
       },
     ],
     stateMutability: "view",
@@ -501,6 +645,64 @@ export const abiSacd: Abi = [
     name: "grantRole",
     outputs: [],
     stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "grantor",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "grantee",
+        type: "address",
+      },
+      {
+        internalType: "uint8",
+        name: "permissionIndex",
+        type: "uint8",
+      },
+    ],
+    name: "hasAccountPermission",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "grantor",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "grantee",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "permissions",
+        type: "uint256",
+      },
+    ],
+    name: "hasAccountPermissions",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
   {
@@ -596,7 +798,13 @@ export const abiSacd: Abi = [
     type: "function",
   },
   {
-    inputs: [],
+    inputs: [
+      {
+        internalType: "address",
+        name: "templateContractAddress",
+        type: "address",
+      },
+    ],
     name: "initialize",
     outputs: [],
     stateMutability: "nonpayable",
@@ -745,8 +953,13 @@ export const abiSacd: Abi = [
           {
             internalType: "string",
             name: "source",
-            type: "string",
-          },
+        type: "string",
+      },
+          {
+            internalType: "uint256",
+            name: "templateId",
+            type: "uint256"
+          }
         ],
         internalType: "struct ISacd.PermissionRecord",
         name: "permissionRecord",
@@ -801,6 +1014,39 @@ export const abiSacd: Abi = [
       },
     ],
     name: "revokeRole",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "grantee",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "permissions",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "expiration",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "templateId",
+        type: "uint256",
+      },
+      {
+        internalType: "string",
+        name: "source",
+        type: "string",
+      },
+    ],
+    name: "setAccountPermissions",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -871,12 +1117,68 @@ export const abiSacd: Abi = [
         type: "uint256",
       },
       {
+        internalType: "uint256",
+        name: "templateId",
+        type: "uint256",
+      },
+      {
         internalType: "string",
         name: "source",
         type: "string",
       },
     ],
     name: "setPermissions",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "asset",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "tokenId",
+        type: "uint256",
+      },
+      {
+        internalType: "address",
+        name: "grantee",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "permissions",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "expiration",
+        type: "uint256",
+      },
+      {
+        internalType: "string",
+        name: "source",
+        type: "string",
+      },
+    ],
+    name: "setPermissions",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "templateContractAddress",
+        type: "address",
+      },
+    ],
+    name: "setTemplateContract",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -895,6 +1197,19 @@ export const abiSacd: Abi = [
         internalType: "bool",
         name: "",
         type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "templateContract",
+    outputs: [
+      {
+        internalType: "address",
+        name: "template_",
+        type: "address",
       },
     ],
     stateMutability: "view",

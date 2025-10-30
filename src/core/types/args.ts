@@ -21,6 +21,7 @@ export type SetVehiclePermissions = {
   grantee: `0x${string}`;
   permissions: Permission[];
   expiration: BigInt;
+  templateId?: BigInt;
   source: string;
 };
 
@@ -29,6 +30,7 @@ export type SetVehiclePermissionsBulk = {
   grantee: `0x${string}`;
   permissions: Permission[];
   expiration: BigInt;
+  templateId?: BigInt;
   source: string;
 };
 
@@ -38,6 +40,15 @@ export type SetPermissionsSACD = {
   grantee: `0x${string}`;
   permissions: Permission[];
   expiration: BigInt;
+  templateId?: BigInt;
+  source: string;
+};
+
+export type SetAccountPermissions = {
+  grantee: `0x${string}`;
+  permissions: Permission[];
+  expiration: BigInt;
+  templateId: BigInt;
   source: string;
 };
 
