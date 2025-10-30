@@ -46,3 +46,30 @@ export function setAccountPermissionsCallData(
     args: [args.grantee, permissionValue, args.expiration, args.templateId, args.source],
   });
 }
+
+/**
+ * Batch sets account-level permissions for multiple grantees or configurations
+ */
+export async function setAccountPermissionsBatch(
+  args: SetAccountPermissions[],
+  client: KernelAccountClient,
+  environment: string = "prod"
+): Promise<`0x${string}`> {
+  const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
+  
+  const callData = args.map((arg) => {
+    const permissionValue = getPermissionsValue(arg.permissions);
+
+    return {
+      to: contracts[ContractType.DIMO_SACD].address,
+      value: BigInt(0),
+      data: encodeFunctionData({
+        abi: contracts[ContractType.DIMO_SACD].abi,
+        functionName: SET_ACCOUNT_PERMISSIONS_SACD,
+        args: [arg.grantee, permissionValue, arg.expiration, arg.templateId, arg.source],
+      }),
+    };
+  });
+
+  return await client.account!.encodeCalls(callData);
+}

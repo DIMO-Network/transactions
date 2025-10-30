@@ -23,6 +23,7 @@ export { setVehiclePermissions, setPermissionsSACD } from "./core/actions/setPer
 export {
   setAccountPermissions,
   setAccountPermissionsCallData,
+  setAccountPermissionsBatch,
 } from "./core/actions/setAccountPermissionsSACD.js";
 export {
   transferVehicleAndAftermarketDeviceIDsCallData,
