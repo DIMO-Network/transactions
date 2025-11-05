@@ -6,6 +6,7 @@ export const UNPAIR_AFTERMARKET_DEVICE = "unpairAftermarketDevice";
 export const PAIR_AFTERMARKET_DEVICE = "pairAftermarketDevice";
 export const PAIR_AFTERMARKET_DEVICE_WITH_AD_SIG = "pairAftermarketDeviceWithAdSig";
 export const SET_PERMISSIONS_SACD = "setPermissions";
+export const SET_ACCOUNT_PERMISSIONS_SACD = "setAccountPermissions";
 export const SEND_DIMO_TOKENS = "transfer";
 export const APPROVE_TOKENS = "approve";
 export const NTT_TRANSFER = "0xb293f97f"; // transfer(uint256,uint16,bytes32,bytes32,bool,bytes)

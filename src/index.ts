@@ -5,6 +5,7 @@ export type {
   SendDIMOTokens,
   SetVehiclePermissions,
   SetVehiclePermissionsBulk,
+  SetAccountPermissions,
   TransactionData,
   TransactionInput,
   VehiclePermissionDescription,
@@ -19,6 +20,11 @@ export {
   mintVehicleCallData,
 } from "./core/actions/mintVehicleWithDeviceDefinition.js";
 export { setVehiclePermissions, setPermissionsSACD } from "./core/actions/setPermissionsSACD.js";
+export {
+  setAccountPermissions,
+  setAccountPermissionsCallData,
+  setAccountPermissionsBatch,
+} from "./core/actions/setAccountPermissionsSACD.js";
 export {
   transferVehicleAndAftermarketDeviceIDsCallData,
   transferVehicleAndAftermarketDeviceIDs,

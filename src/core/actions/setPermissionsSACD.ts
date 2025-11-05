@@ -25,6 +25,7 @@ export async function setVehiclePermissions(
       grantee: args.grantee,
       permissions: args.permissions,
       expiration: args.expiration,
+      templateId: args.templateId,
       source: args.source,
     },
     client,
@@ -39,6 +40,7 @@ export async function setVehiclePermissionsBulk(
 ): Promise<`0x${string}`> {
   const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
   const permissionValue = getPermissionsValue(arg.permissions);
+  const templateId = arg.templateId ?? BigInt(0);
 
   const callData = arg.tokenIds.map((tokenId) => {
     return {
@@ -53,6 +55,7 @@ export async function setVehiclePermissionsBulk(
           arg.grantee,
           permissionValue,
           arg.expiration,
+          templateId,
           arg.source,
         ],
       }),
@@ -70,6 +73,7 @@ export async function setVehiclePermissionsBatch(
   const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
   const callData = args.map((arg) => {
     const permissionValue = getPermissionsValue(arg.permissions);
+    const templateId = arg.templateId ?? BigInt(0);
 
     return {
       to: contracts[ContractType.DIMO_SACD].address,
@@ -83,6 +87,7 @@ export async function setVehiclePermissionsBatch(
           arg.grantee,
           permissionValue,
           arg.expiration,
+          templateId,
           arg.source,
         ],
       }),
@@ -98,6 +103,7 @@ export async function setPermissionsSACD(
   contracts: ContractToMapping
 ): Promise<`0x${string}`> {
   const permissionValue = getPermissionsValue(args.permissions);
+  const templateId = args.templateId ?? BigInt(0);
 
   return await client.account!.encodeCalls([
     {
@@ -106,7 +112,7 @@ export async function setPermissionsSACD(
       data: encodeFunctionData({
         abi: contracts[ContractType.DIMO_SACD].abi,
         functionName: SET_PERMISSIONS_SACD,
-        args: [args.asset, args.tokenId, args.grantee, permissionValue, args.expiration, args.source],
+        args: [args.asset, args.tokenId, args.grantee, permissionValue, args.expiration, templateId, args.source],
       }),
     },
   ]);
@@ -115,10 +121,12 @@ export async function setPermissionsSACD(
 export function sacdCallData(args: SetPermissionsSACD, environment: string = "prod"): `0x${string}` {
   const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
   const permissionValue = getPermissionsValue(args.permissions);
+  const templateId = args.templateId ?? BigInt(0);
+  
   return encodeFunctionData({
     abi: contracts[ContractType.DIMO_SACD].abi,
     functionName: SET_PERMISSIONS_SACD,
-    args: [args.asset, args.tokenId, args.grantee, permissionValue, args.expiration, args.source],
+    args: [args.asset, args.tokenId, args.grantee, permissionValue, args.expiration, templateId, args.source],
   });
 }
 
