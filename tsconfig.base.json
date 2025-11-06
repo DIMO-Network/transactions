@@ -1,5 +1,5 @@
 {
-  "include": ["./src", "**/*.test.*", "./trash"],
+  "include": ["./src", "**/*.test.*", "./trash", "vitest.config.ts"],
   "exclude": ["dist"],
   "compilerOptions": {
     "allowJs": true,
@@ -30,6 +30,6 @@
     "noImplicitReturns": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "types": ["node", "vitest/globals"]
+    "types": ["node", "vitest"]
   }
 }
