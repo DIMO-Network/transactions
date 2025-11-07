@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     globals: true,
     alias: {
-      "@src": "/src",
+      "@src": path.resolve(__dirname, "./src"),
       ":core": path.resolve(__dirname, "./src/core"),
       ":util": path.resolve(__dirname, "./src/util"),
     },

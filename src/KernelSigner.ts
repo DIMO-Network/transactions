@@ -64,7 +64,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { transferVehicleAndAftermarketDeviceIDs } from ":core/actions/transferVehicleAndADs.js";
 import { unpairAftermarketDevice } from ":core/actions/unpairAftermarketDevice.js";
 import { ApiKeyStamper } from "@turnkey/api-key-stamper";
-import { generateP256KeyPair, decryptBundle, getPublicKey } from "@turnkey/crypto";
+import { generateP256KeyPair, decryptCredentialBundle, getPublicKey } from "@turnkey/crypto";
 import { uint8ArrayToHexString, uint8ArrayFromHexString } from "@turnkey/encoding";
 import { claimAndPairDevice } from ":core/actions/claimAndPair.js";
 import { executeTransaction, executeTransactionBatch } from ":core/actions/executeTransaction.js";
@@ -257,8 +257,8 @@ export class KernelSigner {
     });
 
     const bundle = sessionData.activity.result.createReadWriteSessionResultV2?.credentialBundle;
-    const decryptedBundle = decryptBundle(bundle!, key.privateKey);
-    const privateKey = uint8ArrayToHexString(decryptedBundle);
+    const decryptedBundle = decryptCredentialBundle(bundle!, key.privateKey);
+    const privateKey = decryptedBundle;
     const apiStamper = new ApiKeyStamper({
       apiPublicKey: uint8ArrayToHexString(getPublicKey(uint8ArrayFromHexString(privateKey), true)),
       apiPrivateKey: privateKey,
@@ -331,8 +331,8 @@ export class KernelSigner {
     });
 
     const bundle = sessionData.activity.result.createReadWriteSessionResultV2?.credentialBundle;
-    const decryptedBundle = decryptBundle(bundle!, key.privateKey);
-    const privateKey = uint8ArrayToHexString(decryptedBundle);
+    const decryptedBundle = decryptCredentialBundle(bundle!, key.privateKey);
+    const privateKey = decryptedBundle;
     const apiStamper = new ApiKeyStamper({
       apiPublicKey: uint8ArrayToHexString(getPublicKey(uint8ArrayFromHexString(privateKey), true)),
       apiPrivateKey: privateKey,
@@ -391,8 +391,8 @@ export class KernelSigner {
     });
 
     const bundle = sessionData.activity.result.createReadWriteSessionResultV2?.credentialBundle;
-    const decryptedBundle = decryptBundle(bundle!, key.privateKey);
-    const privateKey = uint8ArrayToHexString(decryptedBundle);
+    const decryptedBundle = decryptCredentialBundle(bundle!, key.privateKey);
+    const privateKey = decryptedBundle;
     const apiStamper = new ApiKeyStamper({
       apiPublicKey: uint8ArrayToHexString(getPublicKey(uint8ArrayFromHexString(privateKey), true)),
       apiPrivateKey: privateKey,

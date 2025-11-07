@@ -1,9 +1,9 @@
-import IUniswapV3PoolABI from "@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json" with { type: "json" };
 import { computePoolAddress } from "@uniswap/v3-sdk";
 import { Token } from "@uniswap/sdk-core";
 import { ethers } from "ethers-v5";
 import type { Hex } from "viem";
 import { PoolInfo, PoolParam } from ":core/types/uniswap.js";
+import { abiUniswapV3Pool } from ":core/abis/UniswapV3Pool.js";
 
 export async function getPoolInfoByAddress(poolAddress: Hex, rpcUrl: string, params?: PoolParam[]): Promise<PoolInfo> {
   const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
@@ -11,7 +11,7 @@ export async function getPoolInfoByAddress(poolAddress: Hex, rpcUrl: string, par
     throw new Error("No provider");
   }
 
-  const poolContract = new ethers.Contract(poolAddress, IUniswapV3PoolABI.abi, provider);
+  const poolContract = new ethers.Contract(poolAddress, abiUniswapV3Pool as any, provider);
 
   // Determine which parameters to fetch based on the params argument
   const fetchToken0 = !params || params.includes(PoolParam.TOKEN0);
@@ -74,7 +74,7 @@ export async function getPoolInfo(
     fee: poolFee,
   });
 
-  const poolContract = new ethers.Contract(currentPoolAddress, IUniswapV3PoolABI.abi, provider);
+  const poolContract = new ethers.Contract(currentPoolAddress, abiUniswapV3Pool as any, provider);
 
   // Determine which parameters to fetch based on the params argument
   // token0 and token1 are derived from tokenA and tokenB, and fee is provided as poolFee

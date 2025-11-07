@@ -1,5 +1,4 @@
-import { type Hex } from "viem";
-import { TransactionDescription } from "ethers";
+import { type Hex, decodeFunctionData, encodeFunctionData, parseAbi } from "viem";
 import { Wormhole, Network, routes, amount, AccountAddress, toUniversal, UniversalAddress } from "@wormhole-foundation/sdk";
 import { NttExecutorRoute, nttExecutorRoute } from "@wormhole-foundation/sdk-route-ntt";
 import { KernelAccountClient } from "@zerodev/sdk";
@@ -554,52 +553,59 @@ async function getRouteQuote(
  * @throws Error if the transaction data cannot be decoded or if the ABI encoding fails
  */
 async function setCustomRefundAddress(args: BridgeInitiateArgs, tx: any): Promise<Hex> {
-  // Import ethers Interface for ABI decoding/encoding
-  const { Interface } = await import("ethers");
-
   // Define the ABI for the transfer function
-  const transferAbi = [
+  const transferAbi = parseAbi([
     "function transfer(address nttManager, uint256 amount, uint16 recipientChain, bytes32 recipientAddress, bytes32 refundAddress, bytes encodedInstructions, (uint256 value, address refundAddress, bytes signedQuote, bytes instructions) executorArgs, (uint16 dbps, address payee) feeArgs) external payable returns (uint64 msgId)",
-  ];
-
-  // Create an interface for decoding/encoding
-  const iface = new Interface(transferAbi);
+  ]);
 
   // Decode the transaction data
-  const decodedData = iface.parseTransaction({ data: tx.transaction.data }) as TransactionDescription;
+  const decodedData = decodeFunctionData({
+    abi: transferAbi,
+    data: tx.transaction.data,
+  });
 
   // Get the original parameters
-  const nttManager = decodedData.args[0];
-  const amount = decodedData.args[1];
-  const recipientChain = decodedData.args[2];
-  const recipientAddress = decodedData.args[3];
-  const encodedInstructions = decodedData.args[5];
-  const executorArgs = decodedData.args[6];
-  const feeArgs = decodedData.args[7];
-
-  const refundAddress = toUniversal(
-    WORMHOLE_CHAIN_MAPPING[args.destinationChain],
-    REFUND_ADDRESS_MAPPING[args.destinationChain]
-  ).toUint8Array();
-
-  const newExecutorArgs = [
-    executorArgs[0],
-    REFUND_ADDRESS_MAPPING[args.sourceChain],
-    executorArgs[2],
-    executorArgs[3]
-  ];
-
-  // Re-encode the transaction with the custom refund address
-  const newData = iface.encodeFunctionData("transfer", [
+  const [
     nttManager,
     amount,
     recipientChain,
     recipientAddress,
-    refundAddress, // Custom refund address
+    ,  // Skip original refundAddress
     encodedInstructions,
-    newExecutorArgs,
-    feeArgs
-  ]) as Hex;
+    executorArgs,
+    feeArgs,
+  ] = decodedData.args;
+
+  const refundAddressBytes = toUniversal(
+    WORMHOLE_CHAIN_MAPPING[args.destinationChain],
+    REFUND_ADDRESS_MAPPING[args.destinationChain]
+  ).toUint8Array();
+
+  // Convert Uint8Array to hex string
+  const refundAddress = `0x${Array.from(refundAddressBytes).map(b => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`;
+
+  const newExecutorArgs = {
+    value: executorArgs.value,
+    refundAddress: REFUND_ADDRESS_MAPPING[args.sourceChain] as `0x${string}`,
+    signedQuote: executorArgs.signedQuote,
+    instructions: executorArgs.instructions,
+  };
+
+  // Re-encode the transaction with the custom refund address
+  const newData = encodeFunctionData({
+    abi: transferAbi,
+    functionName: "transfer",
+    args: [
+      nttManager,
+      amount,
+      recipientChain,
+      recipientAddress,
+      refundAddress, // Custom refund address
+      encodedInstructions,
+      newExecutorArgs,
+      feeArgs
+    ]
+  }) as Hex;
 
   return newData
 }
