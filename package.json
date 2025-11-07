@@ -56,6 +56,14 @@
   "engines": {
     "node": ">=20"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DIMO-Network/transactions.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DIMO-Network/transactions/issues"
+  },
+  "homepage": "https://github.com/DIMO-Network/transactions#readme",
   "author": "Allyson English",
   "license": "Apache-2.0"
 }
