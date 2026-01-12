@@ -3,10 +3,6 @@ name: Publish Package to npm
 on:
   release:
     types: [published]
-    
-permissions:
-  id-token: write  # Required for OIDC
-  contents: read
   
 jobs:
   build:
@@ -28,6 +24,9 @@ jobs:
   publish-npm:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Required for OIDC
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
