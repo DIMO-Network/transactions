@@ -34,7 +34,7 @@
     "@wormhole-foundation/sdk-route-ntt": "^4.0.3",
     "@wormhole-foundation/sdk-solana-ntt": "^4.0.3",
     "@zerodev/ecdsa-validator": "^5.4.9",
-    "@zerodev/sdk": "^5.5.4",
+    "@zerodev/sdk": "5.5.10",
     "ethers-v5": "npm:ethers@^5.8.0",
     "viem": "^2.38.6"
   },
