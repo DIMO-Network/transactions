@@ -26,6 +26,15 @@ import {
   setVehiclePermissionsBatch,
   setVehiclePermissionsBulk,
 } from ":core/actions/setPermissionsSACD.js";
+import {
+  renounceVehiclePermissions,
+  renounceVehiclePermissionsBatch,
+  renounceVehiclePermissionsBulk,
+} from ":core/actions/renouncePermissionsSACD.js";
+import {
+  renounceAccountPermissions,
+  renounceAccountPermissionsBatch,
+} from ":core/actions/renounceAccountPermissionsSACD.js";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING, ENV_TO_API_MAPPING } from ":core/constants/mappings.js";
 import {
   AddStake,
@@ -39,6 +48,9 @@ import {
   PairAftermarketDevice,
   PairAftermarketDeviceWithAdSig,
   PermissionsSACDTemplateInputs,
+  RenounceAccountPermissions,
+  RenounceVehiclePermissions,
+  RenounceVehiclePermissionsBulk,
   SendDIMOTokens,
   SetVehiclePermissions,
   SetVehiclePermissionsBulk,
@@ -606,6 +618,91 @@ export class KernelSigner {
     const setVehiclePermissionsBulkCallData = await setVehiclePermissionsBulk(args, client, this.config.environment);
 
     const userOpHash = await this._sendUserOperation(client, setVehiclePermissionsBulkCallData);
+
+    if (waitForReceipt) {
+      const client = await this.getActiveClient();
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
+      });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    } as TransactionReturnType;
+  }
+
+  public async renounceVehiclePermissions(
+    args: RenounceVehiclePermissions | RenounceVehiclePermissions[],
+    waitForReceipt: boolean = true,
+  ): Promise<TransactionReturnType> {
+    const client = await this.getActiveClient();
+    let callData: `0x${string}`;
+    if (!Array.isArray(args)) {
+      callData = await renounceVehiclePermissions(args, client, this.config.environment);
+    } else {
+      if (args.length >= 25) {
+        throw Error("Batch vehicle permission limit: 25");
+      }
+      callData = await renounceVehiclePermissionsBatch(args, client, this.config.environment);
+    }
+
+    const userOpHash = await this._sendUserOperation(client, callData);
+
+    if (waitForReceipt) {
+      const client = await this.getActiveClient();
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
+      });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    } as TransactionReturnType;
+  }
+
+  public async renounceVehiclePermissionsBulk(
+    args: RenounceVehiclePermissionsBulk,
+    waitForReceipt: boolean = true,
+  ): Promise<TransactionReturnType> {
+    if (args.tokenIds.length >= 25) {
+      throw Error("Bulk vehicle permission renounce limit: 25");
+    }
+    const client = await this.getActiveClient();
+    const callData = await renounceVehiclePermissionsBulk(args, client, this.config.environment);
+
+    const userOpHash = await this._sendUserOperation(client, callData);
+
+    if (waitForReceipt) {
+      const client = await this.getActiveClient();
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
+      });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    } as TransactionReturnType;
+  }
+
+  public async renounceAccountPermissions(
+    args: RenounceAccountPermissions | RenounceAccountPermissions[],
+    waitForReceipt: boolean = true,
+  ): Promise<TransactionReturnType> {
+    const client = await this.getActiveClient();
+    let callData: `0x${string}`;
+    if (!Array.isArray(args)) {
+      callData = await renounceAccountPermissions(args, client, this.config.environment);
+    } else {
+      if (args.length >= 25) {
+        throw Error("Batch account permission limit: 25");
+      }
+      callData = await renounceAccountPermissionsBatch(args, client, this.config.environment);
+    }
+
+    const userOpHash = await this._sendUserOperation(client, callData);
 
     if (waitForReceipt) {
       const client = await this.getActiveClient();

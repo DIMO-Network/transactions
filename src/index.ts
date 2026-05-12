@@ -6,6 +6,10 @@ export type {
   SetVehiclePermissions,
   SetVehiclePermissionsBulk,
   SetAccountPermissions,
+  RenounceVehiclePermissions,
+  RenounceVehiclePermissionsBulk,
+  RenouncePermissionsSACD,
+  RenounceAccountPermissions,
   TransactionData,
   TransactionInput,
   VehiclePermissionDescription,
@@ -25,6 +29,18 @@ export {
   setAccountPermissionsCallData,
   setAccountPermissionsBatch,
 } from "./core/actions/setAccountPermissionsSACD.js";
+export {
+  renounceVehiclePermissions,
+  renounceVehiclePermissionsBulk,
+  renounceVehiclePermissionsBatch,
+  renouncePermissionsSACD,
+  renouncePermissionsCallData,
+} from "./core/actions/renouncePermissionsSACD.js";
+export {
+  renounceAccountPermissions,
+  renounceAccountPermissionsCallData,
+  renounceAccountPermissionsBatch,
+} from "./core/actions/renounceAccountPermissionsSACD.js";
 export {
   transferVehicleAndAftermarketDeviceIDsCallData,
   transferVehicleAndAftermarketDeviceIDs,
