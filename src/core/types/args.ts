@@ -52,6 +52,23 @@ export type SetAccountPermissions = {
   source: string;
 };
 
+export type RenounceVehiclePermissions = {
+  tokenId: BigInt;
+};
+
+export type RenounceVehiclePermissionsBulk = {
+  tokenIds: BigInt[];
+};
+
+export type RenouncePermissionsSACD = {
+  asset: `0x${string}`;
+  tokenId: BigInt;
+};
+
+export type RenounceAccountPermissions = {
+  grantor: `0x${string}`;
+};
+
 export type BurnVehicle = {
   tokenId: BigInt;
 };

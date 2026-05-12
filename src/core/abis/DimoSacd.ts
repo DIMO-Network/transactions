@@ -252,6 +252,31 @@ export const abiSacd: Abi = [
         type: "uint256",
       },
       {
+        indexed: true,
+        internalType: "address",
+        name: "grantee",
+        type: "address",
+      },
+    ],
+    name: "PermissionsRenounced",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "asset",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "uint256",
+        name: "tokenId",
+        type: "uint256",
+      },
+      {
         indexed: false,
         internalType: "uint256",
         name: "permissions",
@@ -980,6 +1005,37 @@ export const abiSacd: Abi = [
       },
     ],
     stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "grantor",
+        type: "address",
+      },
+    ],
+    name: "renounceAccountPermissions",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "asset",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "tokenId",
+        type: "uint256",
+      },
+    ],
+    name: "renouncePermissions",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
   },
   {
