@@ -666,6 +666,9 @@ export class KernelSigner {
     args: RenounceVehiclePermissionsBulk,
     waitForReceipt: boolean = true,
   ): Promise<TransactionReturnType> {
+    if (args.tokenIds.length >= 25) {
+      throw Error("Bulk vehicle permission renounce limit: 25");
+    }
     const client = await this.getActiveClient();
     const callData = await renounceVehiclePermissionsBulk(args, client, this.config.environment);
 
