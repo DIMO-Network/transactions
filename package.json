@@ -1,6 +1,6 @@
 {
   "name": "@dimo-network/transactions",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "DIMO Transactions SDK",
   "keywords": [
     "DIMO",
@@ -29,7 +29,7 @@
     "@uniswap/sdk-core": "^7.8.0",
     "@uniswap/v3-sdk": "^3.26.0",
     "@zerodev/ecdsa-validator": "^5.4.9",
-    "@zerodev/sdk": "5.5.10",
+    "@zerodev/sdk": "5.5.6",
     "ethers-v5": "npm:ethers@^5.8.0",
     "viem": "^2.38.6"
   },
