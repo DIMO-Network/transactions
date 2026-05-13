@@ -8,4 +8,3 @@ export * from "./DimoVehicleId.js";
 export * from "./DimoSyntheticDeviceId.js";
 export * from "./UniswapV3Pool.js";
 export * from "./WMATIC.js";
-export * from "./WormholeNttManager.js";
