@@ -1,6 +1,8 @@
 export { ENVIRONMENT } from "./core/types/dimo.js";
 export type { SACDTemplate } from "./core/types/dimo.js";
 export type {
+  ClaimRewards,
+  ClaimRewardsBatch,
   MintVehicleWithDeviceDefinition,
   SendDIMOTokens,
   SetVehiclePermissions,
@@ -58,6 +60,14 @@ export {
   claimAftermarketDevice,
   claimAftermarketDeviceTypeHash,
 } from "./core/actions/claimAftermarketDevice.js";
+export {
+  claimRewards,
+  claimRewardsCallData,
+  claimRewardsFromAccount,
+  claimRewardsBatch,
+  claimRewardsBatchCallData,
+  claimRewardsBatchFromAccount,
+} from "./core/actions/claimRewards.js";
 export {
   pairAftermarketDeviceCallData,
   pairAftermarketDevice,

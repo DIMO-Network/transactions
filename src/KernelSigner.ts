@@ -42,6 +42,8 @@ import {
   BurnSyntheticDevice,
   BurnVehicle,
   ClaimAftermarketDevice,
+  ClaimRewards,
+  ClaimRewardsBatch,
   DeriveKernelAddress,
   DetachVehicle,
   MintVehicleWithDeviceDefinition,
@@ -64,6 +66,7 @@ import {
 import { claimAftermarketDevice, claimAftermarketDeviceTypeHash } from ":core/actions/claimAftermarketDevice.js";
 import { TypeHashResponse } from ":core/types/responses.js";
 import { sendDIMOTokens } from ":core/actions/sendDIMOTokens.js";
+import { claimRewards, claimRewardsBatch } from ":core/actions/claimRewards.js";
 import { pairAftermarketDevice, pairAftermarketDeviceTypeHash, pairAftermarketDeviceWithAdSig } from ":core/actions/pairAftermarketDevice.js";
 import { TurnkeyClient } from "@turnkey/http";
 import { polygon } from "viem/chains";
@@ -723,6 +726,47 @@ export class KernelSigner {
 
     const sendDIMOTokensCallData = await sendDIMOTokens(args, client, this.config.environment);
     const userOpHash = await this._sendUserOperation(client, sendDIMOTokensCallData);
+
+    if (waitForReceipt) {
+      const client = await this.getActiveClient();
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
+      });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    } as TransactionReturnType;
+  }
+
+  public async claimRewards(args: ClaimRewards, waitForReceipt: boolean = true): Promise<TransactionReturnType> {
+    const client = await this.getActiveClient();
+
+    const claimRewardsCallData = await claimRewards(args, client, this.config.environment);
+    const userOpHash = await this._sendUserOperation(client, claimRewardsCallData);
+
+    if (waitForReceipt) {
+      const client = await this.getActiveClient();
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
+      });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    } as TransactionReturnType;
+  }
+
+  public async claimRewardsBatch(
+    args: ClaimRewardsBatch,
+    waitForReceipt: boolean = true,
+  ): Promise<TransactionReturnType> {
+    const client = await this.getActiveClient();
+
+    const claimRewardsBatchCallData = await claimRewardsBatch(args, client, this.config.environment);
+    const userOpHash = await this._sendUserOperation(client, claimRewardsBatchCallData);
 
     if (waitForReceipt) {
       const client = await this.getActiveClient();

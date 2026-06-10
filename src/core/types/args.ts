@@ -205,3 +205,19 @@ export type AttachVehicle = {
 export type DetachVehicle = {
   vehicleId: BigInt;
 };
+
+export type ClaimRewards = {
+  poolId: bigint;
+  week: bigint;
+  account: `0x${string}`;
+  amount: bigint;
+  proof: `0x${string}`[];
+};
+
+export type ClaimRewardsBatch = {
+  poolId: bigint;
+  weeks: bigint[];
+  account: `0x${string}`;
+  amounts: bigint[];
+  proofs: `0x${string}`[][];
+};
