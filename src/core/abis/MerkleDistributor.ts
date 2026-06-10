@@ -7,7 +7,28 @@ export const abiMerkleDistributor: Abi = [
     type: "constructor",
   },
   {
-    inputs: [],
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "poolId",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "week",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "claimedTotal",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "allocation",
+        type: "uint256",
+      },
+    ],
     name: "AllocationExceeded",
     type: "error",
   },
@@ -22,7 +43,23 @@ export const abiMerkleDistributor: Abi = [
     type: "error",
   },
   {
-    inputs: [],
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "poolId",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "required",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "available",
+        type: "uint256",
+      },
+    ],
     name: "InsufficientPoolBalance",
     type: "error",
   },
@@ -42,7 +79,13 @@ export const abiMerkleDistributor: Abi = [
     type: "error",
   },
   {
-    inputs: [],
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "poolId",
+        type: "uint256",
+      },
+    ],
     name: "PoolDoesNotExist",
     type: "error",
   },
@@ -62,12 +105,44 @@ export const abiMerkleDistributor: Abi = [
     type: "error",
   },
   {
-    inputs: [],
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "poolId",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "requested",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "available",
+        type: "uint256",
+      },
+    ],
     name: "SweepExceedsUncommitted",
     type: "error",
   },
   {
-    inputs: [],
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "poolId",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "allocation",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "limit",
+        type: "uint256",
+      },
+    ],
     name: "WeeklyLimitExceeded",
     type: "error",
   },
@@ -212,6 +287,25 @@ export const abiMerkleDistributor: Abi = [
       {
         indexed: true,
         internalType: "address",
+        name: "newAdmin",
+        type: "address",
+      },
+    ],
+    name: "PoolAdminSet",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "uint256",
+        name: "poolId",
+        type: "uint256",
+      },
+      {
+        indexed: true,
+        internalType: "address",
         name: "token",
         type: "address",
       },
@@ -322,7 +416,7 @@ export const abiMerkleDistributor: Abi = [
         type: "uint256",
       },
       {
-        indexed: false,
+        indexed: true,
         internalType: "bytes32",
         name: "root",
         type: "bytes32",
@@ -366,6 +460,19 @@ export const abiMerkleDistributor: Abi = [
       },
     ],
     name: "RootSetterSet",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
+        internalType: "address",
+        name: "sanctionsList",
+        type: "address",
+      },
+    ],
+    name: "SanctionsListSet",
     type: "event",
   },
   {
@@ -658,6 +765,52 @@ export const abiMerkleDistributor: Abi = [
     name: "fund",
     outputs: [],
     stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "poolId",
+        type: "uint256",
+      },
+    ],
+    name: "getPool",
+    outputs: [
+      {
+        components: [
+          {
+            internalType: "contract IERC20",
+            name: "token",
+            type: "address",
+          },
+          {
+            internalType: "address",
+            name: "admin",
+            type: "address",
+          },
+          {
+            internalType: "uint256",
+            name: "weeklyLimit",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "balance",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "committed",
+            type: "uint256",
+          },
+        ],
+        internalType: "struct MerkleDistributor.Pool",
+        name: "",
+        type: "tuple",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
   {
@@ -977,6 +1130,24 @@ export const abiMerkleDistributor: Abi = [
         type: "uint256",
       },
       {
+        internalType: "address",
+        name: "newAdmin",
+        type: "address",
+      },
+    ],
+    name: "setPoolAdmin",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "poolId",
+        type: "uint256",
+      },
+      {
         internalType: "uint256",
         name: "week",
         type: "uint256",
@@ -1021,6 +1192,19 @@ export const abiMerkleDistributor: Abi = [
       },
     ],
     name: "setRootSetter",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "sanctionsList_",
+        type: "address",
+      },
+    ],
+    name: "setSanctionsList",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",

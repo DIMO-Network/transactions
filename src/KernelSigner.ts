@@ -748,7 +748,6 @@ export class KernelSigner {
     const userOpHash = await this._sendUserOperation(client, claimRewardsCallData);
 
     if (waitForReceipt) {
-      const client = await this.getActiveClient();
       return await client.waitForUserOperationReceipt({
         hash: userOpHash as `0x${string}`,
       });
@@ -771,7 +770,6 @@ export class KernelSigner {
     const userOpHash = await this._sendUserOperation(client, claimRewardsBatchCallData);
 
     if (waitForReceipt) {
-      const client = await this.getActiveClient();
       return await client.waitForUserOperationReceipt({
         hash: userOpHash as `0x${string}`,
       });

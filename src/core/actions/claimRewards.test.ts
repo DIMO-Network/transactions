@@ -1,12 +1,48 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { decodeFunctionData, zeroAddress } from "viem";
 import { KernelAccountClient } from "@zerodev/sdk";
-import { claimRewards, claimRewardsBatch, claimRewardsCallData, claimRewardsBatchCallData } from "./claimRewards.js";
+import {
+  assertMerkleDistributorAddress,
+  claimRewards,
+  claimRewardsBatch,
+  claimRewardsCallData,
+  claimRewardsBatchCallData,
+} from "./claimRewards.js";
 import { abiMerkleDistributor } from "../abis/MerkleDistributor.js";
 import { CLAIM_REWARDS, CLAIM_REWARDS_BATCH } from "../constants/methods.js";
-import { CHAIN_ABI_MAPPING } from "../constants/mappings.js";
 import { ClaimRewards, ClaimRewardsBatch } from "../types/args.js";
-import { ContractType, ENVIRONMENT } from "../types/dimo.js";
+
+const { prodDistributorAddress, devDistributorAddress } = vi.hoisted(() => ({
+  prodDistributorAddress: "0x1111111111111111111111111111111111111111" as `0x${string}`,
+  devDistributorAddress: "0x2222222222222222222222222222222222222222" as `0x${string}`,
+}));
+
+// Module-level mock (no mutation of the CHAIN_ABI_MAPPING singleton): prod and dev get
+// distinct configured addresses; prod_test is left untouched with its zeroAddress placeholder.
+vi.mock("../constants/mappings.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../constants/mappings.js")>();
+  const { ContractType, ENVIRONMENT } = await import("../types/dimo.js");
+
+  const withDistributorAddress = (env: (typeof ENVIRONMENT)[keyof typeof ENVIRONMENT], address: `0x${string}`) => ({
+    ...actual.CHAIN_ABI_MAPPING[env],
+    contracts: {
+      ...actual.CHAIN_ABI_MAPPING[env].contracts,
+      [ContractType.DIMO_MERKLE_DISTRIBUTOR]: {
+        ...actual.CHAIN_ABI_MAPPING[env].contracts[ContractType.DIMO_MERKLE_DISTRIBUTOR],
+        address,
+      },
+    },
+  });
+
+  return {
+    ...actual,
+    CHAIN_ABI_MAPPING: {
+      ...actual.CHAIN_ABI_MAPPING,
+      [ENVIRONMENT.PROD]: withDistributorAddress(ENVIRONMENT.PROD, prodDistributorAddress),
+      [ENVIRONMENT.DEV]: withDistributorAddress(ENVIRONMENT.DEV, devDistributorAddress),
+    },
+  };
+});
 
 const account = "0x1234567890123456789012345678901234567890" as `0x${string}`;
 const proofA = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as `0x${string}`;
@@ -34,9 +70,9 @@ describe("claimRewardsCallData", () => {
     expect(decoded.args).toEqual([args.poolId, args.week, args.account, args.amount, args.proof]);
   });
 
-  it("produces identical call data across environments", () => {
+  it("produces identical call data across configured environments", () => {
+    // dev and prod are mocked with different distributor addresses, proving the address never leaks into call data.
     expect(claimRewardsCallData(args, "dev")).toBe(claimRewardsCallData(args, "prod"));
-    expect(claimRewardsCallData(args, "prod_test")).toBe(claimRewardsCallData(args, "prod"));
   });
 
   it("encodes an empty proof array", () => {
@@ -73,9 +109,8 @@ describe("claimRewardsBatchCallData", () => {
     expect(decoded.args).toEqual([args.poolId, args.weeks, args.account, args.amounts, args.proofs]);
   });
 
-  it("produces identical call data across environments", () => {
+  it("produces identical call data across configured environments", () => {
     expect(claimRewardsBatchCallData(args, "dev")).toBe(claimRewardsBatchCallData(args, "prod"));
-    expect(claimRewardsBatchCallData(args, "prod_test")).toBe(claimRewardsBatchCallData(args, "prod"));
   });
 });
 
@@ -102,35 +137,42 @@ describe("zero-address guard", () => {
     },
   } as unknown as KernelAccountClient;
 
-  const prodTestDistributor = CHAIN_ABI_MAPPING[ENVIRONMENT.PROD_TEST].contracts[ContractType.DIMO_MERKLE_DISTRIBUTOR];
-  const originalProdTestAddress = prodTestDistributor.address;
+  const notConfiguredError = "MerkleDistributor address not configured for this environment";
 
-  afterEach(() => {
-    prodTestDistributor.address = originalProdTestAddress;
-  });
-
-  // prod_test keeps a zeroAddress placeholder, so these stay green once real prod/dev addresses land.
+  // prod_test ships with a zeroAddress placeholder, so these run against the real mapping untouched.
   it("claimRewards throws when the MerkleDistributor address is the zero address", async () => {
-    prodTestDistributor.address = zeroAddress;
-    await expect(claimRewards(claimArgs, mockClient, "prod_test")).rejects.toThrow(
-      "MerkleDistributor address not configured for this environment"
-    );
+    await expect(claimRewards(claimArgs, mockClient, "prod_test")).rejects.toThrow(notConfiguredError);
   });
 
   it("claimRewardsBatch throws when the MerkleDistributor address is the zero address", async () => {
-    prodTestDistributor.address = zeroAddress;
-    await expect(claimRewardsBatch(batchArgs, mockClient, "prod_test")).rejects.toThrow(
+    await expect(claimRewardsBatch(batchArgs, mockClient, "prod_test")).rejects.toThrow(notConfiguredError);
+  });
+
+  it("claimRewardsCallData throws when the MerkleDistributor address is the zero address", () => {
+    expect(() => claimRewardsCallData(claimArgs, "prod_test")).toThrow(notConfiguredError);
+  });
+
+  it("claimRewardsBatchCallData throws when the MerkleDistributor address is the zero address", () => {
+    expect(() => claimRewardsBatchCallData(batchArgs, "prod_test")).toThrow(notConfiguredError);
+  });
+
+  it("claimRewards does not throw for an environment with a configured address", async () => {
+    await expect(claimRewards(claimArgs, mockClient, "prod")).resolves.toBe("0xencoded");
+  });
+
+  it("claimRewardsBatch does not throw for an environment with a configured address", async () => {
+    await expect(claimRewardsBatch(batchArgs, mockClient, "prod")).resolves.toBe("0xencoded");
+  });
+});
+
+describe("assertMerkleDistributorAddress", () => {
+  it("returns the address when it is configured", () => {
+    expect(assertMerkleDistributorAddress(account)).toBe(account);
+  });
+
+  it("throws when the address is the zero address", () => {
+    expect(() => assertMerkleDistributorAddress(zeroAddress)).toThrow(
       "MerkleDistributor address not configured for this environment"
     );
-  });
-
-  it("claimRewards does not throw once a real address is configured", async () => {
-    prodTestDistributor.address = "0x1111111111111111111111111111111111111111";
-    await expect(claimRewards(claimArgs, mockClient, "prod_test")).resolves.toBe("0xencoded");
-  });
-
-  it("claimRewardsBatch does not throw once a real address is configured", async () => {
-    prodTestDistributor.address = "0x1111111111111111111111111111111111111111";
-    await expect(claimRewardsBatch(batchArgs, mockClient, "prod_test")).resolves.toBe("0xencoded");
   });
 });

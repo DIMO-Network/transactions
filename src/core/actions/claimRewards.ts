@@ -16,11 +16,22 @@ import { KernelAccountClient } from "@zerodev/sdk";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING } from ":core/constants/mappings.js";
 import { ClaimRewards, ClaimRewardsBatch } from ":core/types/args.js";
 
-function assertMerkleDistributorAddress(address: Address): Address {
+export function assertMerkleDistributorAddress(address: Address): Address {
   if (address === zeroAddress) {
     throw new Error("MerkleDistributor address not configured for this environment");
   }
   return address;
+}
+
+/**
+ * Resolves the MerkleDistributor contract entry for an environment, throwing if the
+ * address is still the zero-address placeholder (i.e. the environment is unconfigured).
+ */
+export function getMerkleDistributorContract(environment: string) {
+  const contract =
+    CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts[ContractType.DIMO_MERKLE_DISTRIBUTOR];
+  assertMerkleDistributorAddress(contract.address);
+  return contract;
 }
 
 /**
@@ -35,9 +46,9 @@ function assertMerkleDistributorAddress(address: Address): Address {
  * @returns ABI-encoded `claim` call data.
  */
 export function claimRewardsCallData(args: ClaimRewards, environment: string = "prod"): `0x${string}` {
-  const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
+  const contract = getMerkleDistributorContract(environment);
   return encodeFunctionData({
-    abi: contracts[ContractType.DIMO_MERKLE_DISTRIBUTOR].abi,
+    abi: contract.abi,
     functionName: CLAIM_REWARDS,
     args: [args.poolId, args.week, args.account, args.amount, args.proof],
   });
@@ -48,13 +59,13 @@ export async function claimRewards(
   client: KernelAccountClient,
   environment: string = "prod"
 ): Promise<`0x${string}`> {
-  const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
+  const contract = getMerkleDistributorContract(environment);
   return await client.account!.encodeCalls([
     {
-      to: assertMerkleDistributorAddress(contracts[ContractType.DIMO_MERKLE_DISTRIBUTOR].address),
+      to: contract.address,
       value: BigInt(0),
       data: encodeFunctionData({
-        abi: contracts[ContractType.DIMO_MERKLE_DISTRIBUTOR].abi,
+        abi: contract.abi,
         functionName: CLAIM_REWARDS,
         args: [args.poolId, args.week, args.account, args.amount, args.proof],
       }),
@@ -68,11 +79,11 @@ export async function claimRewardsFromAccount(
   publicClient: PublicClient,
   environment: string = "prod"
 ): Promise<`0x${string}`> {
-  const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
+  const contract = getMerkleDistributorContract(environment);
 
   const { request } = await publicClient.simulateContract({
-    address: assertMerkleDistributorAddress(contracts[ContractType.DIMO_MERKLE_DISTRIBUTOR].address),
-    abi: contracts[ContractType.DIMO_MERKLE_DISTRIBUTOR].abi,
+    address: contract.address,
+    abi: contract.abi,
     functionName: CLAIM_REWARDS,
     args: [args.poolId, args.week, args.account, args.amount, args.proof],
     account: walletClient.account,
@@ -94,9 +105,9 @@ export async function claimRewardsFromAccount(
  * @returns ABI-encoded `claimBatch` call data.
  */
 export function claimRewardsBatchCallData(args: ClaimRewardsBatch, environment: string = "prod"): `0x${string}` {
-  const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
+  const contract = getMerkleDistributorContract(environment);
   return encodeFunctionData({
-    abi: contracts[ContractType.DIMO_MERKLE_DISTRIBUTOR].abi,
+    abi: contract.abi,
     functionName: CLAIM_REWARDS_BATCH,
     args: [args.poolId, args.weeks, args.account, args.amounts, args.proofs],
   });
@@ -107,13 +118,13 @@ export async function claimRewardsBatch(
   client: KernelAccountClient,
   environment: string = "prod"
 ): Promise<`0x${string}`> {
-  const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
+  const contract = getMerkleDistributorContract(environment);
   return await client.account!.encodeCalls([
     {
-      to: assertMerkleDistributorAddress(contracts[ContractType.DIMO_MERKLE_DISTRIBUTOR].address),
+      to: contract.address,
       value: BigInt(0),
       data: encodeFunctionData({
-        abi: contracts[ContractType.DIMO_MERKLE_DISTRIBUTOR].abi,
+        abi: contract.abi,
         functionName: CLAIM_REWARDS_BATCH,
         args: [args.poolId, args.weeks, args.account, args.amounts, args.proofs],
       }),
@@ -127,11 +138,11 @@ export async function claimRewardsBatchFromAccount(
   publicClient: PublicClient,
   environment: string = "prod"
 ): Promise<`0x${string}`> {
-  const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
+  const contract = getMerkleDistributorContract(environment);
 
   const { request } = await publicClient.simulateContract({
-    address: assertMerkleDistributorAddress(contracts[ContractType.DIMO_MERKLE_DISTRIBUTOR].address),
-    abi: contracts[ContractType.DIMO_MERKLE_DISTRIBUTOR].abi,
+    address: contract.address,
+    abi: contract.abi,
     functionName: CLAIM_REWARDS_BATCH,
     args: [args.poolId, args.weeks, args.account, args.amounts, args.proofs],
     account: walletClient.account,
