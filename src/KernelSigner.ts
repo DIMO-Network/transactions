@@ -741,6 +741,7 @@ export class KernelSigner {
   }
 
   public async claimRewards(args: ClaimRewards, waitForReceipt: boolean = true): Promise<TransactionReturnType> {
+    // Claims are proof-gated and pay only the proven account, so any active session client suffices (vs getPasskeyClient for transfers).
     const client = await this.getActiveClient();
 
     const claimRewardsCallData = await claimRewards(args, client, this.config.environment);
@@ -763,6 +764,7 @@ export class KernelSigner {
     args: ClaimRewardsBatch,
     waitForReceipt: boolean = true,
   ): Promise<TransactionReturnType> {
+    // Claims are proof-gated and pay only the proven account, so any active session client suffices (vs getPasskeyClient for transfers).
     const client = await this.getActiveClient();
 
     const claimRewardsBatchCallData = await claimRewardsBatch(args, client, this.config.environment);
