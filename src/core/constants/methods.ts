@@ -14,3 +14,5 @@ export const APPROVE_TOKENS = "approve";
 export const NTT_TRANSFER = "0xb293f97f"; // transfer(uint256,uint16,bytes32,bytes32,bool,bytes)
 export const BURN_VEHICLE = "burn";
 export const BURN_SYNTHETIC_DEVICE = "burn";
+export const CLAIM_REWARDS = "claim";
+export const CLAIM_REWARDS_BATCH = "claimBatch";

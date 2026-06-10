@@ -79,6 +79,7 @@ export enum ContractType {
   DIMO_FORWARDER,
   DIMO_STAKING,
   UNISWAP_V3_POOL,
+  DIMO_MERKLE_DISTRIBUTOR,
 }
 
 export enum SupportedNetworks {

@@ -15,6 +15,7 @@ import {
   abiVehicleId,
   abiSyntheticDeviceId,
   abiUniswapV3Pool,
+  abiMerkleDistributor,
 } from ":core/abis/index.js";
 
 import * as contractAddrs from ":core/constants/contractAddrs.js";
@@ -127,6 +128,10 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
         abi: abiUniswapV3Pool,
         address: zeroAddress,
       },
+      [ContractType.DIMO_MERKLE_DISTRIBUTOR]: {
+        abi: abiMerkleDistributor,
+        address: contractAddrs.AMOY_DIMO_MERKLE_DISTRIBUTOR_ADDRESS,
+      },
     },
   },
   [ENVIRONMENT.PROD]: {
@@ -167,6 +172,10 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
         abi: abiUniswapV3Pool,
         address: contractAddrs.POLYGON_UNISWAP_V3_POOL_WMATIC_DIMO_ADDRESS,
       },
+      [ContractType.DIMO_MERKLE_DISTRIBUTOR]: {
+        abi: abiMerkleDistributor,
+        address: contractAddrs.POLYGON_DIMO_MERKLE_DISTRIBUTOR_ADDRESS,
+      },
     },
   },
   [ENVIRONMENT.PROD_TEST]: {
@@ -206,6 +215,10 @@ export const CHAIN_ABI_MAPPING: AllChainInfos = {
       [ContractType.UNISWAP_V3_POOL]: {
         abi: abiUniswapV3Pool,
         address: contractAddrs.POLYGON_TEST_UNISWAP_V3_POOL_WMATIC_DIMO_ADDRESS,
+      },
+      [ContractType.DIMO_MERKLE_DISTRIBUTOR]: {
+        abi: abiMerkleDistributor,
+        address: zeroAddress,
       },
     },
   },

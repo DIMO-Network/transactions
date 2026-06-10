@@ -6,5 +6,6 @@ export * from "./DimoStaking.js";
 export * from "./DimoToken.js";
 export * from "./DimoVehicleId.js";
 export * from "./DimoSyntheticDeviceId.js";
+export * from "./MerkleDistributor.js";
 export * from "./UniswapV3Pool.js";
 export * from "./WMATIC.js";
