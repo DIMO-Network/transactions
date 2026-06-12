@@ -35,6 +35,10 @@ import {
   renounceAccountPermissions,
   renounceAccountPermissionsBatch,
 } from ":core/actions/renounceAccountPermissionsSACD.js";
+import {
+  setAccountPermissions,
+  setAccountPermissionsBatch,
+} from ":core/actions/setAccountPermissionsSACD.js";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING, ENV_TO_API_MAPPING } from ":core/constants/mappings.js";
 import {
   AddStake,
@@ -52,6 +56,7 @@ import {
   RenounceVehiclePermissions,
   RenounceVehiclePermissionsBulk,
   SendDIMOTokens,
+  SetAccountPermissions,
   SetVehiclePermissions,
   SetVehiclePermissionsBulk,
   TransactionInput,
@@ -669,6 +674,36 @@ export class KernelSigner {
     }
     const client = await this.getActiveClient();
     const callData = await renounceVehiclePermissionsBulk(args, client, this.config.environment);
+
+    const userOpHash = await this._sendUserOperation(client, callData);
+
+    if (waitForReceipt) {
+      const client = await this.getActiveClient();
+      return await client.waitForUserOperationReceipt({
+        hash: userOpHash as `0x${string}`,
+      });
+    }
+
+    return {
+      userOperationHash: userOpHash,
+      status: "pending",
+    } as TransactionReturnType;
+  }
+
+  public async setAccountPermissions(
+    args: SetAccountPermissions | SetAccountPermissions[],
+    waitForReceipt: boolean = true,
+  ): Promise<TransactionReturnType> {
+    const client = await this.getActiveClient();
+    let callData: `0x${string}`;
+    if (!Array.isArray(args)) {
+      callData = await setAccountPermissions(args, client, this.config.environment);
+    } else {
+      if (args.length >= 25) {
+        throw Error("Batch account permission limit: 25");
+      }
+      callData = await setAccountPermissionsBatch(args, client, this.config.environment);
+    }
 
     const userOpHash = await this._sendUserOperation(client, callData);
 
