@@ -1,11 +1,10 @@
-import { encodeFunctionData } from "viem";
+import { encodeFunctionData, hashTypedData } from "viem";
 import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING } from ":core/constants/mappings.js";
 import { KernelAccountClient } from "@zerodev/sdk";
 import { CLAIM_AFTERMARKET_DEVICE } from ":core/constants/methods.js";
 import { ClaimAftermarketDevice } from ":core/types/args.js";
 import { polygon } from "viem/chains";
-import { ethers } from "ethers";
 import { TypeHashResponse } from ":core/types/responses.js";
 import {
   ClaimAftermarketDeviceSign,
@@ -45,7 +44,7 @@ export const claimAftermarketDeviceTypeHash = (
     owner: owner,
   };
 
-  const hash = ethers.TypedDataEncoder.hash(domain, types, message);
+  const hash = hashTypedData({ domain, types, primaryType: ClaimAftermarketDeviceSign, message });
 
   return { hash, payload: { domain, types, message } };
 };

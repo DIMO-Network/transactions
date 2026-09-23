@@ -9,6 +9,7 @@ import {
   Transport,
   WalletClient,
   encodeFunctionData,
+  hashTypedData,
 } from "viem";
 import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
 import { CHAIN_ABI_MAPPING, ENV_MAPPING, ENV_NETWORK_MAPPING } from ":core/constants/mappings.js";
@@ -17,7 +18,6 @@ import { TRANSFER_VEHICLE_AND_AFTERMARKET_DEVICE_IDS } from ":core/constants/met
 import { TransferVehicleAndAftermarketDeviceIDs } from ":core/types/args.js";
 import { polygon } from "viem/chains";
 import { DIMODomain, DIMODomainVersion } from ":core/constants/dimo.js";
-import { ethers } from "ethers";
 
 export function transferVehicleAndAftermarketDeviceIDsCallData(
   args: TransferVehicleAndAftermarketDeviceIDs,
@@ -154,7 +154,7 @@ export const transferAllTypeHash = (
     to: args.to,
   };
 
-  const hash = ethers.TypedDataEncoder.hash(domain, types, message);
+  const hash = hashTypedData({ domain, types, primaryType: "TransferVehicleAndAftermarketDeviceIds", message });
 
   return { hash, payload: { domain, types, message } };
 };
