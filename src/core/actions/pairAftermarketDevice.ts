@@ -1,6 +1,5 @@
-import { ethers } from "ethers";
 import { polygon } from "viem/chains";
-import { encodeFunctionData } from "viem";
+import { encodeFunctionData, hashTypedData } from "viem";
 import { KernelAccountClient } from "@zerodev/sdk";
 
 import { ContractType, ENVIRONMENT } from ":core/types/dimo.js";
@@ -45,7 +44,7 @@ export const pairAftermarketDeviceTypeHash = (
     vehicleNode: vehicleNode,
   };
 
-  const hash = ethers.TypedDataEncoder.hash(domain, types, message);
+  const hash = hashTypedData({ domain, types, primaryType: PairAftermarketDeviceSign, message });
 
   return { hash, payload: { domain, types, message } };
 };
