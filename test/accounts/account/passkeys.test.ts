@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
 import type { TurnkeyClient } from "@turnkey/http";
+import { describe, expect, it, vi } from "vitest";
+
 import { addPasskey, removePasskey } from "../../../src/accounts/account/passkeys.js";
 
 const att = {
@@ -48,17 +49,12 @@ describe("addPasskey", () => {
       name: "Phone",
     });
     expect(r).toEqual({ authenticatorId: "auth-new" });
-    const arg = (createAuthenticators.mock.calls[0] as unknown[])[0] as Record<
-      string,
-      unknown
-    >;
+    const arg = (createAuthenticators.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
     expect(arg.type).toBe("ACTIVITY_TYPE_CREATE_AUTHENTICATORS_V2");
     expect(arg.organizationId).toBe("sub");
     expect(arg.parameters).toEqual({
       userId: "u1",
-      authenticators: [
-        { authenticatorName: "Phone", challenge: "ch", attestation: att },
-      ],
+      authenticators: [{ authenticatorName: "Phone", challenge: "ch", attestation: att }],
     });
   });
 });
@@ -84,10 +80,7 @@ describe("removePasskey", () => {
   it("removes the last one with allowLast", async () => {
     const { c, deleteAuthenticators } = client(["a1"]);
     await removePasskey(c, { ...args, allowLast: true });
-    const arg = (deleteAuthenticators.mock.calls[0] as unknown[])[0] as Record<
-      string,
-      unknown
-    >;
+    const arg = (deleteAuthenticators.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
     expect(arg.type).toBe("ACTIVITY_TYPE_DELETE_AUTHENTICATORS");
     expect(arg.parameters).toEqual({ userId: "u1", authenticatorIds: ["a1"] });
   });

@@ -1,4 +1,3 @@
-import type { Scenario } from "./harness.js";
 import { e01 } from "./e01-open-creation.js";
 import { e02 } from "./e02-creation-with-code.js";
 import { e03 } from "./e03-signin-phone-key.js";
@@ -13,24 +12,10 @@ import { e11 } from "./e11-delete.js";
 import { e15 } from "./e15-enumeration.js";
 import { e17 } from "./e17-abandoned.js";
 import { e18 } from "./e18-bulk.js";
+import type { Scenario } from "./harness.js";
 
 /** In run order. E15 reads the account E1 made, so E1 stays first and its cleanup runs last. */
-export const SCENARIOS: Scenario[] = [
-  e01,
-  e02,
-  e03,
-  e04,
-  e05,
-  e06,
-  e07,
-  e08,
-  e09,
-  e10,
-  e11,
-  e15,
-  e17,
-  e18,
-];
+export const SCENARIOS: Scenario[] = [e01, e02, e03, e04, e05, e06, e07, e08, e09, e10, e11, e15, e17, e18];
 
 /** Scenarios whose gate lives elsewhere (see the index plan's E-table). */
 export const GATED_ELSEWHERE: Record<string, string> = {

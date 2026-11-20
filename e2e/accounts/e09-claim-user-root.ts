@@ -1,30 +1,16 @@
 import {
   AccountsError,
-  WebCryptoP256Signer,
   claimDid,
   generateDpopKey,
   getMe,
   lookupByWallet,
+  WebCryptoP256Signer,
 } from "../../src/accounts/index.js";
-import {
-  Failure,
-  assertEndUserIsRoot,
-  check,
-  eq,
-  login,
-  newEmail,
-  track,
-  type Scenario,
-} from "./harness.js";
+import { assertEndUserIsRoot, check, eq, Failure, login, newEmail, type Scenario, track } from "./harness.js";
 import { strangerWallet } from "./k1.js";
 import { v1Create } from "./v1.js";
 
-async function expectAccountsError(
-  what: string,
-  status: number,
-  code: string,
-  p: Promise<unknown>,
-): Promise<void> {
+async function expectAccountsError(what: string, status: number, code: string, p: Promise<unknown>): Promise<void> {
   try {
     await p;
   } catch (e) {
@@ -64,7 +50,7 @@ export const e09: Scenario = {
       "PUT /me/did for a DID not rooted in the user's wallet",
       403,
       "forbidden",
-      claimDid(ctx.cfg, { wallet: stranger, dpopKey: await generateDpopKey() }),
+      claimDid(ctx.cfg, { wallet: stranger, dpopKey: await generateDpopKey() })
     );
 
     const first = await claimDid(ctx.cfg, {
@@ -72,19 +58,11 @@ export const e09: Scenario = {
       dpopKey: await generateDpopKey(),
     });
     eq(first.account.did, first.did, "claimDid account did");
-    eq(
-      first.account.walletAddress.toLowerCase(),
-      user.walletAddress.toLowerCase(),
-      "claimDid account wallet",
-    );
+    eq(first.account.walletAddress.toLowerCase(), user.walletAddress.toLowerCase(), "claimDid account wallet");
     const me = await getMe(ctx.cfg, { session: first.session });
     check(me, "GET /me returned 404 after claimDid");
     eq(me.did, first.did, "GET /me did after claimDid");
-    eq(
-      await lookupByWallet(ctx.cfg, { address: user.walletAddress }),
-      first.did,
-      "by-wallet lookup after claimDid",
-    );
+    eq(await lookupByWallet(ctx.cfg, { address: user.walletAddress }), first.did, "by-wallet lookup after claimDid");
 
     // 409: another DID for the same wallet (a different signing key gives a different genesis).
     await expectAccountsError(
@@ -95,7 +73,7 @@ export const e09: Scenario = {
         wallet: user.wallet,
         signingKey: await WebCryptoP256Signer.generate(),
         dpopKey: await generateDpopKey(),
-      }),
+      })
     );
     return `linked ${first.did}; a second DID got 409; a DID of an unowned wallet got 403 forbidden`;
   },

@@ -2,6 +2,7 @@ import { p256 } from "@noble/curves/nist.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { base64url } from "@scure/base";
 import { describe, expect, it } from "vitest";
+
 import {
   createDpopProof,
   dpopKeyFromKeyPair,
@@ -11,8 +12,7 @@ import {
 import { authedFetch } from "../../../src/accounts/auth/fetch.js";
 
 const b64u = (b: Uint8Array) => base64url.encode(b).replace(/=+$/, "");
-const fromB64u = (s: string) =>
-  base64url.decode(s + "=".repeat((4 - (s.length % 4)) % 4));
+const fromB64u = (s: string) => base64url.decode(s + "=".repeat((4 - (s.length % 4)) % 4));
 const dec = (s: string) => JSON.parse(new TextDecoder().decode(fromB64u(s)));
 
 describe("dpop", () => {
@@ -25,20 +25,13 @@ describe("dpop", () => {
       x: "l8tFrhx-34tV3hRICRDY9zCkDlpBhF42UQUfWVAWBFs",
       y: "9VE4jf_Ok_o64zbTTlcuNJajHmt6v9TDVrU0CdvGRDA",
     };
-    expect(await jwkThumbprint(jwk)).toBe(
-      "0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I",
-    );
+    expect(await jwkThumbprint(jwk)).toBe("0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I");
   });
 
   it("proof has typ, alg, jwk and claims", async () => {
     const key = await generateDpopKey();
     const token = "tok.en.value";
-    const proof = await createDpopProof(
-      key,
-      "GET",
-      "HTTPS://Accounts.dimo.org/api/v2/me?x=1#y",
-      token,
-    );
+    const proof = await createDpopProof(key, "GET", "HTTPS://Accounts.dimo.org/api/v2/me?x=1#y", token);
     const [h, p] = proof.split(".");
     const header = dec(h!);
     const claims = dec(p!);
@@ -60,23 +53,14 @@ describe("dpop", () => {
 
   it("verifies the way pkg/dpop does", async () => {
     const key = await generateDpopKey();
-    const proof = await createDpopProof(
-      key,
-      "POST",
-      "https://a.b/signin/token",
-    );
+    const proof = await createDpopProof(key, "POST", "https://a.b/signin/token");
     const [h, p, s] = proof.split(".");
     const { jwk } = dec(h!);
     const pub = new Uint8Array([4, ...fromB64u(jwk.x), ...fromB64u(jwk.y)]);
-    const ok = p256.verify(
-      fromB64u(s!),
-      sha256(new TextEncoder().encode(`${h}.${p}`)),
-      pub,
-      {
-        prehash: false,
-        lowS: false,
-      },
-    );
+    const ok = p256.verify(fromB64u(s!), sha256(new TextEncoder().encode(`${h}.${p}`)), pub, {
+      prehash: false,
+      lowS: false,
+    });
     expect(ok).toBe(true);
     expect(await key.thumbprint()).toBe(await jwkThumbprint(jwk));
   });
@@ -86,29 +70,19 @@ describe("dpop key hygiene", () => {
   it("strips extra jwk members such as d", async () => {
     const key = await generateDpopKey();
     const jwk = { ...(await key.jwk()), d: "secret" };
-    const proof = await createDpopProof(
-      { ...key, jwk: async () => jwk },
-      "GET",
-      "https://a.b/c",
-    );
+    const proof = await createDpopProof({ ...key, jwk: async () => jwk }, "GET", "https://a.b/c");
     const header = dec(proof.split(".")[0]!);
     expect(Object.keys(header.jwk).sort()).toEqual(["crv", "kty", "x", "y"]);
   });
   it("rejects a non P-256 jwk", async () => {
     const key = await generateDpopKey();
     const bad = { ...(await key.jwk()), crv: "P-384" } as never;
-    await expect(
-      createDpopProof({ ...key, jwk: async () => bad }, "GET", "https://a.b/c"),
-    ).rejects.toThrow(/P-256/);
+    await expect(createDpopProof({ ...key, jwk: async () => bad }, "GET", "https://a.b/c")).rejects.toThrow(/P-256/);
   });
   it("throws on a DER (non 64-byte) signature", async () => {
     const key = await generateDpopKey();
     await expect(
-      createDpopProof(
-        { ...key, sign: async () => new Uint8Array(72) },
-        "GET",
-        "https://a.b/c",
-      ),
+      createDpopProof({ ...key, sign: async () => new Uint8Array(72) }, "GET", "https://a.b/c")
     ).rejects.toThrow(/64-byte/);
   });
 });
@@ -121,39 +95,23 @@ describe("dpop key persistence", () => {
 
   it("dpopKeyFromKeyPair restores the same jwk and thumbprint; its proofs verify", async () => {
     const original = await generateDpopKey();
-    const restored = await dpopKeyFromKeyPair(
-      structuredClone(original.keyPair),
-    );
+    const restored = await dpopKeyFromKeyPair(structuredClone(original.keyPair));
     expect(await restored.jwk()).toEqual(await original.jwk());
     expect(await restored.thumbprint()).toBe(await original.thumbprint());
-    const proof = await createDpopProof(
-      restored,
-      "GET",
-      "https://a.b/c",
-      "tok",
-    );
+    const proof = await createDpopProof(restored, "GET", "https://a.b/c", "tok");
     const [h, p, s] = proof.split(".");
     const { jwk } = dec(h!);
     const pub = new Uint8Array([4, ...fromB64u(jwk.x), ...fromB64u(jwk.y)]);
     expect(
-      p256.verify(
-        fromB64u(s!),
-        sha256(new TextEncoder().encode(`${h}.${p}`)),
-        pub,
-        {
-          prehash: false,
-          lowS: false,
-        },
-      ),
+      p256.verify(fromB64u(s!), sha256(new TextEncoder().encode(`${h}.${p}`)), pub, {
+        prehash: false,
+        lowS: false,
+      })
     ).toBe(true);
   });
 
   it("refuses a pair that is not ECDSA P-256", async () => {
-    const p384 = await crypto.subtle.generateKey(
-      { name: "ECDSA", namedCurve: "P-384" },
-      false,
-      ["sign", "verify"],
-    );
+    const p384 = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-384" }, false, ["sign", "verify"]);
     await expect(dpopKeyFromKeyPair(p384)).rejects.toMatchObject({
       name: "UsageError",
       code: "dpop_key_invalid",
@@ -192,11 +150,9 @@ describe("dpop key persistence", () => {
           return new Response(null, { status: 204 });
         }) as typeof fetch,
       },
-      restored,
+      restored
     )("https://accounts.test/api/v2/me");
     expect(header!.jwk).toEqual(await dpopKey.jwk());
-    expect(await restored.dpopKey.thumbprint()).toBe(
-      await dpopKey.thumbprint(),
-    );
+    expect(await restored.dpopKey.thumbprint()).toBe(await dpopKey.thumbprint());
   });
 });

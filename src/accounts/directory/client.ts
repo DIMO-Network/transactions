@@ -1,5 +1,5 @@
-import { computeCid, type Operation } from "../core/index.js";
 import { normalizeUrl, send, unboundFetch } from "../config.js";
+import { computeCid, type Operation } from "../core/index.js";
 import {
   DeactivatedError,
   DidExistsError,
@@ -10,7 +10,7 @@ import {
   HeadMovedError,
   InvalidDidError,
 } from "../errors.js";
-import { verifyAuditLog, type AuditEntry } from "./verify.js";
+import { type AuditEntry, verifyAuditLog } from "./verify.js";
 
 export type { AuditEntry } from "./verify.js";
 
@@ -38,9 +38,7 @@ export type Head = { cid: string; op: Operation };
 
 const DID_RE = /^did:dimo:[a-z2-7]{24}$/;
 
-async function readBody(
-  res: Response,
-): Promise<{ message: string; body: unknown }> {
+async function readBody(res: Response): Promise<{ message: string; body: unknown }> {
   const fallback = `directory returned HTTP ${res.status}`;
   try {
     const body: unknown = JSON.parse(await res.text());
@@ -101,11 +99,7 @@ export class DirectoryClient {
       throw new DirectoryRejectedError(message, res.status, body);
     }
     const doc = await readJson(did, res);
-    if (
-      typeof doc !== "object" ||
-      doc === null ||
-      (doc as { id?: unknown }).id !== did
-    ) {
+    if (typeof doc !== "object" || doc === null || (doc as { id?: unknown }).id !== did) {
       throw new DirectoryIntegrityError(did, "not a DID document for this DID");
     }
     return doc as DidDocument;
@@ -121,8 +115,7 @@ export class DirectoryClient {
       throw new DirectoryRejectedError(message, res.status, body);
     }
     const entries = await readJson(did, res);
-    if (!Array.isArray(entries))
-      throw new DirectoryIntegrityError(did, "audit log is not an array");
+    if (!Array.isArray(entries)) throw new DirectoryIntegrityError(did, "audit log is not an array");
     if (entries.length === 0) throw new DidNotFoundError(did);
     return verifyAuditLog(did, entries);
   }
@@ -133,16 +126,12 @@ export class DirectoryClient {
    */
   async head(did: string): Promise<Head> {
     const last = (await this.auditLog(did)).at(-1)!;
-    if (last.operation.type === "plc_tombstone")
-      throw new DeactivatedError(did);
+    if (last.operation.type === "plc_tombstone") throw new DeactivatedError(did);
     return { cid: last.cid, op: last.operation };
   }
 
   /** Submit a signed operation. The returned cid is checked against computeCid(op). */
-  async submit(
-    did: string,
-    op: Operation,
-  ): Promise<{ did: string; cid: string }> {
+  async submit(did: string, op: Operation): Promise<{ did: string; cid: string }> {
     const res = await this.request(this.url(did), {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -155,18 +144,13 @@ export class DirectoryClient {
       } | null;
       const cid = computeCid(op);
       if (body?.did !== did || body.cid !== cid) {
-        throw new DirectoryIntegrityError(
-          did,
-          `submit answered ${JSON.stringify(body)}, expected cid ${cid}`,
-        );
+        throw new DirectoryIntegrityError(did, `submit answered ${JSON.stringify(body)}, expected cid ${cid}`);
       }
       return { did, cid };
     }
     const { message, body } = await readBody(res);
     if (res.status === 409) {
-      throw op.prev === null
-        ? new DidExistsError(message)
-        : new HeadMovedError(message);
+      throw op.prev === null ? new DidExistsError(message) : new HeadMovedError(message);
     }
     throw new DirectoryRejectedError(message, res.status, body);
   }
@@ -175,7 +159,7 @@ export class DirectoryClient {
 /** The DirectoryClient an SDK call uses: the caller's, else one for cfg.directoryUrl and cfg.fetchImpl. */
 export function directoryFor(
   cfg: { directoryUrl: string; fetchImpl?: typeof fetch },
-  directory?: DirectoryClient,
+  directory?: DirectoryClient
 ): DirectoryClient {
   return directory ?? new DirectoryClient(cfg.directoryUrl, cfg.fetchImpl);
 }

@@ -2,6 +2,7 @@
 // but the global. Every module must call cfg.fetchImpl (or the default global fetch) unbound.
 import type { TurnkeyClient } from "@turnkey/http";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { claimDid } from "../../src/accounts/account/claim.js";
 import { deleteAccount } from "../../src/accounts/account/delete.js";
 import { addDeviceKey } from "../../src/accounts/account/keys.js";
@@ -12,15 +13,7 @@ import { signIn } from "../../src/accounts/auth/signin.js";
 import type { SdkConfig } from "../../src/accounts/config.js";
 import { DirectoryClient } from "../../src/accounts/directory/client.js";
 import { WebCryptoP256Signer } from "../../src/accounts/signers/webcrypto.js";
-import {
-  FakeDirectory,
-  cfgFor,
-  fakeDauth,
-  json,
-  k1Signer,
-  router,
-  strictReceiver,
-} from "./helpers.js";
+import { cfgFor, fakeDauth, FakeDirectory, json, k1Signer, router, strictReceiver } from "./helpers.js";
 
 afterEach(() => vi.unstubAllGlobals());
 

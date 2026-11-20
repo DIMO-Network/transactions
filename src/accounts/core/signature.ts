@@ -2,11 +2,11 @@ import { p256 } from "@noble/curves/nist.js";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { base64url } from "@scure/base";
+
 import { decodeDidKey } from "./didkey.js";
 import { EncodingError } from "./errors.js";
 
-const bad = (message: string): EncodingError =>
-  new EncodingError("signature_invalid", message);
+const bad = (message: string): EncodingError => new EncodingError("signature_invalid", message);
 
 const b64u = (b: Uint8Array): string => base64url.encode(b).replace(/=+$/, "");
 
@@ -21,11 +21,7 @@ function fromB64u(s: string): Uint8Array {
  * low-S), and r or s outside [1, n-1] is refused. The message is hashed exactly once, here.
  * Never throws: anything malformed is `false`.
  */
-export function verifyOpSignature(
-  payload: Uint8Array,
-  sig: string,
-  didKey: string,
-): boolean {
+export function verifyOpSignature(payload: Uint8Array, sig: string, didKey: string): boolean {
   try {
     const raw = fromB64u(sig);
     if (raw.length !== 64) return false;
@@ -49,8 +45,7 @@ export function rsToSig(r: string, s: string): string {
   };
   const hex = pad(r) + pad(s);
   const out = new Uint8Array(64);
-  for (let i = 0; i < 64; i++)
-    out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  for (let i = 0; i < 64; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
   return b64u(out);
 }
 

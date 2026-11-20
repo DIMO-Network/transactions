@@ -1,4 +1,4 @@
-import { send, unboundFetch, type SdkConfig } from "../config.js";
+import { type SdkConfig, send, unboundFetch } from "../config.js";
 import { createDpopProof } from "./dpop.js";
 import type { Session } from "./signin.js";
 
@@ -8,7 +8,7 @@ import type { Session } from "./signin.js";
  */
 export function authedFetch(
   cfg: Pick<SdkConfig, "fetchImpl">,
-  session: Session,
+  session: Session
 ): (url: string, init?: RequestInit) => Promise<Response> {
   const f = unboundFetch(cfg);
   return async (url, init = {}) => {
@@ -16,12 +16,7 @@ export function authedFetch(
     headers.set("Authorization", `DPoP ${session.token}`);
     headers.set(
       "DPoP",
-      await createDpopProof(
-        session.dpopKey,
-        (init.method ?? "GET").toUpperCase(),
-        url,
-        session.token,
-      ),
+      await createDpopProof(session.dpopKey, (init.method ?? "GET").toUpperCase(), url, session.token)
     );
     return send(f, "accounts", url, { ...init, headers });
   };

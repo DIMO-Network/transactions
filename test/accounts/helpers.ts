@@ -3,19 +3,20 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { hexToBytes } from "@noble/hashes/utils.js";
 import { base64url } from "@scure/base";
 import { vi } from "vitest";
-import vectors from "./fixtures/did-ops.json";
+
+import type { SdkConfig } from "../../src/accounts/config.js";
 import {
   buildGenesis,
   computeCid,
   deriveDid,
   didKeyFromCompressed,
   encodeSigningPayload,
-  verifyOpSignature,
   type Operation,
   type UnsignedOperation,
+  verifyOpSignature,
 } from "../../src/accounts/core/index.js";
-import type { SdkConfig } from "../../src/accounts/config.js";
 import type { Signer } from "../../src/accounts/signers/types.js";
+import vectors from "./fixtures/did-ops.json";
 
 export type VectorCase = {
   name: string;
@@ -29,8 +30,7 @@ export type VectorCase = {
 };
 
 export const cases = vectors.cases as unknown as VectorCase[];
-export const vector = (name: string): VectorCase =>
-  cases.find((c) => c.name === name)!;
+export const vector = (name: string): VectorCase => cases.find((c) => c.name === name)!;
 /** A vector operation with Go's real signature. */
 export const signedVector = (name: string): Operation => ({
   ...vector(name).unsigned,
@@ -43,29 +43,17 @@ export const signedVector = (name: string): Operation => ({
  */
 export const VECTOR_CHAIN_DID = vector("genesis-wallet-r1-signing").did;
 export const vectorChain = (): Operation[] =>
-  [
-    "genesis-wallet-r1-signing",
-    "update-add-device",
-    "update-remove-device",
-    "tombstone",
-  ].map(signedVector);
+  ["genesis-wallet-r1-signing", "update-add-device", "update-remove-device", "tombstone"].map(signedVector);
 
 const b64u = (b: Uint8Array): string => base64url.encode(b).replace(/=+$/, "");
 
 /** A secp256k1 Signer (default: the vectors' wallet key). `sign` is a vi.fn spy. */
-export function k1Signer(
-  privHex = cases[0]!.signerPrivateKeyHex,
-): Signer & {
+export function k1Signer(privHex = cases[0]!.signerPrivateKeyHex): Signer & {
   sign: ReturnType<typeof vi.fn<(p: Uint8Array) => Promise<string>>>;
 } {
   const priv = hexToBytes(privHex);
-  const didKey = didKeyFromCompressed(
-    "secp256k1",
-    secp256k1.getPublicKey(priv, true),
-  );
-  const sign = vi.fn(async (payload: Uint8Array) =>
-    b64u(secp256k1.sign(sha256(payload), priv, { prehash: false })),
-  );
+  const didKey = didKeyFromCompressed("secp256k1", secp256k1.getPublicKey(priv, true));
+  const sign = vi.fn(async (payload: Uint8Array) => b64u(secp256k1.sign(sha256(payload), priv, { prehash: false })));
   return { didKey, sign };
 }
 
@@ -89,12 +77,7 @@ export type Handler = (url: string, init: RequestInit) => Promise<Response>;
 /** A vi.fn fetch that routes by URL prefix; unknown URLs throw. */
 export function router(routes: Record<string, Handler>) {
   return vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-    const url =
-      typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.href
-          : input.url;
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     for (const [base, h] of Object.entries(routes)) {
       if (url.startsWith(base)) return h(url, init ?? {});
     }
@@ -107,15 +90,9 @@ export function router(routes: Record<string, Handler>) {
  * with `this` undefined or the global object.
  */
 export function strictReceiver(inner: typeof fetch): typeof fetch {
-  return function (
-    this: unknown,
-    input: string | URL | Request,
-    init?: RequestInit,
-  ) {
+  return function (this: unknown, input: string | URL | Request, init?: RequestInit) {
     if (this !== undefined && this !== globalThis) {
-      throw new TypeError(
-        "Failed to execute 'fetch' on 'Window': Illegal invocation",
-      );
+      throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
     }
     return inner(input, init);
   } as typeof fetch;
@@ -150,20 +127,15 @@ export class FakeDirectory {
         cid: computeCid(operation),
         operation,
         createdAt: "2026-11-18T00:00:00Z",
-      })),
+      }))
     );
   }
 
   /** Seed a wallet-signed genesis; returns the DID. */
-  async seedGenesis(
-    wallet: Signer,
-    extra: { signingKey?: string; alias?: string } = {},
-  ): Promise<string> {
+  async seedGenesis(wallet: Signer, extra: { signingKey?: string; alias?: string } = {}): Promise<string> {
     const genesis = buildGenesis({ walletKey: wallet.didKey, ...extra });
     const did = deriveDid(genesis);
-    this.seed(did, [
-      { ...genesis, sig: await wallet.sign(encodeSigningPayload(genesis)) },
-    ]);
+    this.seed(did, [{ ...genesis, sig: await wallet.sign(encodeSigningPayload(genesis)) }]);
     return did;
   }
 
@@ -171,7 +143,7 @@ export class FakeDirectory {
   async append(
     did: string,
     wallet: Signer,
-    patch: (head: UnsignedOperation, cid: string) => UnsignedOperation,
+    patch: (head: UnsignedOperation, cid: string) => UnsignedOperation
   ): Promise<string> {
     const log = this.logs.get(did)!;
     const last = log.at(-1)!;
@@ -204,8 +176,7 @@ export class FakeDirectory {
     }
     if (!log) return json({ error: "DID not found" }, 404);
     const last = log.at(-1)!.operation;
-    if (last.type === "plc_tombstone")
-      return json({ error: `DID ${did} has been deactivated` }, 410);
+    if (last.type === "plc_tombstone") return json({ error: `DID ${did} has been deactivated` }, 410);
     return json({
       "@context": [],
       id: did,
@@ -217,47 +188,35 @@ export class FakeDirectory {
   /** Apply a submitted op under Go's rules and return the directory's response. */
   apply(did: string, op: Operation): Response {
     const payload = encodeSigningPayload(op);
-    const signedBy = (keys: string[]) =>
-      keys.some((k) => verifyOpSignature(payload, op.sig, k));
+    const signedBy = (keys: string[]) => keys.some((k) => verifyOpSignature(payload, op.sig, k));
     const log = this.logs.get(did);
     const cid = computeCid(op);
     if (!log) {
-      if (op.type !== "plc_operation" || op.prev !== null)
-        return json({ error: "invalid create operation" }, 400);
-      if (deriveDid(op) !== did)
-        return json(
-          { error: "DID mismatch: derived DID does not match URL" },
-          400,
-        );
-      if (!signedBy(op.rotationKeys))
-        return json({ error: "invalid signature" }, 400);
+      if (op.type !== "plc_operation" || op.prev !== null) return json({ error: "invalid create operation" }, 400);
+      if (deriveDid(op) !== did) return json({ error: "DID mismatch: derived DID does not match URL" }, 400);
+      if (!signedBy(op.rotationKeys)) return json({ error: "invalid signature" }, 400);
       this.seed(did, [op]);
       return json({ did, cid });
     }
     if (op.prev === null)
       return json(
         {
-          error:
-            "invalid update operation: update operation must reference a previous CID",
+          error: "invalid update operation: update operation must reference a previous CID",
         },
-        400,
+        400
       );
     const current = log.at(-1)!;
     if (current.operation.type === "plc_tombstone")
-      return json(
-        { error: "invalid transition: DID has been deactivated" },
-        400,
-      );
+      return json({ error: "invalid transition: DID has been deactivated" }, 400);
     if (op.prev !== current.cid)
       return json(
         {
           error: "prev CID does not match current head",
           expected: current.cid,
         },
-        409,
+        409
       );
-    if (!signedBy(current.operation.rotationKeys))
-      return json({ error: "invalid signature" }, 400);
+    if (!signedBy(current.operation.rotationKeys)) return json({ error: "invalid signature" }, 400);
     log.push({ did, cid, operation: op, createdAt: "t" });
     return json({ did, cid });
   }
@@ -270,9 +229,7 @@ export function fakeDauth(opts: { granted?: string | null } = {}): Handler {
     const b = JSON.parse(init.body as string);
     if (url.endsWith("/signin/challenge")) {
       asked = b.scope;
-      const canonical = ["read", "write", "approve"]
-        .filter((s) => b.scope.split(" ").includes(s))
-        .join(" ");
+      const canonical = ["read", "write", "approve"].filter((s) => b.scope.split(" ").includes(s)).join(" ");
       return json({
         nonce: "n1",
         challenge: `dimo.org wants you to sign in as\n${b.did}\n\nFor: ${(b.audience ?? []).join(", ")}\nScope: ${canonical}\nKey: ${b.jkt}\n\nNonce: n1\nIssued At: a\nExpiration Time: b`,

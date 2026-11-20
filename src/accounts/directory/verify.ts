@@ -1,10 +1,4 @@
-import {
-  computeCid,
-  deriveDid,
-  encodeSigningPayload,
-  verifyOpSignature,
-  type Operation,
-} from "../core/index.js";
+import { computeCid, deriveDid, encodeSigningPayload, type Operation, verifyOpSignature } from "../core/index.js";
 import { DirectoryIntegrityError } from "../errors.js";
 
 /** One audit-log entry, after verification. */
@@ -15,21 +9,11 @@ export type AuditEntry = {
   createdAt: string;
 };
 
-const OP_FIELDS = new Set([
-  "type",
-  "rotationKeys",
-  "verificationMethods",
-  "alsoKnownAs",
-  "services",
-  "prev",
-  "sig",
-]);
+const OP_FIELDS = new Set(["type", "rotationKeys", "verificationMethods", "alsoKnownAs", "services", "prev", "sig"]);
 
-const isObject = (v: unknown): v is Record<string, unknown> =>
-  typeof v === "object" && v !== null && !Array.isArray(v);
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
-const isStringArray = (v: unknown): v is string[] =>
-  Array.isArray(v) && v.every((x) => typeof x === "string");
+const isStringArray = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === "string");
 
 /**
  * Check one entry's shape. Only the canonical person-DID form is accepted: the six
@@ -60,16 +44,11 @@ function shapeOf(did: string, i: number, raw: unknown): AuditEntry {
   if (
     !isObject(services) ||
     !Object.values(services).every(
-      (s) =>
-        isObject(s) &&
-        Object.keys(s).length === 2 &&
-        typeof s.type === "string" &&
-        typeof s.endpoint === "string",
+      (s) => isObject(s) && Object.keys(s).length === 2 && typeof s.type === "string" && typeof s.endpoint === "string"
     )
   )
     bad("services is not a map of {type, endpoint}");
-  if (op.prev !== null && typeof op.prev !== "string")
-    bad("prev is neither null nor a string");
+  if (op.prev !== null && typeof op.prev !== "string") bad("prev is neither null nor a string");
   if (typeof op.sig !== "string") bad("sig is not a string");
   return {
     did,
@@ -88,8 +67,7 @@ function shapeOf(did: string, i: number, raw: unknown): AuditEntry {
  * computeCid(operation). An empty log is not verified: it throws too. Throws DirectoryIntegrityError on the first failure.
  */
 export function verifyAuditLog(did: string, raw: unknown[]): AuditEntry[] {
-  if (raw.length === 0)
-    throw new DirectoryIntegrityError(did, "audit log is empty");
+  if (raw.length === 0) throw new DirectoryIntegrityError(did, "audit log is empty");
   const entries = raw.map((e, i) => shapeOf(did, i, e));
   entries.forEach((entry, i) => {
     const fail = (why: string, cause?: unknown): never => {
@@ -106,26 +84,20 @@ export function verifyAuditLog(did: string, raw: unknown[]): AuditEntry[] {
     } catch (cause) {
       fail("operation cannot be encoded", cause);
     }
-    if (entry.cid !== cid)
-      fail(`cid ${entry.cid} is not the operation's cid ${cid}`);
+    if (entry.cid !== cid) fail(`cid ${entry.cid} is not the operation's cid ${cid}`);
     let authorized: string[];
     if (i === 0) {
-      if (op.type !== "plc_operation" || op.prev !== null)
-        fail("genesis must be a plc_operation with prev null");
+      if (op.type !== "plc_operation" || op.prev !== null) fail("genesis must be a plc_operation with prev null");
       if (deriveDid(op) !== did) fail("genesis does not derive this DID");
       authorized = op.rotationKeys;
     } else {
       const before = entries[i - 1]!;
-      if (before.operation.type === "plc_tombstone")
-        fail("operation after a tombstone");
-      if (op.prev !== before.cid)
-        fail(`prev ${String(op.prev)} is not entry ${i - 1}'s cid`);
+      if (before.operation.type === "plc_tombstone") fail("operation after a tombstone");
+      if (op.prev !== before.cid) fail(`prev ${String(op.prev)} is not entry ${i - 1}'s cid`);
       authorized = before.operation.rotationKeys;
     }
     if (!authorized.some((k) => verifyOpSignature(payload, op.sig, k)))
-      fail(
-        `signature does not verify under ${i === 0 ? "its own" : "the previous state's"} rotation keys`,
-      );
+      fail(`signature does not verify under ${i === 0 ? "its own" : "the previous state's"} rotation keys`);
   });
   return entries;
 }

@@ -1,17 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import type { TurnkeyClient } from "@turnkey/http";
-import {
-  didKeyFromCompressed,
-  ethAddressFromDidKey,
-  verifyOpSignature,
-} from "../../../src/accounts/core/index.js";
-import {
-  TurnkeyWalletSigner,
-  turnkeyWalletDidKey,
-} from "../../../src/accounts/signers/turnkey.js";
+import { describe, expect, it, vi } from "vitest";
+
+import { didKeyFromCompressed, ethAddressFromDidKey, verifyOpSignature } from "../../../src/accounts/core/index.js";
+import { turnkeyWalletDidKey, TurnkeyWalletSigner } from "../../../src/accounts/signers/turnkey.js";
 
 type SignArg = {
   type: string;
@@ -137,9 +131,7 @@ describe("turnkeyWalletDidKey", () => {
         publicKey: bytesToHex(uncompressed),
       },
     ]);
-    expect(await turnkeyWalletDidKey(client, "org", walletAddress)).toBe(
-      didKey,
-    );
+    expect(await turnkeyWalletDidKey(client, "org", walletAddress)).toBe(didKey);
   });
 
   it("uses a compressed ETH publicKey", async () => {
@@ -150,13 +142,7 @@ describe("turnkeyWalletDidKey", () => {
         publicKey: bytesToHex(compressed),
       },
     ]);
-    expect(
-      await turnkeyWalletDidKey(
-        client,
-        "org",
-        walletAddress.toLowerCase() as `0x${string}`,
-      ),
-    ).toBe(didKey);
+    expect(await turnkeyWalletDidKey(client, "org", walletAddress.toLowerCase() as `0x${string}`)).toBe(didKey);
   });
 
   it("falls back to the compressed account", async () => {
@@ -168,9 +154,7 @@ describe("turnkeyWalletDidKey", () => {
         path: "m/44'/60'/0'/0/0",
       },
     ]);
-    expect(await turnkeyWalletDidKey(client, "org", walletAddress)).toBe(
-      didKey,
-    );
+    expect(await turnkeyWalletDidKey(client, "org", walletAddress)).toBe(didKey);
   });
 
   it("ignores compressed accounts on other paths", async () => {
@@ -182,25 +166,16 @@ describe("turnkeyWalletDidKey", () => {
         path: "m/44'/60'/0'/0/1",
       },
     ]);
-    await expect(
-      turnkeyWalletDidKey(client, "org", walletAddress),
-    ).rejects.toThrow(/compressed/i);
+    await expect(turnkeyWalletDidKey(client, "org", walletAddress)).rejects.toThrow(/compressed/i);
   });
 
   it("throws when no public key is available", async () => {
-    const client = accountsClient([
-      { addressFormat: "ADDRESS_FORMAT_ETHEREUM", address: walletAddress },
-    ]);
-    await expect(
-      turnkeyWalletDidKey(client, "org", walletAddress),
-    ).rejects.toThrow(/compressed/i);
+    const client = accountsClient([{ addressFormat: "ADDRESS_FORMAT_ETHEREUM", address: walletAddress }]);
+    await expect(turnkeyWalletDidKey(client, "org", walletAddress)).rejects.toThrow(/compressed/i);
   });
 
   it("throws when the key does not match the wallet address", async () => {
-    const other = secp256k1.getPublicKey(
-      secp256k1.utils.randomSecretKey(),
-      true,
-    );
+    const other = secp256k1.getPublicKey(secp256k1.utils.randomSecretKey(), true);
     const client = accountsClient([
       {
         addressFormat: "ADDRESS_FORMAT_ETHEREUM",
@@ -208,16 +183,11 @@ describe("turnkeyWalletDidKey", () => {
         publicKey: bytesToHex(other),
       },
     ]);
-    await expect(
-      turnkeyWalletDidKey(client, "org", walletAddress),
-    ).rejects.toThrow(/match/i);
+    await expect(turnkeyWalletDidKey(client, "org", walletAddress)).rejects.toThrow(/match/i);
   });
 
   it("skips another wallets compressed account that comes first", async () => {
-    const otherPub = secp256k1.getPublicKey(
-      secp256k1.utils.randomSecretKey(),
-      true,
-    );
+    const otherPub = secp256k1.getPublicKey(secp256k1.utils.randomSecretKey(), true);
     const client = accountsClient([
       {
         addressFormat: "ADDRESS_FORMAT_COMPRESSED",
@@ -231,9 +201,7 @@ describe("turnkeyWalletDidKey", () => {
         path: "m/44'/60'/0'/0/0",
       },
     ]);
-    expect(await turnkeyWalletDidKey(client, "org", walletAddress)).toBe(
-      didKey,
-    );
+    expect(await turnkeyWalletDidKey(client, "org", walletAddress)).toBe(didKey);
   });
 
   it("passes walletId through when given", async () => {
@@ -265,8 +233,6 @@ describe("TurnkeyWalletSigner sha256-text mode", () => {
       walletAddress,
       didKey,
     });
-    await expect(
-      signer.sign(new Uint8Array([0xff, 0xfe, 0x00])),
-    ).rejects.toThrow();
+    await expect(signer.sign(new Uint8Array([0xff, 0xfe, 0x00]))).rejects.toThrow();
   });
 });

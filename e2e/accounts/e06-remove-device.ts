@@ -1,17 +1,5 @@
-import {
-  SigninError,
-  WebCryptoP256Signer,
-  addDeviceKey,
-  removeDeviceKey,
-} from "../../src/accounts/index.js";
-import {
-  Failure,
-  check,
-  eq,
-  signInWith,
-  signup,
-  type Scenario,
-} from "./harness.js";
+import { addDeviceKey, removeDeviceKey, SigninError, WebCryptoP256Signer } from "../../src/accounts/index.js";
+import { check, eq, Failure, type Scenario, signInWith, signup } from "./harness.js";
 
 /**
  * E6. Remove a device.
@@ -31,7 +19,7 @@ export const e06: Scenario = {
     // Control: the key signs in before it is removed.
     check(
       (await signInWith(ctx, user.did, second, fragment, ["read"])).token,
-      "the added key cannot sign in before removal",
+      "the added key cannot sign in before removal"
     );
     await removeDeviceKey(ctx.cfg, {
       did: user.did,

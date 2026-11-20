@@ -1,4 +1,5 @@
 import { createActivityPoller, type TurnkeyClient } from "@turnkey/http";
+
 import { TurnkeyError, UsageError } from "../errors.js";
 
 /** Turnkey's authenticator transports, as addPasskey sends them. */
@@ -30,7 +31,7 @@ export async function addPasskey(
     attestation: PasskeyAttestation;
     challenge: string;
     name: string;
-  },
+  }
 ): Promise<{ authenticatorId: string }> {
   const poller = createActivityPoller({
     client: turnkey,
@@ -52,11 +53,7 @@ export async function addPasskey(
     },
   });
   const id = activity.result.createAuthenticatorsResult?.authenticatorIds[0];
-  if (!id)
-    throw new TurnkeyError(
-      "no_authenticator_id",
-      "Turnkey returned no authenticator id",
-    );
+  if (!id) throw new TurnkeyError("no_authenticator_id", "Turnkey returned no authenticator id");
   return { authenticatorId: id };
 }
 
@@ -72,20 +69,18 @@ export async function removePasskey(
     userId: string;
     authenticatorId: string;
     allowLast?: boolean;
-  },
+  }
 ): Promise<void> {
   if (!args.allowLast) {
     const { authenticators } = await turnkey.getAuthenticators({
       organizationId: args.subOrganizationId,
       userId: args.userId,
     });
-    const others = authenticators.filter(
-      (a) => a.authenticatorId !== args.authenticatorId,
-    );
+    const others = authenticators.filter((a) => a.authenticatorId !== args.authenticatorId);
     if (others.length === 0) {
       throw new UsageError(
         "last_passkey",
-        "refusing to remove the user's last passkey; pass { allowLast: true } to override",
+        "refusing to remove the user's last passkey; pass { allowLast: true } to override"
       );
     }
   }

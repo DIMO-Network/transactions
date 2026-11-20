@@ -41,11 +41,7 @@ export type EncodingErrorCode =
 /** Input that cannot be encoded the way did-directory's Go code encodes it. */
 export class EncodingError extends AccountSdkError {
   declare readonly code: EncodingErrorCode;
-  constructor(
-    code: EncodingErrorCode,
-    message: string,
-    options?: { cause?: unknown },
-  ) {
+  constructor(code: EncodingErrorCode, message: string, options?: { cause?: unknown }) {
     super(code, message, options);
     this.name = "EncodingError";
   }

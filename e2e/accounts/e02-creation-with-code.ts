@@ -1,4 +1,5 @@
 import { WebCryptoP256Signer } from "../../src/accounts/index.js";
+import { createAccount } from "../../src/accounts/index.js";
 import {
   check,
   eq,
@@ -9,12 +10,11 @@ import {
   requestCode,
   resolveDoc,
   sameSet,
+  type Scenario,
   track,
   userTurnkey,
   walletDidKeyOf,
-  type Scenario,
 } from "./harness.js";
-import { createAccount } from "../../src/accounts/index.js";
 
 /**
  * E2. Creation for a new email with an email code and an r1 phone key.
@@ -40,25 +40,15 @@ export const e02: Scenario = {
 
     const doc = await resolveDoc(ctx, account.did);
     sameSet(fragmentsOf(doc), ["wallet", "signing"], "verification methods");
-    const signing = doc.verificationMethod.find((v) =>
-      v.id.endsWith("#signing"),
-    );
+    const signing = doc.verificationMethod.find((v) => v.id.endsWith("#signing"));
     check(signing, "no signing verification method");
     check(
       signing.publicKeyMultibase.startsWith("zDn"),
-      `signing key is not p256 (multibase ${signing.publicKeyMultibase.slice(0, 6)}...)`,
+      `signing key is not p256 (multibase ${signing.publicKeyMultibase.slice(0, 6)}...)`
     );
-    eq(
-      signing.publicKeyMultibase,
-      multibaseOf(device.didKey),
-      "signing key is the phone key",
-    );
+    eq(signing.publicKeyMultibase, multibaseOf(device.didKey), "signing key is the phone key");
     const head = (await ctx.directory.head(account.did)).op;
-    const walletKey = await walletDidKeyOf(
-      ctx,
-      account.subOrganizationId,
-      account.walletAddress as `0x${string}`,
-    );
+    const walletKey = await walletDidKeyOf(ctx, account.subOrganizationId, account.walletAddress as `0x${string}`);
     sameSet(head.rotationKeys, [walletKey], "rotationKeys");
     eq(account.emailVerified, true, "emailVerified");
 

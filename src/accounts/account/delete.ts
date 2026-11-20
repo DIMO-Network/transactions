@@ -1,32 +1,12 @@
-import {
-  createActivityPoller,
-  TurnkeyRequestError,
-  type TurnkeyClient,
-} from "@turnkey/http";
+import { createActivityPoller, type TurnkeyClient, TurnkeyRequestError } from "@turnkey/http";
+
 import { authedFetch } from "../auth/fetch.js";
 import { requireScopes } from "../auth/scopes.js";
 import type { Session } from "../auth/signin.js";
 import { normalizeUrl, type SdkConfig } from "../config.js";
-import {
-  buildTombstone,
-  computeCid,
-  encodeSigningPayload,
-  verifyOpSignature,
-  type Operation,
-} from "../core/index.js";
-import {
-  directoryFor,
-  type AuditEntry,
-  type DirectoryClient,
-} from "../directory/client.js";
-import {
-  AccountSdkError,
-  AccountsError,
-  HeadMovedError,
-  NetworkError,
-  PolicyError,
-  UsageError,
-} from "../errors.js";
+import { buildTombstone, computeCid, encodeSigningPayload, type Operation, verifyOpSignature } from "../core/index.js";
+import { type AuditEntry, type DirectoryClient, directoryFor } from "../directory/client.js";
+import { AccountSdkError, AccountsError, HeadMovedError, NetworkError, PolicyError, UsageError } from "../errors.js";
 import type { Signer } from "../signers/types.js";
 
 export type DeleteStep = "accounts" | "turnkey" | "tombstone";
@@ -43,11 +23,9 @@ export interface PendingDeletion {
   deleteWithoutExport: boolean;
 }
 
-const describe = (cause: unknown): string =>
-  cause instanceof Error ? cause.message : String(cause);
+const describe = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause));
 
-export type DeleteIncompleteCode =
-  "delete_incomplete" | "delete_head_moved" | "tombstone_signature_invalid";
+export type DeleteIncompleteCode = "delete_incomplete" | "delete_head_moved" | "tombstone_signature_invalid";
 
 /**
  * A deletion stopped part-way. `pending` can be persisted and passed to resumeDelete;
@@ -57,16 +35,10 @@ export type DeleteIncompleteCode =
 export class DeleteIncompleteError extends AccountSdkError {
   declare readonly code: DeleteIncompleteCode;
   readonly pending: PendingDeletion;
-  constructor(
-    pending: PendingDeletion,
-    cause: unknown,
-    code: DeleteIncompleteCode = "delete_incomplete",
-  ) {
-    super(
-      code,
-      `account deletion incomplete (done: ${pending.stepsDone.join(", ") || "none"}): ${describe(cause)}`,
-      { cause },
-    );
+  constructor(pending: PendingDeletion, cause: unknown, code: DeleteIncompleteCode = "delete_incomplete") {
+    super(code, `account deletion incomplete (done: ${pending.stepsDone.join(", ") || "none"}): ${describe(cause)}`, {
+      cause,
+    });
     this.name = "DeleteIncompleteError";
     this.pending = pending;
   }
@@ -121,7 +93,7 @@ function isOrgGone(err: unknown): boolean {
 async function deleteSubOrg(
   turnkey: TurnkeyClient,
   subOrganizationId: string,
-  deleteWithoutExport: boolean,
+  deleteWithoutExport: boolean
 ): Promise<void> {
   const poller = createActivityPoller({
     client: turnkey,
@@ -141,20 +113,12 @@ async function deleteSubOrg(
  * or a 5xx leaves the outcome unknown: DeleteIncompleteError with the step not done.
  * Any other status is an AccountsError and nothing is resumable.
  */
-async function forgetAccount(
-  cfg: SdkConfig,
-  session: Session,
-  pending: PendingDeletion,
-): Promise<PendingDeletion> {
+async function forgetAccount(cfg: SdkConfig, session: Session, pending: PendingDeletion): Promise<PendingDeletion> {
   let res: Response;
   try {
-    res = await authedFetch(cfg, session)(
-      `${normalizeUrl(cfg.accountsUrl)}/api/v2/me`,
-      { method: "DELETE" },
-    );
+    res = await authedFetch(cfg, session)(`${normalizeUrl(cfg.accountsUrl)}/api/v2/me`, { method: "DELETE" });
   } catch (err) {
-    if (err instanceof NetworkError)
-      throw new DeleteIncompleteError(pending, err);
+    if (err instanceof NetworkError) throw new DeleteIncompleteError(pending, err);
     throw err;
   }
   if (!res.ok) {
@@ -174,11 +138,7 @@ async function forgetAccount(
 }
 
 /** True when the verified log already ends with this tombstone. */
-async function tombstoneApplied(
-  directory: DirectoryClient,
-  did: string,
-  tombstoneCid: string,
-): Promise<boolean> {
+async function tombstoneApplied(directory: DirectoryClient, did: string, tombstoneCid: string): Promise<boolean> {
   try {
     return (await directory.auditLog(did)).at(-1)!.cid === tombstoneCid;
   } catch {
@@ -187,10 +147,7 @@ async function tombstoneApplied(
 }
 
 /** True when the tombstone's signature verifies under one of `rotationKeys`. */
-function tombstoneVerifies(
-  tombstone: Operation,
-  rotationKeys: readonly string[],
-): boolean {
+function tombstoneVerifies(tombstone: Operation, rotationKeys: readonly string[]): boolean {
   const { sig, ...unsigned } = tombstone;
   const payload = encodeSigningPayload(unsigned);
   return rotationKeys.some((k) => verifyOpSignature(payload, sig, k));
@@ -201,16 +158,16 @@ const badTombstone = (pending: PendingDeletion): DeleteIncompleteError =>
     pending,
     new PolicyError(
       "proof_invalid",
-      "the signed tombstone does not verify under a rotation key of the head it was signed against",
+      "the signed tombstone does not verify under a rotation key of the head it was signed against"
     ),
-    "tombstone_signature_invalid",
+    "tombstone_signature_invalid"
   );
 
 /** Steps 3 and 4. Skips what stepsDone records. Never calls accounts and never signs. */
 async function finish(
   pending: PendingDeletion,
   turnkey: TurnkeyClient,
-  directory: DirectoryClient,
+  directory: DirectoryClient
 ): Promise<PendingDeletion> {
   const state: PendingDeletion = {
     ...pending,
@@ -236,29 +193,17 @@ async function finish(
     if (headCid !== state.prevCid && headCid !== tombstoneCid) {
       throw new DeleteHeadMovedError(
         snapshot(),
-        new HeadMovedError(
-          `head is ${headCid}; the tombstone was signed against ${state.prevCid}`,
-        ),
+        new HeadMovedError(`head is ${headCid}; the tombstone was signed against ${state.prevCid}`)
       );
     }
     // Never destroy the wallet for a tombstone that cannot apply: its signature must
     // verify under a rotation key of the state it was signed against.
     const signedAgainst = log.find((e) => e.cid === state.prevCid);
-    if (
-      !signedAgainst ||
-      !tombstoneVerifies(
-        state.signedTombstone,
-        signedAgainst.operation.rotationKeys,
-      )
-    ) {
+    if (!signedAgainst || !tombstoneVerifies(state.signedTombstone, signedAgainst.operation.rotationKeys)) {
       throw badTombstone(snapshot());
     }
     try {
-      await deleteSubOrg(
-        turnkey,
-        state.subOrganizationId,
-        state.deleteWithoutExport,
-      );
+      await deleteSubOrg(turnkey, state.subOrganizationId, state.deleteWithoutExport);
     } catch (err) {
       // A lost response to an earlier attempt: the sub-org is already gone.
       if (!isOrgGone(err)) throw new DeleteIncompleteError(snapshot(), err);
@@ -301,20 +246,14 @@ async function finish(
  * resumeDelete. A DELETE /me that fails with a 4xx other than 404 throws AccountsError:
  * nothing happened, so start over.
  */
-export async function deleteAccount(
-  cfg: SdkConfig,
-  opts: DeleteAccountOptions,
-): Promise<PendingDeletion> {
+export async function deleteAccount(cfg: SdkConfig, opts: DeleteAccountOptions): Promise<PendingDeletion> {
   const { session, wallet } = opts;
   requireScopes(session, ["approve"], "account deletion");
   const directory = directoryFor(cfg, opts.directory);
   const did = session.did;
   const { cid: prevCid, op: headOp } = await directory.head(did);
   if (!headOp.rotationKeys.includes(wallet.didKey)) {
-    throw new PolicyError(
-      "rotation_locked",
-      "wallet is not a rotation key of this DID",
-    );
+    throw new PolicyError("rotation_locked", "wallet is not a rotation key of this DID");
   }
   // 1. Sign, don't submit.
   const unsigned = buildTombstone(prevCid);
@@ -331,8 +270,7 @@ export async function deleteAccount(
     deleteWithoutExport: opts.deleteWithoutExport,
   };
   // A bad signature must be caught before accounts forgets anything.
-  if (!tombstoneVerifies(signedTombstone, headOp.rotationKeys))
-    throw badTombstone(initial);
+  if (!tombstoneVerifies(signedTombstone, headOp.rotationKeys)) throw badTombstone(initial);
   // 2. Accounts forgets the email, while the identity token still works.
   const pending = await forgetAccount(cfg, session, initial);
   // 3 and 4.
@@ -348,7 +286,7 @@ export async function deleteAccount(
 export async function resumeDelete(
   cfg: SdkConfig,
   pending: PendingDeletion,
-  opts: ResumeDeleteOptions,
+  opts: ResumeDeleteOptions
 ): Promise<PendingDeletion> {
   const directory = directoryFor(cfg, opts.directory);
   let state = pending;
@@ -357,7 +295,7 @@ export async function resumeDelete(
     if (!session || session.did !== pending.did) {
       throw new UsageError(
         "session_required",
-        "DELETE /api/v2/me has not completed: pass a session for this DID with scope 'approve' (or call deleteAccount again)",
+        "DELETE /api/v2/me has not completed: pass a session for this DID with scope 'approve' (or call deleteAccount again)"
       );
     }
     requireScopes(session, ["approve"], "account deletion");

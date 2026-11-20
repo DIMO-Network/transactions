@@ -1,13 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
+
+import { addDeviceKey, removeDeviceKey, setAliases } from "../../../src/accounts/account/keys.js";
 import {
   buildSetAliases,
   computeCid,
   encodeSigningPayload,
+  type Operation,
   toChecksumAddress,
   verifyOpSignature,
-  type Operation,
 } from "../../../src/accounts/core/index.js";
-import { WebCryptoP256Signer } from "../../../src/accounts/signers/webcrypto.js";
+import { DirectoryClient } from "../../../src/accounts/directory/client.js";
 import {
   DirectoryIntegrityError,
   DirectoryRejectedError,
@@ -16,24 +18,10 @@ import {
   NetworkError,
   PolicyError,
 } from "../../../src/accounts/errors.js";
-import {
-  addDeviceKey,
-  removeDeviceKey,
-  setAliases,
-} from "../../../src/accounts/account/keys.js";
-import { DirectoryClient } from "../../../src/accounts/directory/client.js";
-import {
-  FakeDirectory,
-  VECTOR_CHAIN_DID,
-  cfgFor,
-  json,
-  k1Signer,
-  router,
-  vectorChain,
-} from "../helpers.js";
+import { WebCryptoP256Signer } from "../../../src/accounts/signers/webcrypto.js";
+import { cfgFor, FakeDirectory, json, k1Signer, router, VECTOR_CHAIN_DID, vectorChain } from "../helpers.js";
 
-const alias = (hex: string) =>
-  "did:ethr:137:" + toChecksumAddress("0x" + hex.repeat(20));
+const alias = (hex: string) => "did:ethr:137:" + toChecksumAddress("0x" + hex.repeat(20));
 
 /** A fake directory with a wallet-only genesis for a fresh k1 wallet, wired into cfg. */
 async function setup() {
@@ -67,18 +55,13 @@ describe("addDeviceKey", () => {
     expect(op.prev).toBe(prev);
     expect(op.verificationMethods.signing).toBe(newKey.didKey);
     const { sig, ...unsigned } = op;
-    expect(
-      verifyOpSignature(encodeSigningPayload(unsigned), sig, wallet.didKey),
-    ).toBe(true);
+    expect(verifyOpSignature(encodeSigningPayload(unsigned), sig, wallet.didKey)).toBe(true);
     expect(res.cid).toBe(computeCid(op));
   });
 
   it("uses an explicit directory when given", async () => {
     const { dir, wallet, did } = await setup();
-    const directory = new DirectoryClient(
-      dir.base,
-      router({ [dir.base]: dir.fetch }) as unknown as typeof fetch,
-    );
+    const directory = new DirectoryClient(dir.base, router({ [dir.base]: dir.fetch }) as unknown as typeof fetch);
     const cfg = cfgFor({
       fetchImpl: (() => {
         throw new Error("cfg fetch used");
@@ -97,9 +80,7 @@ describe("addDeviceKey", () => {
       didKey: newKey.didKey,
       sign: (p: Uint8Array) => other.sign(p),
     };
-    const e = await addDeviceKey(cfg, { did, wallet, newKey: liar }).catch(
-      (x: unknown) => x,
-    );
+    const e = await addDeviceKey(cfg, { did, wallet, newKey: liar }).catch((x: unknown) => x);
     expect(e).toBeInstanceOf(PolicyError);
     expect((e as PolicyError).code).toBe("proof_invalid");
     expect(wallet.sign).not.toHaveBeenCalled();
@@ -110,9 +91,9 @@ describe("addDeviceKey", () => {
     const { did, cfg, posts } = await setup();
     const stranger = k1Signer("22".repeat(32));
     const newKey = await WebCryptoP256Signer.generate();
-    await expect(
-      addDeviceKey(cfg, { did, wallet: stranger, newKey }),
-    ).rejects.toMatchObject({ code: "rotation_locked" });
+    await expect(addDeviceKey(cfg, { did, wallet: stranger, newKey })).rejects.toMatchObject({
+      code: "rotation_locked",
+    });
     expect(stranger.sign).not.toHaveBeenCalled();
     expect(posts()).toBe(0);
   });
@@ -127,23 +108,17 @@ describe("addDeviceKey", () => {
     };
     const newKey = await WebCryptoP256Signer.generate();
     await addDeviceKey(cfg, { did, wallet, newKey });
-    const audits = fetchImpl.mock.calls.filter((c) =>
-      String(c[0]).endsWith("/log/audit"),
-    );
+    const audits = fetchImpl.mock.calls.filter((c) => String(c[0]).endsWith("/log/audit"));
     expect(audits).toHaveLength(2);
     expect(wallet.sign).toHaveBeenCalledTimes(2);
-    expect(dir.head(did).operation.verificationMethods.signing).toBe(
-      newKey.didKey,
-    );
+    expect(dir.head(did).operation.verificationMethods.signing).toBe(newKey.didKey);
   });
 
   it("gives up after 3 attempts", async () => {
     const { dir, wallet, did, cfg } = await setup();
     dir.beforeSubmit = () => json({ error: "moved" }, 409);
     const newKey = await WebCryptoP256Signer.generate();
-    await expect(
-      addDeviceKey(cfg, { did, wallet, newKey }),
-    ).rejects.toBeInstanceOf(HeadMovedError);
+    await expect(addDeviceKey(cfg, { did, wallet, newKey })).rejects.toBeInstanceOf(HeadMovedError);
     expect(wallet.sign).toHaveBeenCalledTimes(3);
   });
 
@@ -161,9 +136,7 @@ describe("addDeviceKey", () => {
       const { dir, wallet, did, cfg } = await setup();
       dir.beforeSubmit = respond;
       const newKey = await WebCryptoP256Signer.generate();
-      await expect(
-        addDeviceKey(cfg, { did, wallet, newKey }),
-      ).rejects.toBeInstanceOf(type);
+      await expect(addDeviceKey(cfg, { did, wallet, newKey })).rejects.toBeInstanceOf(type);
       expect(wallet.sign).toHaveBeenCalledTimes(1);
     }
   });
@@ -171,16 +144,13 @@ describe("addDeviceKey", () => {
   it("is idempotent: a key already on the head returns its fragment and the head cid without signing", async () => {
     const { dir, wallet, did, cfg, fetchImpl } = await setup();
     const newKey = await WebCryptoP256Signer.generate();
-    const posts = () =>
-      fetchImpl.mock.calls.filter((c) => c[1]?.method === "POST").length;
+    const posts = () => fetchImpl.mock.calls.filter((c) => c[1]?.method === "POST").length;
     // The first call is applied, but its response is lost.
     dir.beforeSubmit = (d, op) => {
       dir.apply(d, op);
       return json({ error: "gateway timeout" }, 504);
     };
-    await expect(
-      addDeviceKey(cfg, { did, wallet, newKey }),
-    ).rejects.toBeInstanceOf(DirectoryUnavailableError);
+    await expect(addDeviceKey(cfg, { did, wallet, newKey })).rejects.toBeInstanceOf(DirectoryUnavailableError);
     dir.beforeSubmit = undefined;
     wallet.sign.mockClear();
     const newKeySign = vi.spyOn(newKey, "sign");
@@ -211,49 +181,42 @@ describe("addDeviceKey", () => {
       [
         "an injected extra verification method",
         (e) => {
-          e[1]!.operation.verificationMethods.evil =
-            e[1]!.operation.verificationMethods.wallet!;
+          e[1]!.operation.verificationMethods.evil = e[1]!.operation.verificationMethods.wallet!;
           return e;
         },
       ],
       [
         "an injected verification method with a recomputed cid",
         (e) => {
-          e[1]!.operation.verificationMethods.evil =
-            e[1]!.operation.verificationMethods.wallet!;
+          e[1]!.operation.verificationMethods.evil = e[1]!.operation.verificationMethods.wallet!;
           e[1]!.cid = computeCid(e[1]!.operation);
           return e;
         },
       ],
     ];
-    it.each(tampers)(
-      "%s: DirectoryIntegrityError, and the wallet never signs",
-      async (_n, tamper) => {
-        const { dir, cfg, did, wallet } = vectorSetup();
-        dir.tamper = tamper as (e: unknown[]) => unknown;
-        const newKey = await WebCryptoP256Signer.generate();
-        await expect(
-          addDeviceKey(cfg, { did, wallet, newKey }),
-        ).rejects.toBeInstanceOf(DirectoryIntegrityError);
-        await expect(
-          removeDeviceKey(cfg, { did, wallet, fragment: "signing" }),
-        ).rejects.toBeInstanceOf(DirectoryIntegrityError);
-        await expect(
-          setAliases(cfg, { did, wallet, aliases: [alias("ab")] }),
-        ).rejects.toBeInstanceOf(DirectoryIntegrityError);
-        expect(wallet.sign).not.toHaveBeenCalled();
-        expect(dir.submitted).toHaveLength(0);
-      },
-    );
+    it.each(tampers)("%s: DirectoryIntegrityError, and the wallet never signs", async (_n, tamper) => {
+      const { dir, cfg, did, wallet } = vectorSetup();
+      dir.tamper = tamper as (e: unknown[]) => unknown;
+      const newKey = await WebCryptoP256Signer.generate();
+      await expect(addDeviceKey(cfg, { did, wallet, newKey })).rejects.toBeInstanceOf(DirectoryIntegrityError);
+      await expect(removeDeviceKey(cfg, { did, wallet, fragment: "signing" })).rejects.toBeInstanceOf(
+        DirectoryIntegrityError
+      );
+      await expect(setAliases(cfg, { did, wallet, aliases: [alias("ab")] })).rejects.toBeInstanceOf(
+        DirectoryIntegrityError
+      );
+      expect(wallet.sign).not.toHaveBeenCalled();
+      expect(dir.submitted).toHaveLength(0);
+    });
   });
 });
 
 describe("removeDeviceKey", () => {
   it("rejects 'wallet' before any network call", async () => {
     const { wallet, did, cfg, fetchImpl } = await setup();
-    await expect(
-      removeDeviceKey(cfg, { did, wallet, fragment: "wallet" }),
-    ).rejects.toMatchObject({ code: "wallet_required" });
+    await expect(removeDeviceKey(cfg, { did, wallet, fragment: "wallet" })).rejects.toMatchObject({
+      code: "wallet_required",
+    });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
@@ -293,20 +256,13 @@ describe("removeDeviceKey", () => {
     ["an inherited name", "toString"],
     ["constructor", "constructor"],
     ["__proto__", "__proto__"],
-  ])(
-    "%s: fragment_invalid, no signing and no POST (device-2 stays live)",
-    async (_n, fragment) => {
-      const { dir, cfg, did, wallet } = vectorSetup();
-      await expect(
-        removeDeviceKey(cfg, { did, wallet, fragment }),
-      ).rejects.toMatchObject({ code: "fragment_invalid" });
-      expect(wallet.sign).not.toHaveBeenCalled();
-      expect(dir.submitted).toHaveLength(0);
-      expect(
-        dir.head(did).operation.verificationMethods["device-2"],
-      ).toBeDefined();
-    },
-  );
+  ])("%s: fragment_invalid, no signing and no POST (device-2 stays live)", async (_n, fragment) => {
+    const { dir, cfg, did, wallet } = vectorSetup();
+    await expect(removeDeviceKey(cfg, { did, wallet, fragment })).rejects.toMatchObject({ code: "fragment_invalid" });
+    expect(wallet.sign).not.toHaveBeenCalled();
+    expect(dir.submitted).toHaveLength(0);
+    expect(dir.head(did).operation.verificationMethods["device-2"]).toBeDefined();
+  });
 
   it("tells the caller to pass the fragment only when given a VM id", async () => {
     const { cfg, did, wallet } = vectorSetup();
@@ -390,14 +346,10 @@ describe("removeDeviceKey with a key guard", () => {
     }).catch((x: unknown) => x);
     expect(e).toBeInstanceOf(PolicyError);
     expect(e).toMatchObject({ code: "fragment_invalid" });
-    expect((e as PolicyError).message).toContain(
-      "fragment now holds a different key",
-    );
+    expect((e as PolicyError).message).toContain("fragment now holds a different key");
     expect(wallet.sign).not.toHaveBeenCalled();
     expect(dir.submitted).toHaveLength(before);
-    expect(dir.head(did).operation.verificationMethods.signing).toBe(
-      keyB.didKey,
-    );
+    expect(dir.head(did).operation.verificationMethods.signing).toBe(keyB.didKey);
   });
 
   it("without key the behaviour is unchanged: the re-added key is removed", async () => {
@@ -435,7 +387,7 @@ describe("removeDeviceKey with a key guard", () => {
         wallet,
         fragment: "signing",
         key: other.didKey,
-      }),
+      })
     ).rejects.toMatchObject({ code: "fragment_invalid" });
   });
 });
@@ -462,9 +414,7 @@ describe("addDeviceKey after a removal", () => {
     const { dir, cfg, did, wallet, keyA } = await removed();
     const before = dir.submitted.length;
     const keySign = vi.spyOn(keyA, "sign");
-    const e = await addDeviceKey(cfg, { did, wallet, newKey: keyA }).catch(
-      (x: unknown) => x,
-    );
+    const e = await addDeviceKey(cfg, { did, wallet, newKey: keyA }).catch((x: unknown) => x);
     expect(e).toBeInstanceOf(PolicyError);
     expect(e).toMatchObject({
       code: "key_removed",
@@ -486,9 +436,7 @@ describe("addDeviceKey after a removal", () => {
       allowReAdd: true,
     });
     expect(dir.submitted).toHaveLength(before + 1);
-    expect(dir.head(did).operation.verificationMethods[res.fragment]).toBe(
-      keyA.didKey,
-    );
+    expect(dir.head(did).operation.verificationMethods[res.fragment]).toBe(keyA.didKey);
     expect(res.cid).toBe(dir.head(did).cid);
   });
 
@@ -496,9 +444,7 @@ describe("addDeviceKey after a removal", () => {
     const { dir, cfg, did, wallet } = await removed();
     const keyB = await WebCryptoP256Signer.generate();
     const res = await addDeviceKey(cfg, { did, wallet, newKey: keyB });
-    expect(dir.head(did).operation.verificationMethods[res.fragment]).toBe(
-      keyB.didKey,
-    );
+    expect(dir.head(did).operation.verificationMethods[res.fragment]).toBe(keyB.didKey);
   });
 });
 
@@ -538,7 +484,7 @@ describe("setAliases", () => {
         did,
         wallet,
         aliases: ["did:ethr:137:0x" + "ab".repeat(20)],
-      }),
+      })
     ).rejects.toMatchObject({ code: "alias_invalid" });
     expect(wallet.sign).not.toHaveBeenCalled();
     expect(posts()).toBe(0);
@@ -547,9 +493,7 @@ describe("setAliases", () => {
   it("is idempotent: the same aliases in any order return the head cid without signing", async () => {
     const { dir, wallet, did, cfg, posts } = await setup();
     const [a, b] = [alias("ab"), alias("cd")];
-    await dir.append(did, k1Signer(), (head, cid) =>
-      buildSetAliases(head, cid, [a, b]),
-    );
+    await dir.append(did, k1Signer(), (head, cid) => buildSetAliases(head, cid, [a, b]));
     const res = await setAliases(cfg, { did, wallet, aliases: [b, a] });
     expect(res).toEqual({ cid: dir.head(did).cid });
     expect(wallet.sign).not.toHaveBeenCalled();

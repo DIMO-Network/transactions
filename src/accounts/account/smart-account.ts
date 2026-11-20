@@ -1,15 +1,23 @@
+import { signerToEcdsaValidator } from "@zerodev/ecdsa-validator";
 import {
+  createKernelAccount,
+  createKernelAccountClient,
+  createZeroDevPaymasterClient,
+  getUserOperationGasPrice,
+} from "@zerodev/sdk";
+import { getEntryPoint, KERNEL_V3_1 } from "@zerodev/sdk/constants";
+import {
+  type Address,
+  type Chain,
   createPublicClient,
   defineChain,
+  type Hex,
   http,
   isAddress,
   isAddressEqual,
   isHex,
-  zeroAddress,
-  type Address,
-  type Chain,
-  type Hex,
   type LocalAccount,
+  zeroAddress,
 } from "viem";
 import {
   createBundlerClient,
@@ -18,18 +26,11 @@ import {
   getUserOperationHash,
   type UserOperation,
 } from "viem/account-abstraction";
-import { getEntryPoint, KERNEL_V3_1 } from "@zerodev/sdk/constants";
-import { signerToEcdsaValidator } from "@zerodev/ecdsa-validator";
-import {
-  createKernelAccount,
-  createKernelAccountClient,
-  createZeroDevPaymasterClient,
-  getUserOperationGasPrice,
-} from "@zerodev/sdk";
+
 import { authedFetch } from "../auth/fetch.js";
 import { requireScopes } from "../auth/scopes.js";
 import type { Session } from "../auth/signin.js";
-import { normalizeUrl, unboundFetch, type SdkConfig } from "../config.js";
+import { normalizeUrl, type SdkConfig, unboundFetch } from "../config.js";
 import {
   GasProxyError,
   parseRetryAfter,
@@ -62,16 +63,9 @@ export interface SendUserOperationOptions extends SmartAccountOptions {
   calls: Array<{ to: Hex; value?: bigint; data?: Hex }>;
 }
 
-function chainFor(
-  cfg: SdkConfig,
-  chainId: number,
-): { chain: Chain; rpcUrl: string } {
+function chainFor(cfg: SdkConfig, chainId: number): { chain: Chain; rpcUrl: string } {
   const rpcUrl = cfg.rpcUrls[chainId];
-  if (!rpcUrl)
-    throw new UsageError(
-      "rpc_url_missing",
-      `no rpcUrl configured for chain ${chainId}`,
-    );
+  if (!rpcUrl) throw new UsageError("rpc_url_missing", `no rpcUrl configured for chain ${chainId}`);
   const chain = defineChain({
     id: chainId,
     name: `chain-${chainId}`,
@@ -96,7 +90,7 @@ function publicClientFor(cfg: SdkConfig, chainId: number) {
 /** The plain kernel: ECDSA sudo validator = the user's wallet, index 0, EntryPoint 0.7, kernel v3.1. */
 async function plainKernelAccount(
   publicClient: ReturnType<typeof publicClientFor>["publicClient"],
-  walletViemAccount: LocalAccount,
+  walletViemAccount: LocalAccount
 ) {
   const entryPoint = getEntryPoint("0.7");
   const sudo = await signerToEcdsaValidator(publicClient, {
@@ -123,22 +117,13 @@ interface Kernel {
 }
 
 /** Build the shared kernel. Refuses an RPC that serves another chain, before any signing. */
-async function kernelFor(
-  cfg: SdkConfig,
-  opts: SmartAccountOptions,
-): Promise<Kernel> {
+async function kernelFor(cfg: SdkConfig, opts: SmartAccountOptions): Promise<Kernel> {
   const { chain, publicClient } = publicClientFor(cfg, opts.chainId);
   const served = await publicClient.getChainId();
   if (served !== opts.chainId) {
-    throw new UsageError(
-      "chain_mismatch",
-      `cfg.rpcUrls[${opts.chainId}] serves chain ${served}`,
-    );
+    throw new UsageError("chain_mismatch", `cfg.rpcUrls[${opts.chainId}] serves chain ${served}`);
   }
-  const account = await plainKernelAccount(
-    publicClient,
-    guardSigner(opts.walletViemAccount),
-  );
+  const account = await plainKernelAccount(publicClient, guardSigner(opts.walletViemAccount));
   return { chain, publicClient, account };
 }
 
@@ -159,23 +144,15 @@ function buildClients(
   cfg: SdkConfig,
   opts: SmartAccountOptions,
   { chain, publicClient, account }: Kernel,
-  provider: GasProvider,
+  provider: GasProvider
 ) {
   const proxyUrl = `${normalizeUrl(cfg.accountsUrl)}/api/v2/bundler/${opts.chainId}/${provider}`;
   const authed = authedFetch(cfg, opts.session);
   const proxyFetch = (input: string | URL | Request, init?: RequestInit) =>
-    authed(
-      typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.href
-          : input.url,
-      init,
-    );
+    authed(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, init);
   // retryCount 0: the SDK owns provider fallback; viem's silent retries (with backoff, also
   // on 429) would stall the caller before the next provider or the typed error.
-  const proxyTransport = (timeout: number) =>
-    http(proxyUrl, { fetchFn: proxyFetch, retryCount: 0, timeout });
+  const proxyTransport = (timeout: number) => http(proxyUrl, { fetchFn: proxyFetch, retryCount: 0, timeout });
   const paymaster = createZeroDevPaymasterClient({
     chain,
     transport: proxyTransport(PROXY_TIMEOUT_MS),
@@ -189,16 +166,10 @@ function buildClients(
       // viem spreads whatever this returns into the UserOp before it is signed, so take
       // only paymaster and gas fields, and only a real sponsorship.
       getPaymasterData: async (userOperation) =>
-        sponsorshipFields(
-          cfg,
-          opts.chainId,
-          provider,
-          await paymaster.sponsorUserOperation({ userOperation }),
-        ),
+        sponsorshipFields(cfg, opts.chainId, provider, await paymaster.sponsorUserOperation({ userOperation })),
     },
     userOperation: {
-      estimateFeesPerGas: ({ bundlerClient }) =>
-        getUserOperationGasPrice(bundlerClient),
+      estimateFeesPerGas: ({ bundlerClient }) => getUserOperationGasPrice(bundlerClient),
     },
   });
   // The send alone gets the longer timeout (SEND_TIMEOUT_MS).
@@ -225,35 +196,21 @@ const SPONSOR_FIELDS = [
 type Sponsorship = {
   paymaster: Address;
   paymasterData: Hex;
-} & Partial<
-  Record<
-    Exclude<(typeof SPONSOR_FIELDS)[number], "paymaster" | "paymasterData">,
-    bigint
-  >
->;
+} & Partial<Record<Exclude<(typeof SPONSOR_FIELDS)[number], "paymaster" | "paymasterData">, bigint>>;
 
 /**
  * Keep only the paymaster and gas fields of a proxy sponsorship, and refuse (before
  * anything is signed) one without a non-zero paymaster: that UserOp would be unsponsored
  * and pay the proxy's chosen gas itself. A refusal moves on to the next provider.
  */
-function sponsorshipFields(
-  cfg: SdkConfig,
-  chainId: number,
-  provider: GasProvider,
-  raw: unknown,
-): Sponsorship {
+function sponsorshipFields(cfg: SdkConfig, chainId: number, provider: GasProvider, raw: unknown): Sponsorship {
   const r = (raw ?? {}) as Record<string, unknown>;
   const pm = r.paymaster;
-  if (
-    typeof pm !== "string" ||
-    !isAddress(pm) ||
-    isAddressEqual(pm, zeroAddress)
-  ) {
+  if (typeof pm !== "string" || !isAddress(pm) || isAddressEqual(pm, zeroAddress)) {
     throw new SponsorshipError(
       "not_sponsored",
       provider,
-      "the gas proxy returned no paymaster; refusing to sign an unsponsored UserOp",
+      "the gas proxy returned no paymaster; refusing to sign an unsponsored UserOp"
     );
   }
   const allowed = cfg.allowedPaymasters?.[chainId];
@@ -261,16 +218,12 @@ function sponsorshipFields(
     throw new SponsorshipError(
       "paymaster_not_allowed",
       provider,
-      `paymaster ${pm} is not in cfg.allowedPaymasters[${chainId}]`,
+      `paymaster ${pm} is not in cfg.allowedPaymasters[${chainId}]`
     );
   }
   const data = r.paymasterData ?? "0x";
   if (typeof data !== "string" || !isHex(data)) {
-    throw new SponsorshipError(
-      "not_sponsored",
-      provider,
-      "paymasterData is not hex",
-    );
+    throw new SponsorshipError("not_sponsored", provider, "paymasterData is not hex");
   }
   const out: Record<string, unknown> = { paymaster: pm, paymasterData: data };
   for (const k of SPONSOR_FIELDS) {
@@ -278,11 +231,7 @@ function sponsorshipFields(
     const v = r[k];
     if (v === undefined) continue;
     if (typeof v !== "bigint" || v < 0n) {
-      throw new SponsorshipError(
-        "not_sponsored",
-        provider,
-        `${k} is not a gas amount`,
-      );
+      throw new SponsorshipError("not_sponsored", provider, `${k} is not a gas amount`);
     }
     out[k] = v;
   }
@@ -327,10 +276,7 @@ function findFatal(e: unknown, provider: GasProvider): Error | undefined {
     )
       return cur;
     const http = cur as { name?: unknown; status?: unknown; headers?: unknown };
-    if (
-      http.name === "HttpRequestError" &&
-      FATAL_PROXY_STATUSES.some((s) => s === http.status)
-    ) {
+    if (http.name === "HttpRequestError" && FATAL_PROXY_STATUSES.some((s) => s === http.status)) {
       const status = http.status as 401 | 403 | 429;
       const retryAfter =
         status === 429 && http.headers instanceof Headers
@@ -353,7 +299,7 @@ async function withProviders<T>(
   kernel: Kernel,
   run: (clients: ProxyClients, provider: GasProvider) => Promise<T>,
   /** Runs before each attempt; a defined result short-circuits (e.g. already deployed). */
-  precheck?: () => Promise<{ result: T; provider: string } | undefined>,
+  precheck?: () => Promise<{ result: T; provider: string } | undefined>
 ): Promise<{ result: T; provider: string }> {
   const providers = opts.providers?.length ? opts.providers : DEFAULT_PROVIDERS;
   const errors: unknown[] = [];
@@ -395,10 +341,8 @@ const RPC_INTERNAL_ERROR = -32603;
 function isRefusedSend(e: unknown): boolean {
   for (let cur = e, i = 0; cur instanceof Error && i < 10; i++) {
     const x = cur as { name?: unknown; status?: unknown; code?: unknown };
-    if (x.name === "HttpRequestError")
-      return typeof x.status === "number" && x.status >= 400 && x.status < 500;
-    if (x.name === "RpcRequestError")
-      return typeof x.code === "number" && x.code !== RPC_INTERNAL_ERROR;
+    if (x.name === "HttpRequestError") return typeof x.status === "number" && x.status >= 400 && x.status < 500;
+    if (x.name === "RpcRequestError") return typeof x.code === "number" && x.code !== RPC_INTERNAL_ERROR;
     cur = cur.cause;
   }
   return false;
@@ -408,19 +352,14 @@ function isRefusedSend(e: unknown): boolean {
  * Ask the provider once whether it has the op: found only when the answer carries a
  * `userOperation`. Any other answer, or none, counts as no.
  */
-async function knowsUserOperation(
-  client: ProxyClient,
-  hash: Hex,
-): Promise<boolean> {
+async function knowsUserOperation(client: ProxyClient, hash: Hex): Promise<boolean> {
   try {
     const found: unknown = await client.request(
       { method: "eth_getUserOperationByHash", params: [hash] },
-      { retryCount: 0 },
+      { retryCount: 0 }
     );
     const op =
-      typeof found === "object" && found !== null
-        ? (found as { userOperation?: unknown }).userOperation
-        : undefined;
+      typeof found === "object" && found !== null ? (found as { userOperation?: unknown }).userOperation : undefined;
     return typeof op === "object" && op !== null;
   } catch {
     return false;
@@ -440,7 +379,7 @@ async function submitUserOperation(
   { client, sender }: ProxyClients,
   chainId: number,
   provider: GasProvider,
-  calls: SendUserOperationOptions["calls"],
+  calls: SendUserOperationOptions["calls"]
 ): Promise<Hex> {
   const { account } = client;
   const entryPointAddress = account.entryPoint.address;
@@ -457,12 +396,7 @@ async function submitUserOperation(
   });
   const unknownOutcome = async (cause: unknown): Promise<Hex> => {
     if (await knowsUserOperation(client, hash)) return hash;
-    throw new UserOperationUnknownError(
-      hash,
-      provider,
-      userOperation.nonce,
-      cause,
-    );
+    throw new UserOperationUnknownError(hash, provider, userOperation.nonce, cause);
   };
   // Built outside the try: only the request itself can leave the op's fate unknown.
   const rpcUserOperation = formatUserOperationRequest(userOperation);
@@ -473,18 +407,16 @@ async function submitUserOperation(
         method: "eth_sendUserOperation",
         params: [rpcUserOperation, entryPointAddress],
       },
-      { retryCount: 0 },
+      { retryCount: 0 }
     );
   } catch (e) {
-    if (isRefusedSend(e))
-      throw getUserOperationError(e as Error, { ...userOperation, calls });
+    if (isRefusedSend(e)) throw getUserOperationError(e as Error, { ...userOperation, calls });
     return unknownOutcome(e);
   }
   // A 2xx counts as accepted only when it names this op; null, none or another hash do not.
-  if (typeof result === "string" && result.toLowerCase() === hash.toLowerCase())
-    return hash;
+  if (typeof result === "string" && result.toLowerCase() === hash.toLowerCase()) return hash;
   return unknownOutcome(
-    `eth_sendUserOperation returned ${JSON.stringify(result) ?? "no result"} instead of the op's hash`,
+    `eth_sendUserOperation returned ${JSON.stringify(result) ?? "no result"} instead of the op's hash`
   );
 }
 
@@ -497,7 +429,7 @@ async function submitUserOperation(
  */
 export async function deploySmartAccount(
   cfg: SdkConfig,
-  opts: SmartAccountOptions,
+  opts: SmartAccountOptions
 ): Promise<{ address: `0x${string}`; provider: string }> {
   requireScopes(opts.session, ["write"], "deploying the smart account");
   const kernel = await kernelFor(cfg, opts);
@@ -505,9 +437,7 @@ export async function deploySmartAccount(
   // Runs before every attempt, the first included: existing code means nothing is sent.
   const deployed = async () => {
     const c = await publicClient.getCode({ address: account.address });
-    return c && c !== "0x"
-      ? { result: account.address, provider: "none" }
-      : undefined;
+    return c && c !== "0x" ? { result: account.address, provider: "none" } : undefined;
   };
   const { result, provider } = await withProviders(
     cfg,
@@ -519,9 +449,7 @@ export async function deploySmartAccount(
       const hash = await submitUserOperation(clients, opts.chainId, provider, [
         { to: zeroAddress, value: 0n, data: "0x" },
       ]);
-      let receipt: Awaited<
-        ReturnType<typeof client.waitForUserOperationReceipt>
-      >;
+      let receipt: Awaited<ReturnType<typeof client.waitForUserOperationReceipt>>;
       try {
         receipt = await client.waitForUserOperationReceipt({
           hash,
@@ -536,7 +464,7 @@ export async function deploySmartAccount(
       }
       return client.account.address;
     },
-    deployed,
+    deployed
   );
   return { address: result, provider };
 }
@@ -557,15 +485,11 @@ export async function deploySmartAccount(
  */
 export async function sendUserOperation(
   cfg: SdkConfig,
-  opts: SendUserOperationOptions,
+  opts: SendUserOperationOptions
 ): Promise<{ userOpHash: `0x${string}`; provider: string }> {
   requireScopes(opts.session, ["write"], "sending a UserOperation");
-  const { result, provider } = await withProviders(
-    cfg,
-    opts,
-    await kernelFor(cfg, opts),
-    (clients, provider) =>
-      submitUserOperation(clients, opts.chainId, provider, opts.calls),
+  const { result, provider } = await withProviders(cfg, opts, await kernelFor(cfg, opts), (clients, provider) =>
+    submitUserOperation(clients, opts.chainId, provider, opts.calls)
   );
   return { userOpHash: result, provider };
 }

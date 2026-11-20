@@ -1,10 +1,4 @@
-import {
-  createHash,
-  generateKeyPairSync,
-  KeyObject,
-  randomBytes,
-  sign,
-} from "crypto";
+import { createHash, generateKeyPairSync, KeyObject, randomBytes, sign } from "crypto";
 
 // A passkey made and used in software (node crypto), standing in for a
 // browser's: an attestation object as registration stores it, and assertions
@@ -17,8 +11,7 @@ const FLAG_UP = 0x01;
 const FLAG_UV = 0x04;
 const FLAG_AT = 0x40;
 
-const sha256 = (data: Buffer | string) =>
-  createHash("sha256").update(data).digest();
+const sha256 = (data: Buffer | string) => createHash("sha256").update(data).digest();
 
 const uint = (bytes: number, value: number) => {
   const buffer = Buffer.alloc(bytes);
@@ -34,18 +27,13 @@ const head = (major: number, length: number) => {
 };
 type Cbor = number | string | Buffer | Map<Cbor, Cbor>;
 const cbor = (value: Cbor): Buffer => {
-  if (typeof value === "number")
-    return value >= 0 ? head(0, value) : head(1, -1 - value);
+  if (typeof value === "number") return value >= 0 ? head(0, value) : head(1, -1 - value);
   if (typeof value === "string") {
     const text = Buffer.from(value, "utf8");
     return Buffer.concat([head(3, text.length), text]);
   }
-  if (Buffer.isBuffer(value))
-    return Buffer.concat([head(2, value.length), value]);
-  return Buffer.concat([
-    head(5, value.size),
-    ...[...value].flatMap(([key, item]) => [cbor(key), cbor(item)]),
-  ]);
+  if (Buffer.isBuffer(value)) return Buffer.concat([head(2, value.length), value]);
+  return Buffer.concat([head(5, value.size), ...[...value].flatMap(([key, item]) => [cbor(key), cbor(item)])]);
 };
 
 const coseKey = (publicKey: KeyObject, algorithm: "ES256" | "RS256") => {
@@ -101,7 +89,7 @@ export const makePasskey = ({
       ["fmt", "none"],
       ["attStmt", new Map()],
       ["authData", authData],
-    ]),
+    ])
   ).toString("base64url");
 
   /** An assertion over `challenge`, made as a browser would, unless told otherwise. */
@@ -120,19 +108,9 @@ export const makePasskey = ({
     flags?: number;
     signer?: KeyObject;
   }): Assertion => {
-    const clientDataJSON = Buffer.from(
-      JSON.stringify({ type, challenge, origin, crossOrigin: false }),
-    );
-    const authenticatorData = Buffer.concat([
-      sha256(assertedRpId),
-      Buffer.from([flags]),
-      uint(4, 1),
-    ]);
-    const signature = sign(
-      "sha256",
-      Buffer.concat([authenticatorData, sha256(clientDataJSON)]),
-      signer,
-    );
+    const clientDataJSON = Buffer.from(JSON.stringify({ type, challenge, origin, crossOrigin: false }));
+    const authenticatorData = Buffer.concat([sha256(assertedRpId), Buffer.from([flags]), uint(4, 1)]);
+    const signature = sign("sha256", Buffer.concat([authenticatorData, sha256(clientDataJSON)]), signer);
     return {
       id: credentialId,
       response: {

@@ -1,12 +1,5 @@
 import { generateDpopKey, getMe, recordSignIn } from "../../src/accounts/index.js";
-import {
-  check,
-  eq,
-  jwtClaims,
-  signInWith,
-  signup,
-  type Scenario,
-} from "./harness.js";
+import { check, eq, jwtClaims, type Scenario, signInWith, signup } from "./harness.js";
 
 /**
  * E3. Sign-in with the r1 phone key.
@@ -19,21 +12,10 @@ export const e03: Scenario = {
   async run(ctx) {
     const user = await signup(ctx, "e03");
     const dpop = await generateDpopKey();
-    const session = await signInWith(
-      ctx,
-      user.did,
-      user.device!,
-      "signing",
-      ["read", "write"],
-      dpop,
-    );
+    const session = await signInWith(ctx, user.did, user.device!, "signing", ["read", "write"], dpop);
     const claims = jwtClaims(session.token);
     eq(claims.sub, user.did, "token sub");
-    eq(
-      (claims.cnf as { jkt?: string } | undefined)?.jkt,
-      await dpop.thumbprint(),
-      "token cnf.jkt",
-    );
+    eq((claims.cnf as { jkt?: string } | undefined)?.jkt, await dpop.thumbprint(), "token cnf.jkt");
     const me = await getMe(ctx.cfg, { session });
     check(me, "GET /me did not return 200 (got 404)");
     eq(me.did, user.did, "GET /me did");

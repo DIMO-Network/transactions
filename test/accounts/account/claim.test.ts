@@ -1,22 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { claimDid } from "../../../src/accounts/account/claim.js";
 import { generateDpopKey } from "../../../src/accounts/auth/dpop.js";
-import { WebCryptoP256Signer } from "../../../src/accounts/signers/webcrypto.js";
 import { buildGenesis, deriveDid } from "../../../src/accounts/core/index.js";
-import {
-  AccountsError,
-  DeactivatedError,
-  DirectoryRejectedError,
-  PolicyError,
-} from "../../../src/accounts/errors.js";
-import {
-  FakeDirectory,
-  cfgFor,
-  fakeDauth,
-  json,
-  router,
-  type Handler,
-} from "../helpers.js";
+import { AccountsError, DeactivatedError, DirectoryRejectedError, PolicyError } from "../../../src/accounts/errors.js";
+import { WebCryptoP256Signer } from "../../../src/accounts/signers/webcrypto.js";
+import { cfgFor, fakeDauth, FakeDirectory, type Handler, json, router } from "../helpers.js";
 
 const ACCOUNTS = "https://accounts.test";
 
@@ -63,10 +52,7 @@ function setup(accounts?: Handler, wrap?: (defaults: Handler) => Handler) {
     fetchImpl: fetchImpl as unknown as typeof fetch,
   });
   const calls = () =>
-    fetchImpl.mock.calls.map(
-      ([u, i]) =>
-        `${(i as RequestInit | undefined)?.method ?? "GET"} ${String(u)}`,
-    );
+    fetchImpl.mock.calls.map(([u, i]) => `${(i as RequestInit | undefined)?.method ?? "GET"} ${String(u)}`);
   return { dir, fetchImpl, cfg, calls };
 }
 
@@ -89,8 +75,7 @@ describe("claimDid", () => {
       "POST https://dauth.test/signin/token",
       "PUT https://accounts.test/api/v2/me/did",
     ]);
-    const body = (i: number) =>
-      JSON.parse((fetchImpl.mock.calls[i]![1] as RequestInit).body as string);
+    const body = (i: number) => JSON.parse((fetchImpl.mock.calls[i]![1] as RequestInit).body as string);
     expect(body(1)).toMatchObject({
       did: r.did,
       scope: "read write",
@@ -155,18 +140,16 @@ describe("claimDid", () => {
     const { dir, cfg } = setup();
     const did = await dir.seedGenesis(wallet);
     dir.beforeSubmit = () => json({ error: "DID already exists" }, 409);
-    expect(
-      (await claimDid(cfg, { wallet, dpopKey: await generateDpopKey() })).did,
-    ).toBe(did);
+    expect((await claimDid(cfg, { wallet, dpopKey: await generateDpopKey() })).did).toBe(did);
   });
 
   it("rethrows a 400 when the DID does not exist", async () => {
     const wallet = await WebCryptoP256Signer.generate();
     const { dir, cfg } = setup();
     dir.beforeSubmit = () => json({ error: "bad genesis" }, 400);
-    await expect(
-      claimDid(cfg, { wallet, dpopKey: await generateDpopKey() }),
-    ).rejects.toBeInstanceOf(DirectoryRejectedError);
+    await expect(claimDid(cfg, { wallet, dpopKey: await generateDpopKey() })).rejects.toBeInstanceOf(
+      DirectoryRejectedError
+    );
   });
 
   it("refuses to claim a deactivated DID", async () => {
@@ -181,20 +164,14 @@ describe("claimDid", () => {
       services: {},
       prev: cid,
     }));
-    await expect(
-      claimDid(cfg, { wallet, dpopKey: await generateDpopKey() }),
-    ).rejects.toBeInstanceOf(DeactivatedError);
+    await expect(claimDid(cfg, { wallet, dpopKey: await generateDpopKey() })).rejects.toBeInstanceOf(DeactivatedError);
     expect(calls().some((c) => c.includes("dauth"))).toBe(false);
   });
 
   it("maps a failed PUT to AccountsError", async () => {
     const wallet = await WebCryptoP256Signer.generate();
-    const { cfg } = setup(async () =>
-      json({ error: { code: "forbidden", message: "no" } }, 403),
-    );
-    await expect(
-      claimDid(cfg, { wallet, dpopKey: await generateDpopKey() }),
-    ).rejects.toMatchObject({
+    const { cfg } = setup(async () => json({ error: { code: "forbidden", message: "no" } }, 403));
+    await expect(claimDid(cfg, { wallet, dpopKey: await generateDpopKey() })).rejects.toMatchObject({
       name: "AccountsError",
       code: "forbidden",
       status: 403,
@@ -206,9 +183,7 @@ describe("claimDid", () => {
     const genesis = buildGenesis({ walletKey: wallet.didKey });
     const did = deriveDid(genesis);
     const { cfg, calls } = setup(async (_url, init) =>
-      init.method === "PUT"
-        ? json({ error: { code: "did_already_linked", message: "x" } }, 409)
-        : json(viewFor(did)),
+      init.method === "PUT" ? json({ error: { code: "did_already_linked", message: "x" } }, 409) : json(viewFor(did))
     );
     const r = await claimDid(cfg, { wallet, dpopKey: await generateDpopKey() });
     expect(r.did).toBe(did);
@@ -224,7 +199,7 @@ describe("claimDid", () => {
     const { cfg } = setup(async (_url, init) =>
       init.method === "PUT"
         ? json({ error: { code: "did_taken", message: "taken" } }, 409)
-        : json(viewFor("did:dimo:someoneelseentirelyxxx")),
+        : json(viewFor("did:dimo:someoneelseentirelyxxx"))
     );
     const e = await claimDid(cfg, {
       wallet,
@@ -242,9 +217,7 @@ describe("claimDid scope", () => {
     const { cfg } = setup(
       undefined,
       (def) => async (u, init) =>
-        init.method === "PUT"
-          ? json({ error: { code: "conflict", message: "x" } }, 409)
-          : def(u, init),
+        init.method === "PUT" ? json({ error: { code: "conflict", message: "x" } }, 409) : def(u, init)
     );
     const r = await claimDid(cfg, {
       wallet,
@@ -298,9 +271,7 @@ describe("claimDid: the PUT /me/did body", () => {
   it("a 2xx that is not an account is AccountsError invalid_response", async () => {
     const wallet = await WebCryptoP256Signer.generate();
     const { cfg } = setup(async () => json([viewFor("did:dimo:x")]));
-    await expect(
-      claimDid(cfg, { wallet, dpopKey: await generateDpopKey() }),
-    ).rejects.toMatchObject({
+    await expect(claimDid(cfg, { wallet, dpopKey: await generateDpopKey() })).rejects.toMatchObject({
       name: "AccountsError",
       code: "invalid_response",
       status: 200,
@@ -320,17 +291,14 @@ describe("claimDid: PUT /me/did retries on 503", () => {
           "content-type": "application/json",
           ...(retryAfter === undefined ? {} : { "Retry-After": retryAfter }),
         },
-      },
+      }
     );
 
   /** Records every setTimeout delay and fires immediately. */
   const recordDelays = () => {
     const delays: number[] = [];
     const real = globalThis.setTimeout;
-    vi.spyOn(globalThis, "setTimeout").mockImplementation(((
-      fn: () => void,
-      ms?: number,
-    ) => {
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void, ms?: number) => {
       delays.push(ms ?? 0);
       return real(fn, 0);
     }) as unknown as typeof setTimeout);
@@ -341,9 +309,7 @@ describe("claimDid: PUT /me/did retries on 503", () => {
     const delays = recordDelays();
     const wallet = await WebCryptoP256Signer.generate();
     let puts = 0;
-    const { cfg } = setup(async () =>
-      ++puts < 3 ? unavailable("2") : json(viewFor("did:dimo:x")),
-    );
+    const { cfg } = setup(async () => (++puts < 3 ? unavailable("2") : json(viewFor("did:dimo:x"))));
     const r = await claimDid(cfg, { wallet, dpopKey: await generateDpopKey() });
     expect(r.session.token).toBe("jwt");
     expect(puts).toBe(3);
@@ -355,9 +321,7 @@ describe("claimDid: PUT /me/did retries on 503", () => {
     const wallet = await WebCryptoP256Signer.generate();
     const headers = [undefined, "999", "abc"];
     let puts = 0;
-    const { cfg } = setup(async () =>
-      puts < 3 ? unavailable(headers[puts++]) : json(viewFor("did:dimo:x")),
-    );
+    const { cfg } = setup(async () => (puts < 3 ? unavailable(headers[puts++]) : json(viewFor("did:dimo:x"))));
     await claimDid(cfg, { wallet, dpopKey: await generateDpopKey() });
     expect(puts).toBe(3);
     expect(delays.filter((d) => d >= 1000)).toEqual([1000, 5000, 1000]);
@@ -368,9 +332,7 @@ describe("claimDid: PUT /me/did retries on 503", () => {
     const wallet = await WebCryptoP256Signer.generate();
     const headers = ["1.5", "Wed, 21 Oct 2026 07:28:00 GMT", "-1"];
     let puts = 0;
-    const { cfg } = setup(async () =>
-      puts < 3 ? unavailable(headers[puts++]) : json(viewFor("did:dimo:x")),
-    );
+    const { cfg } = setup(async () => (puts < 3 ? unavailable(headers[puts++]) : json(viewFor("did:dimo:x"))));
     await claimDid(cfg, { wallet, dpopKey: await generateDpopKey() });
     expect(delays.filter((d) => d >= 1000)).toEqual([1000, 1000, 1000]);
   });
@@ -382,9 +344,7 @@ describe("claimDid: PUT /me/did retries on 503", () => {
       puts++;
       return unavailable("0");
     });
-    await expect(
-      claimDid(cfg, { wallet, dpopKey: await generateDpopKey() }),
-    ).rejects.toMatchObject({
+    await expect(claimDid(cfg, { wallet, dpopKey: await generateDpopKey() })).rejects.toMatchObject({
       name: "AccountsError",
       code: "unavailable",
       status: 503,
@@ -399,9 +359,9 @@ describe("claimDid: PUT /me/did retries on 503", () => {
       puts++;
       return json({ error: { code: "bad_gateway", message: "x" } }, 502);
     });
-    await expect(
-      claimDid(cfg, { wallet, dpopKey: await generateDpopKey() }),
-    ).rejects.toMatchObject({ code: "bad_gateway" });
+    await expect(claimDid(cfg, { wallet, dpopKey: await generateDpopKey() })).rejects.toMatchObject({
+      code: "bad_gateway",
+    });
     expect(puts).toBe(1);
   });
 
@@ -411,14 +371,10 @@ describe("claimDid: PUT /me/did retries on 503", () => {
     let puts = 0;
     const { cfg } = setup(async (_u, init) => {
       if (init.method === "PUT") {
-        return ++puts === 1
-          ? unavailable("0")
-          : json({ error: { code: "conflict", message: "x" } }, 409);
+        return ++puts === 1 ? unavailable("0") : json({ error: { code: "conflict", message: "x" } }, 409);
       }
       return json(viewFor(did));
     });
-    expect(
-      (await claimDid(cfg, { wallet, dpopKey: await generateDpopKey() })).did,
-    ).toBe(did);
+    expect((await claimDid(cfg, { wallet, dpopKey: await generateDpopKey() })).did).toBe(did);
   });
 });

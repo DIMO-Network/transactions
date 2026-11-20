@@ -1,12 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
 import type { TurnkeyClient } from "@turnkey/http";
-import {
-  loginWithEmail,
-  loginWithPasskey,
-  requestEmailCode,
-} from "../../../src/accounts/account/login.js";
-import { AccountsError, NetworkError, TurnkeyError } from "../../../src/accounts/errors.js";
+import { describe, expect, it, vi } from "vitest";
+
+import { loginWithEmail, loginWithPasskey, requestEmailCode } from "../../../src/accounts/account/login.js";
 import type { SdkConfig } from "../../../src/accounts/config.js";
+import { AccountsError, NetworkError, TurnkeyError } from "../../../src/accounts/errors.js";
 
 const base: SdkConfig = {
   accountsUrl: "https://accounts.test/",
@@ -19,8 +16,7 @@ const withFetch = (f: unknown): SdkConfig => ({
   ...base,
   fetchImpl: f as typeof fetch,
 });
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status });
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 const wallet = "0x1111111111111111111111111111111111111111";
 
 function tk() {
@@ -49,15 +45,11 @@ function tk() {
 describe("loginWithPasskey", () => {
   it("resolves sub-org, wallet and DID", async () => {
     const { c, getWhoami, getWalletAccounts } = tk();
-    const f = vi.fn((url: string) =>
-      Promise.resolve(json({ did: "did:dimo:x", url })),
-    );
+    const f = vi.fn((url: string) => Promise.resolve(json({ did: "did:dimo:x", url })));
     const r = await loginWithPasskey(withFetch(f), { turnkey: c });
     expect(getWhoami).toHaveBeenCalledWith({ organizationId: "parent" });
     expect(getWalletAccounts).toHaveBeenCalledWith({ organizationId: "sub" });
-    expect(f.mock.calls[0]![0]).toBe(
-      `https://accounts.test/api/v2/accounts/by-wallet/${wallet}`,
-    );
+    expect(f.mock.calls[0]![0]).toBe(`https://accounts.test/api/v2/accounts/by-wallet/${wallet}`);
     expect(r).toEqual({
       subOrganizationId: "sub",
       walletAddress: wallet,
@@ -66,29 +58,22 @@ describe("loginWithPasskey", () => {
   });
   it("returns did null when lookup 404s", async () => {
     const { c } = tk();
-    const f = vi.fn(async () =>
-      json({ error: { code: "not_found", message: "no" } }, 404),
-    );
+    const f = vi.fn(async () => json({ error: { code: "not_found", message: "no" } }, 404));
     const r = await loginWithPasskey(withFetch(f), { turnkey: c });
     expect(r.did).toBeNull();
   });
   it("a 404 without accounts' not_found envelope is an error, not 'no DID'", async () => {
     const { c } = tk();
-    const f = vi.fn(
-      async () => new Response("<html>nope</html>", { status: 404 }),
-    );
-    await expect(
-      loginWithPasskey(withFetch(f), { turnkey: c }),
-    ).rejects.toMatchObject({ name: "AccountsError", status: 404 });
+    const f = vi.fn(async () => new Response("<html>nope</html>", { status: 404 }));
+    await expect(loginWithPasskey(withFetch(f), { turnkey: c })).rejects.toMatchObject({
+      name: "AccountsError",
+      status: 404,
+    });
   });
   it("maps other lookup errors to AccountsError", async () => {
     const { c } = tk();
-    const f = vi.fn(async () =>
-      json({ error: { code: "boom", message: "bad" } }, 500),
-    );
-    await expect(
-      loginWithPasskey(withFetch(f), { turnkey: c }),
-    ).rejects.toMatchObject({
+    const f = vi.fn(async () => json({ error: { code: "boom", message: "bad" } }, 500));
+    await expect(loginWithPasskey(withFetch(f), { turnkey: c })).rejects.toMatchObject({
       code: "boom",
       status: 500,
       message: "boom: bad",
@@ -127,7 +112,7 @@ describe("email login", () => {
           walletAddress: wallet,
           did: null,
           credentialBundle: "cb",
-        }),
+        })
       );
     const cfg = withFetch(f);
     expect(await requestEmailCode(cfg, { email: "a@b.c" })).toEqual({
@@ -140,12 +125,8 @@ describe("email login", () => {
       sessionPublicKey: "pk",
     });
     expect(r.credentialBundle).toBe("cb");
-    expect(f.mock.calls[0]![0]).toBe(
-      "https://accounts.test/api/v2/email-codes",
-    );
-    expect(f.mock.calls[1]![0]).toBe(
-      "https://accounts.test/api/v2/login/email",
-    );
+    expect(f.mock.calls[0]![0]).toBe("https://accounts.test/api/v2/email-codes");
+    expect(f.mock.calls[1]![0]).toBe("https://accounts.test/api/v2/login/email");
     expect(JSON.parse(f.mock.calls[1]![1].body)).toEqual({
       email: "a@b.c",
       codeId: "c1",
@@ -154,9 +135,7 @@ describe("email login", () => {
     });
   });
   it("throws AccountsError built from the error body", async () => {
-    const f = vi.fn(async () =>
-      json({ error: { code: "invalid_code", message: "wrong code" } }, 401),
-    );
+    const f = vi.fn(async () => json({ error: { code: "invalid_code", message: "wrong code" } }, 401));
     const err = await requestEmailCode(withFetch(f), {
       email: "a@b.c",
     }).catch((e) => e);
@@ -179,17 +158,15 @@ describe("email login", () => {
       withFetch(async () => res()),
       {
         email: "a@b.c",
-      },
+      }
     ).catch((e) => e);
     expect(err).toBeInstanceOf(AccountsError);
     expect(err.code).toBe("invalid_response");
   });
   it("guards the login body too", async () => {
     const err = await loginWithEmail(
-      withFetch(async () =>
-        json({ subOrganizationId: "s", walletAddress: "nope", did: null }),
-      ),
-      { email: "a", codeId: "c", code: "1", sessionPublicKey: "pk" },
+      withFetch(async () => json({ subOrganizationId: "s", walletAddress: "nope", did: null })),
+      { email: "a", codeId: "c", code: "1", sessionPublicKey: "pk" }
     ).catch((e) => e);
     expect(err).toMatchObject({ code: "invalid_response" });
   });
@@ -199,7 +176,7 @@ describe("email login", () => {
       withFetch(async () => {
         throw boom;
       }),
-      { email: "a@b.c" },
+      { email: "a@b.c" }
     ).catch((e) => e);
     expect(err).toBeInstanceOf(NetworkError);
     expect(err.service).toBe("accounts");

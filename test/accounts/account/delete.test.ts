@@ -1,5 +1,15 @@
+import { type TurnkeyClient, TurnkeyRequestError } from "@turnkey/http";
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
-import { TurnkeyRequestError, type TurnkeyClient } from "@turnkey/http";
+
+import {
+  deleteAccount,
+  DeleteHeadMovedError,
+  DeleteIncompleteError,
+  type PendingDeletion,
+  resumeDelete,
+} from "../../../src/accounts/account/delete.js";
+import { generateDpopKey } from "../../../src/accounts/auth/dpop.js";
+import type { Session } from "../../../src/accounts/auth/signin.js";
 import {
   buildSetAliases,
   computeCid,
@@ -7,8 +17,6 @@ import {
   toChecksumAddress,
   verifyOpSignature,
 } from "../../../src/accounts/core/index.js";
-import { generateDpopKey } from "../../../src/accounts/auth/dpop.js";
-import type { Session } from "../../../src/accounts/auth/signin.js";
 import {
   AccountsError,
   DeactivatedError,
@@ -17,21 +25,7 @@ import {
   NetworkError,
   UsageError,
 } from "../../../src/accounts/errors.js";
-import {
-  deleteAccount,
-  resumeDelete,
-  DeleteHeadMovedError,
-  DeleteIncompleteError,
-  type PendingDeletion,
-} from "../../../src/accounts/account/delete.js";
-import {
-  FakeDirectory,
-  cfgFor,
-  json,
-  k1Signer,
-  router,
-  type Handler,
-} from "../helpers.js";
+import { cfgFor, FakeDirectory, type Handler, json, k1Signer, router } from "../helpers.js";
 
 const ACCOUNTS = "https://accounts.test";
 const SUB = "sub-org-1";
@@ -44,7 +38,7 @@ async function setup(
     scopes?: string[];
     tkFails?: boolean;
     accounts?: Handler;
-  } = {},
+  } = {}
 ) {
   const order: string[] = [];
   const dir = new FakeDirectory();
@@ -56,18 +50,10 @@ async function setup(
     order.push("sign");
     return realSign(p);
   });
-  const accounts = vi.fn<Handler>(
-    opts.accounts ?? (async () => new Response(null, { status: 204 })),
-  );
+  const accounts = vi.fn<Handler>(opts.accounts ?? (async () => new Response(null, { status: 204 })));
   const fetchImpl = router({
     [dir.base]: async (url, init) => {
-      order.push(
-        init.method === "POST"
-          ? "submit"
-          : url.endsWith("/log/audit")
-            ? "audit"
-            : "resolve",
-      );
+      order.push(init.method === "POST" ? "submit" : url.endsWith("/log/audit") ? "audit" : "resolve");
       return dir.fetch(url, init);
     },
     [ACCOUNTS]: async (url, init) => {
@@ -136,9 +122,7 @@ async function pendingAfterTkFailure(s: S): Promise<PendingDeletion> {
 /** Another writer moves the head (an alias change signed by the wallet). */
 const moveHead = (s: S) =>
   s.dir.append(s.did, s.owner, (head, cid) =>
-    buildSetAliases(head, cid, [
-      "did:ethr:137:" + toChecksumAddress("0x" + "ab".repeat(20)),
-    ]),
+    buildSetAliases(head, cid, ["did:ethr:137:" + toChecksumAddress("0x" + "ab".repeat(20))])
   );
 
 describe("deleteAccount", () => {
@@ -146,14 +130,7 @@ describe("deleteAccount", () => {
     const s = await setup();
     const prev = s.dir.head(s.did).cid;
     const res = await deleteAccount(...s.args());
-    expect(s.order).toEqual([
-      "audit",
-      "sign",
-      "accounts",
-      "audit",
-      "turnkey",
-      "submit",
-    ]);
+    expect(s.order).toEqual(["audit", "sign", "accounts", "audit", "turnkey", "submit"]);
     expect(s.wallet.sign).toHaveBeenCalledTimes(1);
     const [url, init] = s.accounts.mock.calls[0]!;
     expect(url).toBe(`${ACCOUNTS}/api/v2/me`);
@@ -162,9 +139,7 @@ describe("deleteAccount", () => {
     const op = s.dir.submitted[0]!;
     expect(op.prev).toBe(prev);
     const { sig, ...unsigned } = op;
-    expect(
-      verifyOpSignature(encodeSigningPayload(unsigned), sig, s.wallet.didKey),
-    ).toBe(true);
+    expect(verifyOpSignature(encodeSigningPayload(unsigned), sig, s.wallet.didKey)).toBe(true);
     expect(res.stepsDone).toEqual(["accounts", "turnkey", "tombstone"]);
     expect(res.signedTombstone).toEqual(op);
     expect(s.tombstoned()).toBe(true);
@@ -183,9 +158,7 @@ describe("deleteAccount", () => {
     const s = await setup();
     await deleteAccount(...s.args());
     s.wallet.sign.mockClear();
-    await expect(deleteAccount(...s.args())).rejects.toBeInstanceOf(
-      DeactivatedError,
-    );
+    await expect(deleteAccount(...s.args())).rejects.toBeInstanceOf(DeactivatedError);
     expect(s.wallet.sign).not.toHaveBeenCalled();
   });
 
@@ -206,8 +179,7 @@ describe("deleteAccount", () => {
 
   it("a 4xx from DELETE /me (other than 404) is an AccountsError; Turnkey and the directory are untouched", async () => {
     const s = await setup({
-      accounts: async () =>
-        json({ error: { code: "forbidden", message: "no" } }, 403),
+      accounts: async () => json({ error: { code: "forbidden", message: "no" } }, 403),
     });
     const e = await deleteAccount(...s.args()).catch((x: unknown) => x);
     expect(e).toBeInstanceOf(AccountsError);
@@ -218,8 +190,7 @@ describe("deleteAccount", () => {
 
   it("404 from DELETE /me counts as done (accounts already forgot the DID)", async () => {
     const s = await setup({
-      accounts: async () =>
-        json({ error: { code: "not_found", message: "no user" } }, 404),
+      accounts: async () => json({ error: { code: "not_found", message: "no user" } }, 404),
     });
     const res = await deleteAccount(...s.args());
     expect(res.stepsDone).toEqual(["accounts", "turnkey", "tombstone"]);
@@ -227,14 +198,8 @@ describe("deleteAccount", () => {
   });
 
   it.each([
-    [
-      "a framework 404 (no body)",
-      () => new Response("Not Found", { status: 404 }),
-    ],
-    [
-      "a 404 with another error code",
-      () => json({ error: { code: "route_missing", message: "x" } }, 404),
-    ],
+    ["a framework 404 (no body)", () => new Response("Not Found", { status: 404 })],
+    ["a 404 with another error code", () => json({ error: { code: "route_missing", message: "x" } }, 404)],
     ["a 404 with a bare JSON body", () => json({ message: "nope" }, 404)],
   ])(
     "%s at DELETE /me is not 'done': DeleteIncompleteError with stepsDone [], nothing destroyed",
@@ -245,21 +210,17 @@ describe("deleteAccount", () => {
       expect((err as DeleteIncompleteError).pending.stepsDone).toEqual([]);
       expect(s.deleteSubOrganization).not.toHaveBeenCalled();
       expect(s.dir.submitted).toHaveLength(0);
-    },
+    }
   );
 
   it("refuses to destroy the wallet when the signed tombstone does not verify", async () => {
     const s = await setup();
     // Signs a different payload: a well-formed signature that is wrong for the tombstone.
     const realSign = s.wallet.sign.getMockImplementation()!;
-    s.wallet.sign.mockImplementation(async (p: Uint8Array) =>
-      realSign(new Uint8Array([...p, 1])),
-    );
+    s.wallet.sign.mockImplementation(async (p: Uint8Array) => realSign(new Uint8Array([...p, 1])));
     const err = await deleteAccount(...s.args()).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(DeleteIncompleteError);
-    expect((err as DeleteIncompleteError).code).toBe(
-      "tombstone_signature_invalid",
-    );
+    expect((err as DeleteIncompleteError).code).toBe("tombstone_signature_invalid");
     // Caught right after signing: accounts was never contacted.
     expect((err as DeleteIncompleteError).pending.stepsDone).toEqual([]);
     expect(s.accounts).not.toHaveBeenCalled();
@@ -288,9 +249,9 @@ describe("deleteAccount", () => {
       ...pending,
       signedTombstone: { ...pending.signedTombstone, sig: "AAAA" },
     };
-    await expect(
-      resumeDelete(s.cfg, bad, { turnkeyWithUserStamper: s.turnkey }),
-    ).rejects.toMatchObject({ code: "tombstone_signature_invalid" });
+    await expect(resumeDelete(s.cfg, bad, { turnkeyWithUserStamper: s.turnkey })).rejects.toMatchObject({
+      code: "tombstone_signature_invalid",
+    });
     expect(s.deleteSubOrganization).not.toHaveBeenCalled();
   });
 
@@ -302,44 +263,35 @@ describe("deleteAccount", () => {
       },
       NetworkError,
     ],
-    [
-      "a 503",
-      async () => json({ error: { code: "down", message: "x" } }, 503),
-      AccountsError,
-    ],
-  ] as const)(
-    "%s at DELETE /me leaves a resumable pending with stepsDone []",
-    async (_n, accounts, causeType) => {
-      const s = await setup({ accounts });
-      const err = await deleteAccount(...s.args()).catch((e: unknown) => e);
-      expect(err).toBeInstanceOf(DeleteIncompleteError);
-      const pending = (err as DeleteIncompleteError).pending;
-      expect(pending.stepsDone).toEqual([]);
-      expect(pending.signedTombstone.type).toBe("plc_tombstone");
-      expect((err as Error).cause).toBeInstanceOf(causeType);
-      expect(s.deleteSubOrganization).not.toHaveBeenCalled();
-      expect(s.dir.submitted).toHaveLength(0);
+    ["a 503", async () => json({ error: { code: "down", message: "x" } }, 503), AccountsError],
+  ] as const)("%s at DELETE /me leaves a resumable pending with stepsDone []", async (_n, accounts, causeType) => {
+    const s = await setup({ accounts });
+    const err = await deleteAccount(...s.args()).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(DeleteIncompleteError);
+    const pending = (err as DeleteIncompleteError).pending;
+    expect(pending.stepsDone).toEqual([]);
+    expect(pending.signedTombstone.type).toBe("plc_tombstone");
+    expect((err as Error).cause).toBeInstanceOf(causeType);
+    expect(s.deleteSubOrganization).not.toHaveBeenCalled();
+    expect(s.dir.submitted).toHaveLength(0);
 
-      // resume needs a session for step 2 ...
-      const noSession = await resumeDelete(s.cfg, pending, {
-        turnkeyWithUserStamper: s.turnkey,
-      }).catch((e: unknown) => e);
-      expect(noSession).toBeInstanceOf(UsageError);
-      expect((noSession as UsageError).code).toBe("session_required");
-      // ... and with one, finishes without signing again.
-      s.accounts.mockImplementation(
-        async () => new Response(null, { status: 204 }),
-      );
-      s.wallet.sign.mockClear();
-      const done = await resumeDelete(s.cfg, pending, {
-        turnkeyWithUserStamper: s.turnkey,
-        session: s.session,
-      });
-      expect(done.stepsDone).toEqual(["accounts", "turnkey", "tombstone"]);
-      expect(s.wallet.sign).not.toHaveBeenCalled();
-      expect(s.tombstoned()).toBe(true);
-    },
-  );
+    // resume needs a session for step 2 ...
+    const noSession = await resumeDelete(s.cfg, pending, {
+      turnkeyWithUserStamper: s.turnkey,
+    }).catch((e: unknown) => e);
+    expect(noSession).toBeInstanceOf(UsageError);
+    expect((noSession as UsageError).code).toBe("session_required");
+    // ... and with one, finishes without signing again.
+    s.accounts.mockImplementation(async () => new Response(null, { status: 204 }));
+    s.wallet.sign.mockClear();
+    const done = await resumeDelete(s.cfg, pending, {
+      turnkeyWithUserStamper: s.turnkey,
+      session: s.session,
+    });
+    expect(done.stepsDone).toEqual(["accounts", "turnkey", "tombstone"]);
+    expect(s.wallet.sign).not.toHaveBeenCalled();
+    expect(s.tombstoned()).toBe(true);
+  });
 
   it("resume from stepsDone [] refuses a session for another DID", async () => {
     const s = await setup({
@@ -347,16 +299,12 @@ describe("deleteAccount", () => {
         throw new TypeError("offline");
       },
     });
-    const pending = (
-      (await deleteAccount(...s.args()).catch(
-        (e: unknown) => e,
-      )) as DeleteIncompleteError
-    ).pending;
+    const pending = ((await deleteAccount(...s.args()).catch((e: unknown) => e)) as DeleteIncompleteError).pending;
     await expect(
       resumeDelete(s.cfg, pending, {
         turnkeyWithUserStamper: s.turnkey,
         session: { ...s.session, did: "did:dimo:aaaaaaaaaaaaaaaaaaaaaaaa" },
-      }),
+      })
     ).rejects.toMatchObject({ code: "session_required" });
   });
 
@@ -375,16 +323,12 @@ describe("deleteAccount", () => {
     expect(err).toBeInstanceOf(DeleteHeadMovedError);
     expect(err).toBeInstanceOf(DeleteIncompleteError);
     expect((err as DeleteHeadMovedError).code).toBe("delete_head_moved");
-    expect((err as DeleteHeadMovedError).pending.stepsDone).toEqual([
-      "accounts",
-    ]);
+    expect((err as DeleteHeadMovedError).pending.stepsDone).toEqual(["accounts"]);
     expect(s.deleteSubOrganization).not.toHaveBeenCalled();
     expect(s.dir.submitted).toHaveLength(0);
 
     const done = await deleteAccount(...s.args());
-    expect(done.prevCid).not.toBe(
-      (err as DeleteHeadMovedError).pending.prevCid,
-    );
+    expect(done.prevCid).not.toBe((err as DeleteHeadMovedError).pending.prevCid);
     expect(done.stepsDone).toEqual(["accounts", "turnkey", "tombstone"]);
     expect(s.deleteSubOrganization).toHaveBeenCalledTimes(1);
     expect(s.tombstoned()).toBe(true);
@@ -415,9 +359,7 @@ describe("resumeDelete", () => {
       turnkeyWithUserStamper: s.turnkey,
     }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(DeleteHeadMovedError);
-    expect((err as DeleteHeadMovedError).pending.stepsDone).toEqual([
-      "accounts",
-    ]);
+    expect((err as DeleteHeadMovedError).pending.stepsDone).toEqual(["accounts"]);
     expect(s.deleteSubOrganization).not.toHaveBeenCalled();
   });
 
@@ -428,7 +370,7 @@ describe("resumeDelete", () => {
     await resumeDelete(
       s.cfg,
       { ...pending, stepsDone: ["accounts", "turnkey"] },
-      { turnkeyWithUserStamper: s.turnkey },
+      { turnkeyWithUserStamper: s.turnkey }
     );
     expect(s.deleteSubOrganization).not.toHaveBeenCalled();
     expect(s.dir.submitted).toHaveLength(1);
@@ -455,7 +397,7 @@ describe("resumeDelete", () => {
     const done = await resumeDelete(
       s.cfg,
       { ...pending, stepsDone: ["accounts", "turnkey"] },
-      { turnkeyWithUserStamper: s.turnkey },
+      { turnkeyWithUserStamper: s.turnkey }
     );
     expect(done.stepsDone).toEqual(["accounts", "turnkey", "tombstone"]);
   });
@@ -467,12 +409,10 @@ describe("resumeDelete", () => {
     const err = await resumeDelete(
       s.cfg,
       { ...pending, stepsDone: ["accounts", "turnkey"] },
-      { turnkeyWithUserStamper: s.turnkey },
+      { turnkeyWithUserStamper: s.turnkey }
     ).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(DeleteIncompleteError);
-    expect((err as DeleteIncompleteError).cause).toBeInstanceOf(
-      DirectoryRejectedError,
-    );
+    expect((err as DeleteIncompleteError).cause).toBeInstanceOf(DirectoryRejectedError);
     expect(s.order).not.toContain("resolve");
   });
 
@@ -484,7 +424,7 @@ describe("resumeDelete", () => {
     const err = await resumeDelete(
       s.cfg,
       { ...pending, stepsDone: ["accounts", "turnkey"] },
-      { turnkeyWithUserStamper: s.turnkey },
+      { turnkeyWithUserStamper: s.turnkey }
     ).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(DeleteHeadMovedError);
     expect((err as DeleteIncompleteError).cause).toBeInstanceOf(HeadMovedError);
@@ -493,20 +433,15 @@ describe("resumeDelete", () => {
 });
 
 describe("deleteWithoutExport and an already-deleted sub-org", () => {
-  it.each([true, false])(
-    "passes deleteWithoutExport=%s to Turnkey",
-    async (flag) => {
-      const s = await setup();
-      const res = await deleteAccount(...s.args(flag));
-      const body = (
-        s.deleteSubOrganization.mock.calls[0] as unknown as [
-          { parameters: { deleteWithoutExport: boolean } },
-        ]
-      )[0];
-      expect(body.parameters.deleteWithoutExport).toBe(flag);
-      expect(res.deleteWithoutExport).toBe(flag);
-    },
-  );
+  it.each([true, false])("passes deleteWithoutExport=%s to Turnkey", async (flag) => {
+    const s = await setup();
+    const res = await deleteAccount(...s.args(flag));
+    const body = (
+      s.deleteSubOrganization.mock.calls[0] as unknown as [{ parameters: { deleteWithoutExport: boolean } }]
+    )[0];
+    expect(body.parameters.deleteWithoutExport).toBe(flag);
+    expect(res.deleteWithoutExport).toBe(flag);
+  });
 
   it("with false, a Turnkey refusal is recoverable by resumeDelete", async () => {
     const s = await setup();
@@ -527,9 +462,7 @@ describe("deleteWithoutExport and an already-deleted sub-org", () => {
       turnkeyWithUserStamper: s.turnkey,
     });
     const body = (
-      s.deleteSubOrganization.mock.calls.at(-1) as unknown as [
-        { parameters: { deleteWithoutExport: boolean } },
-      ]
+      s.deleteSubOrganization.mock.calls.at(-1) as unknown as [{ parameters: { deleteWithoutExport: boolean } }]
     )[0];
     expect(body.parameters.deleteWithoutExport).toBe(false);
     expect(done.stepsDone).toEqual(["accounts", "turnkey", "tombstone"]);
@@ -575,12 +508,8 @@ describe("DeleteIncompleteError.code", () => {
   it("is a union of its literal codes, not string", () => {
     const pending = { stepsDone: [] } as unknown as PendingDeletion;
     const e = new DeleteIncompleteError(pending, "x");
-    expectTypeOf(e.code).toEqualTypeOf<
-      "delete_incomplete" | "delete_head_moved" | "tombstone_signature_invalid"
-    >();
+    expectTypeOf(e.code).toEqualTypeOf<"delete_incomplete" | "delete_head_moved" | "tombstone_signature_invalid">();
     expect(e.code).toBe("delete_incomplete");
-    expect(new DeleteHeadMovedError(pending, "x").code).toBe(
-      "delete_head_moved",
-    );
+    expect(new DeleteHeadMovedError(pending, "x").code).toBe("delete_head_moved");
   });
 });

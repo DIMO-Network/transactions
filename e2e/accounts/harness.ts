@@ -1,33 +1,30 @@
 /** Shared plumbing for the scenarios: context, assertions, mailbox, Turnkey, sessions, cleanup. */
-import { randomBytes } from "node:crypto";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { ApiKeyStamper } from "@turnkey/api-key-stamper";
-import {
-  decryptCredentialBundle,
-  generateP256KeyPair,
-  getPublicKey,
-} from "@turnkey/crypto";
+import { decryptCredentialBundle, generateP256KeyPair, getPublicKey } from "@turnkey/crypto";
 import { TurnkeyClient } from "@turnkey/http";
+import { randomBytes } from "node:crypto";
+
 import {
+  createAccount,
+  type CreateAccountInput,
+  deleteAccount,
+  type DidDocument,
   DirectoryClient,
   DirectoryRejectedError,
-  TurnkeyWalletSigner,
-  WebCryptoP256Signer,
-  createAccount,
-  deleteAccount,
+  type DpopKey,
   generateDpopKey,
   loginWithEmail,
   normalizeUrl,
   requestEmailCode,
-  signIn,
-  turnkeyWalletDidKey,
-  type CreateAccountInput,
-  type DidDocument,
-  type DpopKey,
+  type Scope,
   type SdkConfig,
   type Session,
-  type Scope,
   type Signer,
+  signIn,
+  turnkeyWalletDidKey,
+  TurnkeyWalletSigner,
+  WebCryptoP256Signer,
 } from "../../src/accounts/index.js";
 import type { E2eEnv } from "./env.js";
 
@@ -44,24 +41,17 @@ export function check(cond: unknown, msg: string): asserts cond {
 
 export function eq<T>(actual: T, expected: T, what: string): void {
   if (actual !== expected) {
-    throw new Failure(
-      `${what}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
-    );
+    throw new Failure(`${what}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
   }
 }
 
-export function sameSet(
-  actual: readonly string[],
-  expected: readonly string[],
-  what: string,
-): void {
+export function sameSet(actual: readonly string[], expected: readonly string[], what: string): void {
   const a = JSON.stringify([...actual].sort());
   const e = JSON.stringify([...expected].sort());
   if (a !== e) throw new Failure(`${what}: expected ${e}, got ${a}`);
 }
 
-export const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+export const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 export interface Ctx {
   env: E2eEnv;
@@ -91,7 +81,7 @@ export function makeCtx(env: E2eEnv): Ctx {
       new ApiKeyStamper({
         apiPublicKey: env.TURNKEY_API_PUBLIC_KEY,
         apiPrivateKey: env.TURNKEY_API_PRIVATE_KEY,
-      }),
+      })
     ),
     accountsRequests: 0,
     directoryRejections: [],
@@ -100,12 +90,7 @@ export function makeCtx(env: E2eEnv): Ctx {
     shared: {},
   };
   const countingFetch: typeof fetch = async (input, init) => {
-    const url =
-      typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.href
-          : input.url;
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     if (url.startsWith(accountsPrefix)) ctx.accountsRequests++;
     const res = await globalThis.fetch(input, init);
     if (url.startsWith(directoryPrefix) && res.status === 400) {
@@ -132,9 +117,7 @@ export function makeCtx(env: E2eEnv): Ctx {
 export function noteError(ctx: Ctx, e: unknown): void {
   for (let cur = e, i = 0; cur instanceof Error && i < 10; i++) {
     if (cur instanceof DirectoryRejectedError) {
-      ctx.directoryRejections.push(
-        `DirectoryRejectedError ${cur.status}: ${cur.message}`,
-      );
+      ctx.directoryRejections.push(`DirectoryRejectedError ${cur.status}: ${cur.message}`);
     }
     cur = cur.cause;
   }
@@ -147,8 +130,7 @@ export interface Scenario {
   run(ctx: Ctx): Promise<string>;
 }
 
-export const accountsApi = (ctx: Ctx): string =>
-  `${normalizeUrl(ctx.env.ACCOUNTS_URL)}/api/v2`;
+export const accountsApi = (ctx: Ctx): string => `${normalizeUrl(ctx.env.ACCOUNTS_URL)}/api/v2`;
 
 export function newEmail(ctx: Ctx, scenario: string): string {
   return `e2e+${scenario}-${Date.now()}-${randomBytes(3).toString("hex")}@${ctx.env.E2E_EMAIL_DOMAIN}`;
@@ -163,7 +145,7 @@ export function track(ctx: Ctx, scenario: string, email: string): void {
 export async function accountsRaw(
   ctx: Ctx,
   path: string,
-  init?: RequestInit,
+  init?: RequestInit
 ): Promise<{ status: number; body: unknown; headers: Headers }> {
   const res = await globalThis.fetch(`${accountsApi(ctx)}${path}`, init);
   const text = await res.text();
@@ -191,9 +173,7 @@ export const errorCode = (body: unknown): string | undefined => {
 // --- mailbox ---------------------------------------------------------------
 
 async function peekCode(ctx: Ctx, email: string): Promise<string | null> {
-  const res = await globalThis.fetch(
-    `${ctx.env.MAILBOX_API}/latest?to=${encodeURIComponent(email)}`,
-  );
+  const res = await globalThis.fetch(`${ctx.env.MAILBOX_API}/latest?to=${encodeURIComponent(email)}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Failure(`mailbox answered HTTP ${res.status}`);
   const body = (await res.json()) as { code?: unknown };
@@ -206,10 +186,7 @@ const MIN_CODE_GAP_MS = 31_000;
  * Request an email code and read it from the mailbox. accounts sends at most one code per
  * email per 30 s, so this waits out the gap first and retries once if nothing arrives.
  */
-export async function requestCode(
-  ctx: Ctx,
-  email: string,
-): Promise<{ codeId: string; code: string }> {
+export async function requestCode(ctx: Ctx, email: string): Promise<{ codeId: string; code: string }> {
   for (let attempt = 1; ; attempt++) {
     const gap = Date.now() - (ctx.lastCodeAt.get(email) ?? 0);
     if (gap < MIN_CODE_GAP_MS) await sleep(MIN_CODE_GAP_MS - gap);
@@ -223,9 +200,7 @@ export async function requestCode(
       if (now !== null && now !== before) return { codeId, code: now };
     }
     if (attempt >= 2) {
-      throw new Failure(
-        `no new email code for ${email} arrived in the mailbox`,
-      );
+      throw new Failure(`no new email code for ${email} arrived in the mailbox`);
     }
   }
 }
@@ -236,16 +211,12 @@ export type SessionKey = ReturnType<typeof generateP256KeyPair>;
 export const newSessionKey = (): SessionKey => generateP256KeyPair();
 
 /** A Turnkey client stamping as the end user, from the credential bundle of a signup or login. */
-export function userTurnkey(
-  ctx: Ctx,
-  bundle: string,
-  sessionKey: SessionKey,
-): TurnkeyClient {
+export function userTurnkey(ctx: Ctx, bundle: string, sessionKey: SessionKey): TurnkeyClient {
   const priv = decryptCredentialBundle(bundle, sessionKey.privateKey);
   const pub = bytesToHex(getPublicKey(priv, true));
   return new TurnkeyClient(
     { baseUrl: ctx.env.TURNKEY_BASE_URL },
-    new ApiKeyStamper({ apiPublicKey: pub, apiPrivateKey: priv }),
+    new ApiKeyStamper({ apiPublicKey: pub, apiPrivateKey: priv })
   );
 }
 
@@ -253,27 +224,19 @@ export async function walletSigner(
   ctx: Ctx,
   turnkey: TurnkeyClient,
   subOrganizationId: string,
-  walletAddress: `0x${string}`,
+  walletAddress: `0x${string}`
 ): Promise<TurnkeyWalletSigner> {
   return new TurnkeyWalletSigner({
     client: turnkey,
     organizationId: subOrganizationId,
     walletAddress,
-    didKey: await turnkeyWalletDidKey(
-      turnkey,
-      subOrganizationId,
-      walletAddress,
-    ),
+    didKey: await turnkeyWalletDidKey(turnkey, subOrganizationId, walletAddress),
     mode: ctx.env.signMode,
   });
 }
 
 /** The wallet's did:key, read with the parent-org API key (read-only). */
-export const walletDidKeyOf = (
-  ctx: Ctx,
-  subOrganizationId: string,
-  walletAddress: `0x${string}`,
-): Promise<string> =>
+export const walletDidKeyOf = (ctx: Ctx, subOrganizationId: string, walletAddress: `0x${string}`): Promise<string> =>
   turnkeyWalletDidKey(ctx.parentTurnkey, subOrganizationId, walletAddress);
 
 export async function rootQuorum(ctx: Ctx, subOrganizationId: string) {
@@ -289,20 +252,11 @@ export async function rootQuorum(ctx: Ctx, subOrganizationId: string) {
   };
 }
 
-const isEndUser = (
-  u: { userName?: string; userEmail?: string } | undefined,
-  email: string,
-): boolean =>
-  !!u &&
-  (u.userName?.toLowerCase() === email.toLowerCase() ||
-    u.userEmail?.toLowerCase() === email.toLowerCase());
+const isEndUser = (u: { userName?: string; userEmail?: string } | undefined, email: string): boolean =>
+  !!u && (u.userName?.toLowerCase() === email.toLowerCase() || u.userEmail?.toLowerCase() === email.toLowerCase());
 
 /** The sub-org's root quorum is exactly [end user]. */
-export async function assertEndUserOnlyRoot(
-  ctx: Ctx,
-  subOrganizationId: string,
-  email: string,
-): Promise<void> {
+export async function assertEndUserOnlyRoot(ctx: Ctx, subOrganizationId: string, email: string): Promise<void> {
   const q = await rootQuorum(ctx, subOrganizationId);
   eq(q.userIds.length, 1, "root quorum size");
   eq(q.threshold, 1, "root quorum threshold");
@@ -311,25 +265,17 @@ export async function assertEndUserOnlyRoot(
 }
 
 /** The end user is among the sub-org's root users (v1 account created with deployAccount). */
-export async function assertEndUserIsRoot(
-  ctx: Ctx,
-  subOrganizationId: string,
-  email: string,
-): Promise<void> {
+export async function assertEndUserIsRoot(ctx: Ctx, subOrganizationId: string, email: string): Promise<void> {
   const q = await rootQuorum(ctx, subOrganizationId);
   const roots = q.users.filter((u) => q.userIds.includes(u.userId));
   check(
     roots.some((u) => isEndUser(u, email)),
-    "setup: after deployAccount: true the user is not in the root quorum",
+    "setup: after deployAccount: true the user is not in the root quorum"
   );
 }
 
 /** The sub-org's root quorum is exactly [DIMO] (a v1 account whose end user is not root). */
-export async function assertDimoOnlyRoot(
-  ctx: Ctx,
-  subOrganizationId: string,
-  email: string,
-): Promise<void> {
+export async function assertDimoOnlyRoot(ctx: Ctx, subOrganizationId: string, email: string): Promise<void> {
   const q = await rootQuorum(ctx, subOrganizationId);
   eq(q.userIds.length, 1, "root quorum size");
   const sole = q.users.find((u) => u.userId === q.userIds[0]);
@@ -347,16 +293,12 @@ export async function resolveDoc(ctx: Ctx, did: string): Promise<DidDocument> {
   return doc;
 }
 
-export const multibaseOf = (didKey: string): string =>
-  didKey.slice("did:key:".length);
+export const multibaseOf = (didKey: string): string => didKey.slice("did:key:".length);
 
 export function jwtClaims(token: string): Record<string, unknown> {
   const part = token.split(".")[1];
   check(part, "token is not a JWT");
-  return JSON.parse(Buffer.from(part, "base64url").toString("utf8")) as Record<
-    string,
-    unknown
-  >;
+  return JSON.parse(Buffer.from(part, "base64url").toString("utf8")) as Record<string, unknown>;
 }
 
 // --- accounts --------------------------------------------------------------
@@ -381,12 +323,11 @@ export async function signup(
   opts: {
     device?: boolean;
     smartAccount?: CreateAccountInput["smartAccount"];
-  } = {},
+  } = {}
 ): Promise<User> {
   const email = newEmail(ctx, scenario);
   const { codeId, code } = await requestCode(ctx, email);
-  const device =
-    opts.device === false ? undefined : await WebCryptoP256Signer.generate();
+  const device = opts.device === false ? undefined : await WebCryptoP256Signer.generate();
   const sessionKey = newSessionKey();
   const { account, credentialBundle } = await createAccount(ctx.cfg, {
     email,
@@ -396,10 +337,7 @@ export async function signup(
     ...(opts.smartAccount ? { smartAccount: opts.smartAccount } : {}),
   });
   track(ctx, scenario, email);
-  check(
-    credentialBundle,
-    "signup with a code and a session key returned no credentialBundle",
-  );
+  check(credentialBundle, "signup with a code and a session key returned no credentialBundle");
   const walletAddress = account.walletAddress as `0x${string}`;
   const turnkey = userTurnkey(ctx, credentialBundle, sessionKey);
   return {
@@ -408,12 +346,7 @@ export async function signup(
     subOrganizationId: account.subOrganizationId,
     walletAddress,
     turnkey,
-    wallet: await walletSigner(
-      ctx,
-      turnkey,
-      account.subOrganizationId,
-      walletAddress,
-    ),
+    wallet: await walletSigner(ctx, turnkey, account.subOrganizationId, walletAddress),
     ...(device ? { device } : {}),
   };
 }
@@ -422,7 +355,7 @@ export async function signup(
 export async function login(
   ctx: Ctx,
   scenario: string,
-  email: string,
+  email: string
 ): Promise<Omit<User, "did"> & { did: string | null }> {
   const { codeId, code } = await requestCode(ctx, email);
   const sessionKey = newSessionKey();
@@ -432,10 +365,7 @@ export async function login(
     code,
     sessionPublicKey: sessionKey.publicKeyUncompressed,
   });
-  check(
-    res.credentialBundle,
-    `${scenario}: login returned no credentialBundle`,
-  );
+  check(res.credentialBundle, `${scenario}: login returned no credentialBundle`);
   const turnkey = userTurnkey(ctx, res.credentialBundle, sessionKey);
   return {
     email,
@@ -443,12 +373,7 @@ export async function login(
     subOrganizationId: res.subOrganizationId,
     walletAddress: res.walletAddress,
     turnkey,
-    wallet: await walletSigner(
-      ctx,
-      turnkey,
-      res.subOrganizationId,
-      res.walletAddress,
-    ),
+    wallet: await walletSigner(ctx, turnkey, res.subOrganizationId, res.walletAddress),
   };
 }
 
@@ -458,7 +383,7 @@ export async function signInWith(
   signer: Signer,
   fragment: string,
   scope: Scope[],
-  dpopKey?: DpopKey,
+  dpopKey?: DpopKey
 ): Promise<Session> {
   return signIn(ctx.cfg, {
     did,
@@ -472,11 +397,9 @@ export async function signInWith(
 /** Delete the account the way a user does: DELETE /me, the sub-org, then the tombstone. */
 export async function deleteUser(
   ctx: Ctx,
-  user: Pick<User, "did" | "wallet" | "turnkey" | "subOrganizationId">,
+  user: Pick<User, "did" | "wallet" | "turnkey" | "subOrganizationId">
 ): Promise<void> {
-  const session = await signInWith(ctx, user.did, user.wallet, "wallet", [
-    "approve",
-  ]);
+  const session = await signInWith(ctx, user.did, user.wallet, "wallet", ["approve"]);
   await deleteAccount(ctx.cfg, {
     session,
     wallet: user.wallet,
@@ -499,9 +422,7 @@ const MAX_429_RETRIES = 4;
 export async function cleanupAll(ctx: Ctx): Promise<CleanupResult> {
   const result: CleanupResult = { deleted: 0, failed: [], leftBehind: 0 };
   const bulk = (s: string) => s === "E18";
-  const work = ctx.cleanup.filter(
-    (c) => ctx.env.bulkCleanup || !bulk(c.scenario),
-  );
+  const work = ctx.cleanup.filter((c) => ctx.env.bulkCleanup || !bulk(c.scenario));
   result.leftBehind = ctx.cleanup.length - work.length;
   const hasBulk = work.some((c) => bulk(c.scenario));
   // Bulk signups used the public per-IP limit: let its window pass before the logins start.
@@ -511,9 +432,7 @@ export async function cleanupAll(ctx: Ctx): Promise<CleanupResult> {
       try {
         const user = await login(ctx, item.scenario, item.email);
         if (!user.did) {
-          result.failed.push(
-            `${item.scenario} ${item.email}: no DID, cannot delete`,
-          );
+          result.failed.push(`${item.scenario} ${item.email}: no DID, cannot delete`);
           return;
         }
         await deleteUser(ctx, { ...user, did: user.did });
@@ -525,9 +444,7 @@ export async function cleanupAll(ctx: Ctx): Promise<CleanupResult> {
           await sleep(BULK_WAIT_MS);
           continue;
         }
-        result.failed.push(
-          `${item.scenario} ${item.email}: ${e instanceof Error ? e.message : String(e)}`,
-        );
+        result.failed.push(`${item.scenario} ${item.email}: ${e instanceof Error ? e.message : String(e)}`);
         return;
       }
     }
@@ -535,9 +452,7 @@ export async function cleanupAll(ctx: Ctx): Promise<CleanupResult> {
   const next = async (): Promise<void> => {
     for (let item = work.shift(); item; item = work.shift()) await one(item);
   };
-  const workers = hasBulk
-    ? Math.min(work.length, ctx.env.cleanupConcurrency)
-    : 1;
+  const workers = hasBulk ? Math.min(work.length, ctx.env.cleanupConcurrency) : 1;
   await Promise.all(Array.from({ length: Math.max(workers, 1) }, next));
   return result;
 }

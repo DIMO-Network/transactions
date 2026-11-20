@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
+
 import {
+  type AccountView,
   createAccount,
+  type CreateAccountInput,
   getMe,
   lookupByWallet,
   recordSignIn,
-  type AccountView,
-  type CreateAccountInput,
 } from "../../../src/accounts/account/accounts.js";
 import { generateDpopKey } from "../../../src/accounts/auth/dpop.js";
 import type { Session } from "../../../src/accounts/auth/signin.js";
@@ -56,14 +57,7 @@ async function session(scopes: string[]): Promise<Session> {
 describe("createAccount", () => {
   // accounts src/models/v2/validations.ts:14-48 (CreateAccountSchema) and
   // src/models/v2/accounts.d.ts:3-18 (CreateAccountRequest). Top-level keys:
-  const REQUEST_KEYS = [
-    "email",
-    "proof",
-    "sessionPublicKey",
-    "passkey",
-    "signingKey",
-    "smartAccount",
-  ];
+  const REQUEST_KEYS = ["email", "proof", "sessionPublicKey", "passkey", "signingKey", "smartAccount"];
   // signingKey: validations.ts:34-36 -> { didKey, proof }
   // passkey: validations.ts:23-33 -> { challenge, attestation: { credentialId,
   //   clientDataJson, attestationObject, transports } }
@@ -72,9 +66,7 @@ describe("createAccount", () => {
 
   it("POSTs the exact schema shape to /api/v2/accounts without auth", async () => {
     const key = await WebCryptoP256Signer.generate();
-    const { cfg, sent } = setup(async () =>
-      json({ account: VIEW, credentialBundle: "bundle" }, 201),
-    );
+    const { cfg, sent } = setup(async () => json({ account: VIEW, credentialBundle: "bundle" }, 201));
     const passkey = {
       challenge: "ch",
       attestation: {
@@ -104,9 +96,7 @@ describe("createAccount", () => {
     expect(req!.body.proof).toEqual({ codeId: "id", code: "123456" });
     expect(req!.body.sessionPublicKey).toBe("spk");
     expect(req!.body.passkey).toEqual(passkey);
-    expect(Object.keys(req!.body.signingKey).sort()).toEqual(
-      ["didKey", "proof"].sort(),
-    );
+    expect(Object.keys(req!.body.signingKey).sort()).toEqual(["didKey", "proof"].sort());
     expect(req!.body.signingKey.didKey).toBe(key.didKey);
     expect(req!.body.smartAccount).toEqual({
       chain: "POLYGON",
@@ -119,9 +109,7 @@ describe("createAccount", () => {
     const { cfg, sent } = setup(async () => json({ account: VIEW }, 201));
     await createAccount(cfg, { email: "  Mixed@Case.IO ", signingKey: key });
     const sk = sent()[0]!.body.signingKey;
-    const msg = new TextEncoder().encode(
-      SIGNUP_POP_MESSAGE("mixed@case.io", key.didKey),
-    );
+    const msg = new TextEncoder().encode(SIGNUP_POP_MESSAGE("mixed@case.io", key.didKey));
     expect(sk.proof).toMatch(/^[A-Za-z0-9_-]{86}$/); // 64 bytes, base64url, no padding
     expect(verifyOpSignature(msg, sk.proof, key.didKey)).toBe(true);
   });
@@ -147,9 +135,10 @@ describe("createAccount", () => {
       sign: (p: Uint8Array) => other.sign(p),
     };
     const { cfg, fetchImpl } = setup(async () => json({ account: VIEW }, 201));
-    await expect(
-      createAccount(cfg, { email: "a@b.c", signingKey: liar }),
-    ).rejects.toMatchObject({ name: "PolicyError", code: "proof_invalid" });
+    await expect(createAccount(cfg, { email: "a@b.c", signingKey: liar })).rejects.toMatchObject({
+      name: "PolicyError",
+      code: "proof_invalid",
+    });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
@@ -159,18 +148,12 @@ describe("createAccount", () => {
     const { cfg, sent } = setup(async () => json({ account: VIEW }, 201));
     await createAccount(cfg, { email: "a@b.c", signingKey: key });
     expect(sign).toHaveBeenCalledTimes(1);
-    expect(sent()[0]!.body.signingKey.proof).toBe(
-      await sign.mock.results[0]!.value,
-    );
+    expect(sent()[0]!.body.signingKey.proof).toBe(await sign.mock.results[0]!.value);
   });
 
   it("maps 409 to AccountsError conflict, message passed through", async () => {
-    const { cfg } = setup(async () =>
-      json(errBody("conflict", "signup in progress"), 409),
-    );
-    const e = await createAccount(cfg, { email: "a@b.c" }).catch(
-      (x: unknown) => x,
-    );
+    const { cfg } = setup(async () => json(errBody("conflict", "signup in progress"), 409));
+    const e = await createAccount(cfg, { email: "a@b.c" }).catch((x: unknown) => x);
     expect(e).toMatchObject({
       name: "AccountsError",
       code: "conflict",
@@ -218,24 +201,14 @@ describe("a 2xx body of the wrong shape is invalid_response, with the status", (
     Record<string, unknown>,
     (cfg: ReturnType<typeof setup>["cfg"]) => Promise<unknown>,
   ][] = [
-    [
-      "createAccount",
-      201,
-      { account: VIEW },
-      (cfg) => createAccount(cfg, { email: "a@b.c" }),
-    ],
+    ["createAccount", 201, { account: VIEW }, (cfg) => createAccount(cfg, { email: "a@b.c" })],
     [
       "getMe",
       200,
       VIEW as unknown as Record<string, unknown>,
       async (cfg) => getMe(cfg, { session: await session(["read"]) }),
     ],
-    [
-      "lookupByWallet",
-      200,
-      { did: VIEW.did },
-      (cfg) => lookupByWallet(cfg, { address: "0x" + "ab".repeat(20) }),
-    ],
+    ["lookupByWallet", 200, { did: VIEW.did }, (cfg) => lookupByWallet(cfg, { address: "0x" + "ab".repeat(20) })],
   ];
   for (const [name, status, good, call] of helpers) {
     it.each([
@@ -287,9 +260,7 @@ describe("getMe", () => {
   // subOrganizationId, walletAddress, smartAccount
   it("GETs /api/v2/me with DPoP auth and returns the view", async () => {
     const { cfg, sent } = setup(async () => json(VIEW));
-    expect(await getMe(cfg, { session: await session(["read"]) })).toEqual(
-      VIEW,
-    );
+    expect(await getMe(cfg, { session: await session(["read"]) })).toEqual(VIEW);
     const [req] = sent();
     expect(req!.url).toBe(`${ACCOUNTS}/api/v2/me`);
     expect(req!.method).toBe("GET");
@@ -304,9 +275,7 @@ describe("getMe", () => {
 
   it("a 404 without the accounts envelope is an error, not null", async () => {
     const { cfg } = setup(async () => new Response("nope", { status: 404 }));
-    await expect(
-      getMe(cfg, { session: await session(["read"]) }),
-    ).rejects.toMatchObject({
+    await expect(getMe(cfg, { session: await session(["read"]) })).rejects.toMatchObject({
       name: "AccountsError",
       status: 404,
     });
@@ -314,9 +283,7 @@ describe("getMe", () => {
 
   it("fails fast without the read scope", async () => {
     const { cfg, fetchImpl } = setup(async () => json(VIEW));
-    await expect(
-      getMe(cfg, { session: await session(["write"]) }),
-    ).rejects.toMatchObject({
+    await expect(getMe(cfg, { session: await session(["write"]) })).rejects.toMatchObject({
       name: "UsageError",
       code: "scope_missing",
     });
@@ -325,9 +292,7 @@ describe("getMe", () => {
 
   it("maps other failures to AccountsError", async () => {
     const { cfg } = setup(async () => json(errBody("unauthenticated"), 401));
-    await expect(
-      getMe(cfg, { session: await session(["read"]) }),
-    ).rejects.toMatchObject({
+    await expect(getMe(cfg, { session: await session(["read"]) })).rejects.toMatchObject({
       code: "unauthenticated",
       status: 401,
     });
@@ -337,14 +302,12 @@ describe("getMe", () => {
 describe("recordSignIn", () => {
   it("POSTs { deviceKey } to /api/v2/me/sign-ins and resolves on 202", async () => {
     const key = await WebCryptoP256Signer.generate();
-    const { cfg, sent } = setup(
-      async () => new Response(null, { status: 202 }),
-    );
+    const { cfg, sent } = setup(async () => new Response(null, { status: 202 }));
     await expect(
       recordSignIn(cfg, {
         session: await session(["write"]),
         deviceKey: key.didKey,
-      }),
+      })
     ).resolves.toBeUndefined();
     const [req] = sent();
     expect(req!.url).toBe(`${ACCOUNTS}/api/v2/me/sign-ins`);
@@ -358,27 +321,23 @@ describe("recordSignIn", () => {
 
   it("fails fast without the write scope", async () => {
     const key = await WebCryptoP256Signer.generate();
-    const { cfg, fetchImpl } = setup(
-      async () => new Response(null, { status: 202 }),
-    );
+    const { cfg, fetchImpl } = setup(async () => new Response(null, { status: 202 }));
     await expect(
       recordSignIn(cfg, {
         session: await session(["read"]),
         deviceKey: key.didKey,
-      }),
+      })
     ).rejects.toMatchObject({ name: "UsageError", code: "scope_missing" });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("rejects a deviceKey that is not a did:key before any request", async () => {
-    const { cfg, fetchImpl } = setup(
-      async () => new Response(null, { status: 202 }),
-    );
+    const { cfg, fetchImpl } = setup(async () => new Response(null, { status: 202 }));
     await expect(
       recordSignIn(cfg, {
         session: await session(["write"]),
         deviceKey: "not-a-did-key",
-      }),
+      })
     ).rejects.toBeInstanceOf(Error);
     expect(fetchImpl).not.toHaveBeenCalled();
   });
@@ -390,7 +349,7 @@ describe("recordSignIn", () => {
       recordSignIn(cfg, {
         session: await session(["write"]),
         deviceKey: key.didKey,
-      }),
+      })
     ).rejects.toMatchObject({ name: "AccountsError", code: "not_found" });
   });
 });
@@ -414,18 +373,16 @@ describe("lookupByWallet", () => {
     expect(await lookupByWallet(cfg, { address: ADDR })).toBeNull();
   });
 
-  it.each([
-    "0x123",
-    "ab".repeat(20),
-    "0x" + "g".repeat(40),
-    "0x" + "a".repeat(41),
-  ])("rejects %s before any request", async (bad) => {
-    const { cfg, fetchImpl } = setup(async () => json({ did: VIEW.did }));
-    await expect(lookupByWallet(cfg, { address: bad })).rejects.toMatchObject({
-      name: "UsageError",
-    });
-    expect(fetchImpl).not.toHaveBeenCalled();
-  });
+  it.each(["0x123", "ab".repeat(20), "0x" + "g".repeat(40), "0x" + "a".repeat(41)])(
+    "rejects %s before any request",
+    async (bad) => {
+      const { cfg, fetchImpl } = setup(async () => json({ did: VIEW.did }));
+      await expect(lookupByWallet(cfg, { address: bad })).rejects.toMatchObject({
+        name: "UsageError",
+      });
+      expect(fetchImpl).not.toHaveBeenCalled();
+    }
+  );
 
   it("maps other failures to AccountsError", async () => {
     const { cfg } = setup(async () => json(errBody("rate_limited"), 429));

@@ -8,9 +8,9 @@ import {
   postJson,
   resolveDoc,
   sameSet,
+  type Scenario,
   track,
   walletDidKeyOf,
-  type Scenario,
 } from "./harness.js";
 
 /**
@@ -40,16 +40,8 @@ export const e01: Scenario = {
     const head = log.at(-1)!.operation;
     const walletKey = await walletDidKeyOf(ctx, subOrg, wallet);
     sameSet(head.rotationKeys, [walletKey], "rotationKeys");
-    sameSet(
-      Object.keys(head.verificationMethods),
-      ["wallet"],
-      "head verificationMethods",
-    );
-    eq(
-      head.verificationMethods.wallet,
-      walletKey,
-      "wallet verification method key",
-    );
+    sameSet(Object.keys(head.verificationMethods), ["wallet"], "head verificationMethods");
+    eq(head.verificationMethods.wallet, walletKey, "wallet verification method key");
 
     await assertEndUserOnlyRoot(ctx, subOrg, email);
     eq(account.emailVerified, false, "emailVerified");
@@ -58,7 +50,7 @@ export const e01: Scenario = {
     const local = email.split("@")[0]!.toLowerCase();
     check(
       !haystack.includes(email.toLowerCase()) && !haystack.includes(local),
-      "the email appears in the DID document or the audit log",
+      "the email appears in the DID document or the audit log"
     );
     return `201, ${did}, rotationKeys=[wallet], quorum=[end user], unverified, no email in document or log`;
   },

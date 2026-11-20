@@ -1,111 +1,86 @@
 export {
-  DirectoryClient,
-  type DidDocument,
-  type AuditEntry,
-  type Head,
-} from "./directory/client.js";
-export { verifyAuditLog } from "./directory/verify.js";
-export {
-  AccountSdkError,
-  PolicyError,
-  EncodingError,
-  NetworkError,
-  HeadMovedError,
-  DeactivatedError,
-  DirectoryRejectedError,
-  InvalidDidError,
-  DidExistsError,
-  DidNotFoundError,
-  DirectoryUnavailableError,
-  DirectoryIntegrityError,
-  SigninError,
-  AccountsError,
-  UsageError,
-  TurnkeyError,
-  SignerError,
-  UserOperationPendingError,
-  UserOperationUnknownError,
-  UserOperationRevertedError,
-  SponsorshipError,
-  ProvidersExhaustedError,
-  GasProxyError,
-  type PolicyErrorCode,
-  type EncodingErrorCode,
-  type UsageErrorCode,
-  type GasProxyErrorCode,
-  type TurnkeyErrorCode,
-  type SdkService,
-} from "./errors.js";
-export type { Signer } from "./signers/types.js";
-export {
-  TurnkeyWalletSigner,
-  turnkeyWalletDidKey,
-  type TurnkeySignMode,
-  type TurnkeyWalletSignerOptions,
-} from "./signers/turnkey.js";
-export { WebCryptoP256Signer } from "./signers/webcrypto.js";
-export {
-  generateDpopKey,
-  dpopKeyFromKeyPair,
-  createDpopProof,
-  jwkThumbprint,
-  type DpopKey,
-  type DpopJwk,
-  type WebCryptoDpopKey,
-} from "./auth/dpop.js";
-export {
-  signIn,
-  type Session,
-  type SignInOptions,
-  type Scope,
-} from "./auth/signin.js";
-export { authedFetch } from "./auth/fetch.js";
-export {
-  addDeviceKey,
-  removeDeviceKey,
-  setAliases,
-  type KeyChangeArgs,
-} from "./account/keys.js";
-export { normalizeUrl, type SdkConfig } from "./config.js";
-export {
-  requestEmailCode,
-  loginWithEmail,
-  loginWithPasskey,
-  type LoginResult,
-} from "./account/login.js";
-export { claimDid } from "./account/claim.js";
-export {
-  createAccount,
-  getMe,
-  recordSignIn,
-  lookupByWallet,
-  type AccountView,
   type AccountChain,
+  type AccountView,
+  createAccount,
   type CreateAccountInput,
   type CreateAccountPasskeyAttestation,
   type CreateAccountResult,
+  getMe,
+  lookupByWallet,
+  recordSignIn,
 } from "./account/accounts.js";
-export {
-  addPasskey,
-  removePasskey,
-  type PasskeyAttestation,
-  type PasskeyTransport,
-} from "./account/passkeys.js";
-export {
-  deploySmartAccount,
-  sendUserOperation,
-  type GasProvider,
-  type SmartAccountOptions,
-  type SendUserOperationOptions,
-} from "./account/smart-account.js";
+export { claimDid } from "./account/claim.js";
 export {
   deleteAccount,
-  resumeDelete,
-  DeleteIncompleteError,
+  type DeleteAccountOptions,
   DeleteHeadMovedError,
   type DeleteIncompleteCode,
-  type PendingDeletion,
+  DeleteIncompleteError,
   type DeleteStep,
-  type DeleteAccountOptions,
+  type PendingDeletion,
+  resumeDelete,
   type ResumeDeleteOptions,
 } from "./account/delete.js";
+export { addDeviceKey, type KeyChangeArgs, removeDeviceKey, setAliases } from "./account/keys.js";
+export { type LoginResult, loginWithEmail, loginWithPasskey, requestEmailCode } from "./account/login.js";
+export { addPasskey, type PasskeyAttestation, type PasskeyTransport, removePasskey } from "./account/passkeys.js";
+export {
+  deploySmartAccount,
+  type GasProvider,
+  sendUserOperation,
+  type SendUserOperationOptions,
+  type SmartAccountOptions,
+} from "./account/smart-account.js";
+export {
+  createDpopProof,
+  type DpopJwk,
+  type DpopKey,
+  dpopKeyFromKeyPair,
+  generateDpopKey,
+  jwkThumbprint,
+  type WebCryptoDpopKey,
+} from "./auth/dpop.js";
+export { authedFetch } from "./auth/fetch.js";
+export { type Scope, type Session, signIn, type SignInOptions } from "./auth/signin.js";
+export { normalizeUrl, type SdkConfig } from "./config.js";
+export { type AuditEntry, type DidDocument, DirectoryClient, type Head } from "./directory/client.js";
+export { verifyAuditLog } from "./directory/verify.js";
+export {
+  AccountSdkError,
+  AccountsError,
+  DeactivatedError,
+  DidExistsError,
+  DidNotFoundError,
+  DirectoryIntegrityError,
+  DirectoryRejectedError,
+  DirectoryUnavailableError,
+  EncodingError,
+  type EncodingErrorCode,
+  GasProxyError,
+  type GasProxyErrorCode,
+  HeadMovedError,
+  InvalidDidError,
+  NetworkError,
+  PolicyError,
+  type PolicyErrorCode,
+  ProvidersExhaustedError,
+  type SdkService,
+  SignerError,
+  SigninError,
+  SponsorshipError,
+  TurnkeyError,
+  type TurnkeyErrorCode,
+  UsageError,
+  type UsageErrorCode,
+  UserOperationPendingError,
+  UserOperationRevertedError,
+  UserOperationUnknownError,
+} from "./errors.js";
+export {
+  type TurnkeySignMode,
+  turnkeyWalletDidKey,
+  TurnkeyWalletSigner,
+  type TurnkeyWalletSignerOptions,
+} from "./signers/turnkey.js";
+export type { Signer } from "./signers/types.js";
+export { WebCryptoP256Signer } from "./signers/webcrypto.js";

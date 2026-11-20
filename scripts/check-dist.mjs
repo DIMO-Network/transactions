@@ -45,40 +45,29 @@ for (const entry of ["core/index.js", "core/index.cjs"]) {
   const { files, external } = await walk(resolve(dist, entry));
   for (const [spec, file] of external) {
     // node: builtins would be fine; nothing else may load at runtime from core.
-    if (!spec.startsWith("node:"))
-      fail(`dist/accounts/${entry} reaches external "${spec}" (via ${file})`);
+    if (!spec.startsWith("node:")) fail(`dist/accounts/${entry} reaches external "${spec}" (via ${file})`);
   }
   console.log(
-    `dist/accounts/${entry}: ${files.length} file(s) [${files.join(", ")}], externals: ${[...external.keys()].join(", ") || "none"}`,
+    `dist/accounts/${entry}: ${files.length} file(s) [${files.join(", ")}], externals: ${[...external.keys()].join(", ") || "none"}`
   );
 }
 
 function sameExports(label, main, core) {
   const shared = Object.keys(core).filter((k) => k in main);
-  const classes = shared.filter(
-    (k) => typeof core[k] === "function" && /^[A-Z]/.test(k),
-  );
+  const classes = shared.filter((k) => typeof core[k] === "function" && /^[A-Z]/.test(k));
   for (const k of classes) {
-    if (main[k] !== core[k])
-      fail(`${label}: main.${k} !== core.${k} (core is duplicated)`);
+    if (main[k] !== core[k]) fail(`${label}: main.${k} !== core.${k} (core is duplicated)`);
   }
-  if (!classes.includes("PolicyError"))
-    fail(`${label}: PolicyError missing from main or core`);
-  console.log(
-    `${label}: ${classes.length} shared class(es) checked: ${classes.join(", ")}`,
-  );
+  if (!classes.includes("PolicyError")) fail(`${label}: PolicyError missing from main or core`);
+  console.log(`${label}: ${classes.length} shared class(es) checked: ${classes.join(", ")}`);
 }
 
 const require = createRequire(import.meta.url);
-sameExports(
-  "cjs",
-  require(resolve(dist, "index.cjs")),
-  require(resolve(dist, "core/index.cjs")),
-);
+sameExports("cjs", require(resolve(dist, "index.cjs")), require(resolve(dist, "core/index.cjs")));
 sameExports(
   "esm",
   await import(pathToFileURL(resolve(dist, "index.js")).href),
-  await import(pathToFileURL(resolve(dist, "core/index.js")).href),
+  await import(pathToFileURL(resolve(dist, "core/index.js")).href)
 );
 
 if (failures.length) {

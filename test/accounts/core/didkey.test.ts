@@ -1,15 +1,16 @@
-import { describe, expect, it } from "vitest";
-import { hexToBytes } from "@noble/hashes/utils.js";
-import { keccak_256 } from "@noble/hashes/sha3.js";
-import { base58 } from "@scure/base";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
-import vectors from "../fixtures/did-ops.json";
+import { keccak_256 } from "@noble/hashes/sha3.js";
+import { hexToBytes } from "@noble/hashes/utils.js";
+import { base58 } from "@scure/base";
+import { describe, expect, it } from "vitest";
+
 import {
-  EncodingError,
   decodeDidKey,
   didKeyFromCompressed,
+  EncodingError,
   ethAddressFromDidKey,
 } from "../../../src/accounts/core/index.js";
+import vectors from "../fixtures/did-ops.json";
 
 const WALLET = vectors.cases[0]!.signerDidKey;
 const PHONE = "did:key:zDnaex62me84JZnkEzmeYRa8FCLNe7y1asoSwBMK26GBYpL7c";
@@ -27,9 +28,7 @@ describe("didkey", () => {
     }
   });
   it("rejects other multicodecs and malformed input", () => {
-    expect(() =>
-      decodeDidKey("did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"),
-    ).toThrow();
+    expect(() => decodeDidKey("did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK")).toThrow();
     expect(() => decodeDidKey("zQ3s")).toThrow();
     expect(() => decodeDidKey("did:key:abc")).toThrow();
   });
@@ -41,10 +40,8 @@ describe("didkey", () => {
       raw[raw.length - 1] = x;
       return "did:key:z" + base58.encode(raw);
     };
-    it("off-curve P-256 point", () =>
-      expect(() => decodeDidKey(enc([0x80, 0x24], 1))).toThrow());
-    it("off-curve secp256k1 point", () =>
-      expect(() => decodeDidKey(enc([0xe7, 0x01], 5))).toThrow());
+    it("off-curve P-256 point", () => expect(() => decodeDidKey(enc([0x80, 0x24], 1))).toThrow());
+    it("off-curve secp256k1 point", () => expect(() => decodeDidKey(enc([0xe7, 0x01], 5))).toThrow());
     it("bad prefix byte", () => {
       const d = decodeDidKey(WALLET);
       const raw = new Uint8Array([0xe7, 0x01, 0x04, ...d.compressed.slice(1)]);
@@ -67,13 +64,8 @@ describe("didkey", () => {
   });
   it("derives the wallet address", () => {
     const c = vectors.cases[0]!;
-    const pub = secp256k1.getPublicKey(
-      hexToBytes(c.signerPrivateKeyHex),
-      false,
-    );
-    const hex = Array.from(keccak_256(pub.slice(1)).slice(12), (b) =>
-      b.toString(16).padStart(2, "0"),
-    ).join("");
+    const pub = secp256k1.getPublicKey(hexToBytes(c.signerPrivateKeyHex), false);
+    const hex = Array.from(keccak_256(pub.slice(1)).slice(12), (b) => b.toString(16).padStart(2, "0")).join("");
     const addr = ethAddressFromDidKey(WALLET);
     expect(addr.toLowerCase()).toBe("0x" + hex);
     expect(addr).toMatch(/^0x[0-9a-fA-F]{40}$/);
@@ -81,12 +73,9 @@ describe("didkey", () => {
   });
   it("matches the EIP-55 reference vector", () => {
     // priv=1 -> 0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf
-    const pub = secp256k1.getPublicKey(
-      hexToBytes("00".repeat(31) + "01"),
-      true,
-    );
+    const pub = secp256k1.getPublicKey(hexToBytes("00".repeat(31) + "01"), true);
     expect(ethAddressFromDidKey(didKeyFromCompressed("secp256k1", pub))).toBe(
-      "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf",
+      "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf"
     );
   });
   it("returns a 0x-prefixed template type", () => {
@@ -94,11 +83,7 @@ describe("didkey", () => {
     expect(addr.startsWith("0x")).toBe(true);
   });
   it("throws EncodingError for malformed did:keys", () => {
-    for (const bad of [
-      "did:key:abc",
-      "zQ3s",
-      "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
-    ]) {
+    for (const bad of ["did:key:abc", "zQ3s", "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"]) {
       expect(() => decodeDidKey(bad)).toThrow(EncodingError);
     }
     expect(() => ethAddressFromDidKey(PHONE)).toThrow(EncodingError);

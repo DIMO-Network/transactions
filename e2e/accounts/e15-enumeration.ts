@@ -1,16 +1,7 @@
-import {
-  Failure,
-  check,
-  eq,
-  newEmail,
-  postJson,
-  type Ctx,
-  type Scenario,
-} from "./harness.js";
+import { check, type Ctx, eq, Failure, newEmail, postJson, type Scenario } from "./harness.js";
 
 const CALLS = 20;
-const UUID_V4 =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_P95_GAP_MS = 50;
 
 type Sample = { status: number; keys: string; codeIdOk: boolean; ms: number };
@@ -29,8 +20,7 @@ async function sample(ctx: Ctx, email: string): Promise<Sample> {
 }
 
 /** Nearest-rank p95. */
-const p95 = (xs: number[]): number =>
-  [...xs].sort((a, b) => a - b)[Math.ceil(0.95 * xs.length) - 1]!;
+const p95 = (xs: number[]): number => [...xs].sort((a, b) => a - b)[Math.ceil(0.95 * xs.length) - 1]!;
 
 /**
  * E15. No account enumeration: POST /api/v2/email-codes for a known email (one E1 created)
@@ -44,10 +34,7 @@ export const e15: Scenario = {
   title: "no account enumeration",
   async run(ctx) {
     const known = ctx.shared.knownEmail;
-    if (!known)
-      throw new Failure(
-        "needs the account E1 created, and E1 did not create one",
-      );
+    if (!known) throw new Failure("needs the account E1 created, and E1 did not create one");
     const WARMUP = 2;
     const attempts: string[] = [];
     const all: Sample[] = [];
@@ -72,25 +59,22 @@ export const e15: Scenario = {
       const pu = p95(u.map((s) => s.ms));
       gap = Math.abs(pk - pu);
       attempts.push(
-        `attempt ${attempt}: p95 known ${pk.toFixed(1)} ms, unknown ${pu.toFixed(1)} ms, gap ${gap.toFixed(1)} ms`,
+        `attempt ${attempt}: p95 known ${pk.toFixed(1)} ms, unknown ${pu.toFixed(1)} ms, gap ${gap.toFixed(1)} ms`
       );
       if (gap < MAX_P95_GAP_MS) break;
     }
     const statuses = new Set(all.map((s) => s.status));
-    check(
-      statuses.size === 1,
-      `status differs: ${JSON.stringify([...statuses])}`,
-    );
+    check(statuses.size === 1, `status differs: ${JSON.stringify([...statuses])}`);
     const keys = new Set(all.map((s) => s.keys));
     check(keys.size === 1, `body keys differ: ${JSON.stringify([...keys])}`);
     eq(
       all.every((s) => s.codeIdOk),
       true,
-      "every codeId is a UUID v4",
+      "every codeId is a UUID v4"
     );
     check(
       gap < MAX_P95_GAP_MS,
-      `p95 latencies differ by 50 ms or more (limit ${MAX_P95_GAP_MS}): ${attempts.join("; ")}`,
+      `p95 latencies differ by 50 ms or more (limit ${MAX_P95_GAP_MS}): ${attempts.join("; ")}`
     );
     return `${[...statuses][0]}, keys ${[...keys][0]}, UUID v4 codeIds; ${attempts.join("; ")}`;
   },

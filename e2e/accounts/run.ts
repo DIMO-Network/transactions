@@ -4,15 +4,7 @@
  */
 import { AccountSdkError } from "../../src/accounts/index.js";
 import { EnvError, loadEnvFile, readEnv } from "./env.js";
-import {
-  Failure,
-  Skip,
-  cleanupAll,
-  makeCtx,
-  noteError,
-  type Ctx,
-  type Scenario,
-} from "./harness.js";
+import { cleanupAll, type Ctx, Failure, makeCtx, noteError, type Scenario, Skip } from "./harness.js";
 import { GATED_ELSEWHERE, SCENARIOS } from "./scenarios.js";
 
 const ORDER = Array.from({ length: 18 }, (_, i) => `E${i + 1}`);
@@ -21,7 +13,7 @@ type Outcome = "PASS" | "FAIL" | "SKIP";
 let failed = 0;
 
 function line(status: string, id: string, text: string): void {
-  console.log(`${status.padEnd(4)} ${id.padEnd(3)} ${text}`);
+  console.info(`${status.padEnd(4)} ${id.padEnd(3)} ${text}`);
 }
 
 function describeError(e: unknown): string {
@@ -47,11 +39,7 @@ async function runOne(ctx: Ctx, s: Scenario): Promise<Outcome> {
   }
   if (outcome === "FAIL") failed++;
   if (outcome !== "SKIP") ran.add(s.id);
-  line(
-    outcome,
-    s.id,
-    `${s.title}: ${text} (${((Date.now() - start) / 1000).toFixed(1)} s)`,
-  );
+  line(outcome, s.id, `${s.title}: ${text} (${((Date.now() - start) / 1000).toFixed(1)} s)`);
   return outcome;
 }
 
@@ -68,13 +56,7 @@ async function main(): Promise<void> {
   }
   const onlyFlag = argv.indexOf("--only");
   const only =
-    onlyFlag >= 0
-      ? new Set(
-          (argv[onlyFlag + 1] ?? "")
-            .split(",")
-            .map((x) => x.trim().toUpperCase()),
-        )
-      : undefined;
+    onlyFlag >= 0 ? new Set((argv[onlyFlag + 1] ?? "").split(",").map((x) => x.trim().toUpperCase())) : undefined;
 
   let ctx: Ctx;
   try {
@@ -97,60 +79,50 @@ async function main(): Promise<void> {
         line("N/A", id, `(gated elsewhere) ${GATED_ELSEWHERE[id]}`);
       } else if (!only && id === "E14") {
         const n = ctx.directoryRejections.length;
-        const directoryRan = ORDER.slice(0, 11).filter((x) =>
-          ran.has(x),
-        ).length;
+        const directoryRan = ORDER.slice(0, 11).filter((x) => ran.has(x)).length;
         if (directoryRan < 5) {
-          line(
-            "N/A",
-            id,
-            `encoding: (too few directory scenarios ran: ${directoryRan} of E1-E11)`,
-          );
+          line("N/A", id, `encoding: (too few directory scenarios ran: ${directoryRan} of E1-E11)`);
         } else if (n === 0) {
           line(
             "PASS",
             id,
-            `encoding: 0 DirectoryRejectedErrors (and no directory 400 naming a mismatch or signature) over ${directoryRan} scenarios of E1-E11`,
+            `encoding: 0 DirectoryRejectedErrors (and no directory 400 naming a mismatch or signature) over ${directoryRan} scenarios of E1-E11`
           );
         } else {
           failed++;
           line(
             "FAIL",
             id,
-            `encoding: ${n} directory rejection(s) over E1-E11: ${ctx.directoryRejections.slice(0, 3).join(" | ")}`,
+            `encoding: ${n} directory rejection(s) over E1-E11: ${ctx.directoryRejections.slice(0, 3).join(" | ")}`
           );
         }
       }
     }
   } finally {
     const res = await cleanupAll(ctx);
-    for (const p of res.failed) console.log(`WARN cleanup: ${p}`);
+    for (const p of res.failed) console.info(`WARN cleanup: ${p}`);
     if (res.failed.length > 0) {
       failed++;
-      line(
-        "FAIL",
-        "cleanup",
-        `cleanup: ${res.failed.length} account(s) could not be deleted`,
-      );
+      line("FAIL", "cleanup", `cleanup: ${res.failed.length} account(s) could not be deleted`);
     } else {
       line(
         "PASS",
         "cleanup",
         res.leftBehind > 0
           ? `cleanup: ${res.deleted} deleted, ${res.leftBehind} left behind (bulk cleanup skipped)`
-          : "cleanup: every account the suite created was deleted",
+          : "cleanup: every account the suite created was deleted"
       );
     }
-    console.log(
-      `cleanup summary: ${res.deleted} deleted, ${res.failed.length} failed, ${res.leftBehind} left behind (bulk cleanup skipped)`,
+    console.info(
+      `cleanup summary: ${res.deleted} deleted, ${res.failed.length} failed, ${res.leftBehind} left behind (bulk cleanup skipped)`
     );
     if ((ctx.shared.e15Unknown ?? 0) > 0 && !ran.has("E17")) {
-      console.log(
-        `note: E15 made ${ctx.shared.e15Unknown} unknown-email sub-orgs; they stay DIMO-rooted until the next sweep because E17 did not run`,
+      console.info(
+        `note: E15 made ${ctx.shared.e15Unknown} unknown-email sub-orgs; they stay DIMO-rooted until the next sweep because E17 did not run`
       );
     }
   }
-  console.log(failed === 0 ? "e2e: no FAIL" : `e2e: ${failed} FAIL`);
+  console.info(failed === 0 ? "e2e: no FAIL" : `e2e: ${failed} FAIL`);
   process.exit(failed === 0 ? 0 : 1);
 }
 

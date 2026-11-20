@@ -2,14 +2,13 @@ import { AccountSdkError } from "./core/errors.js";
 
 export {
   AccountSdkError,
-  PolicyError,
   EncodingError,
-  type PolicyErrorCode,
   type EncodingErrorCode,
+  PolicyError,
+  type PolicyErrorCode,
 } from "./core/errors.js";
 
-const describe = (cause: unknown): string =>
-  cause instanceof Error ? cause.message : String(cause);
+const describe = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause));
 
 /** The service a request went to. */
 export type SdkService = "accounts" | "dauth" | "directory";
@@ -124,9 +123,7 @@ export class SigninError extends AccountSdkError {
 }
 
 /** Retry-After as whole seconds. An HTTP-date, a negative or any other value is ignored (undefined). */
-export function parseRetryAfter(
-  header: string | null | undefined,
-): number | undefined {
+export function parseRetryAfter(header: string | null | undefined): number | undefined {
   const h = header?.trim();
   return h !== undefined && /^\d+$/.test(h) ? Number(h) : undefined;
 }
@@ -141,17 +138,11 @@ export function parseRetryAfter(
 export class AccountsError extends AccountSdkError {
   readonly status: number;
   readonly retryAfterSeconds?: number;
-  constructor(
-    code: string,
-    status: number,
-    message: string,
-    retryAfterSeconds?: number,
-  ) {
+  constructor(code: string, status: number, message: string, retryAfterSeconds?: number) {
     super(code, `${code}: ${message}`);
     this.name = "AccountsError";
     this.status = status;
-    if (retryAfterSeconds !== undefined)
-      this.retryAfterSeconds = retryAfterSeconds;
+    if (retryAfterSeconds !== undefined) this.retryAfterSeconds = retryAfterSeconds;
   }
 
   /** Read a non-ok accounts response into an AccountsError (tolerates non-JSON bodies). */
@@ -169,12 +160,7 @@ export class AccountsError extends AccountSdkError {
     } catch {
       /* non-JSON body */
     }
-    return new AccountsError(
-      code,
-      res.status,
-      message,
-      parseRetryAfter(res.headers.get("retry-after")),
-    );
+    return new AccountsError(code, res.status, message, parseRetryAfter(res.headers.get("retry-after")));
   }
 }
 
@@ -234,7 +220,7 @@ export class UserOperationPendingError extends AccountSdkError {
     super(
       "user_operation_pending",
       `UserOp ${userOpHash} submitted via ${provider} but not confirmed: ${describe(cause)}`,
-      { cause },
+      { cause }
     );
     this.name = "UserOperationPendingError";
     this.userOpHash = userOpHash;
@@ -257,16 +243,11 @@ export class UserOperationUnknownError extends AccountSdkError {
   readonly provider: string;
   /** The op's full EntryPoint nonce (key in the high 192 bits, sequence in the low 64). */
   readonly nonce: bigint;
-  constructor(
-    userOpHash: `0x${string}`,
-    provider: string,
-    nonce: bigint,
-    cause: unknown,
-  ) {
+  constructor(userOpHash: `0x${string}`, provider: string, nonce: bigint, cause: unknown) {
     super(
       "user_operation_unknown",
       `UserOp ${userOpHash} (nonce ${nonce}) sent via ${provider} with an unknown outcome: ${brief(cause)}`,
-      { cause },
+      { cause }
     );
     this.name = "UserOperationUnknownError";
     this.userOpHash = userOpHash;
@@ -280,15 +261,8 @@ export class UserOperationRevertedError extends AccountSdkError {
   readonly userOpHash: `0x${string}`;
   readonly provider: string;
   readonly reason: string | undefined;
-  constructor(
-    userOpHash: `0x${string}`,
-    provider: string,
-    reason: string | undefined,
-  ) {
-    super(
-      "user_operation_reverted",
-      `UserOp ${userOpHash} via ${provider} reverted: ${reason ?? "unknown reason"}`,
-    );
+  constructor(userOpHash: `0x${string}`, provider: string, reason: string | undefined) {
+    super("user_operation_reverted", `UserOp ${userOpHash} via ${provider} reverted: ${reason ?? "unknown reason"}`);
     this.name = "UserOperationRevertedError";
     this.userOpHash = userOpHash;
     this.provider = provider;
@@ -303,19 +277,14 @@ export class UserOperationRevertedError extends AccountSdkError {
  */
 export class SponsorshipError extends AccountSdkError {
   readonly provider: string;
-  constructor(
-    code: "not_sponsored" | "paymaster_not_allowed",
-    provider: string,
-    message: string,
-  ) {
+  constructor(code: "not_sponsored" | "paymaster_not_allowed", provider: string, message: string) {
     super(code, `${provider}: ${message}`);
     this.name = "SponsorshipError";
     this.provider = provider;
   }
 }
 
-export type GasProxyErrorCode =
-  "proxy_unauthorized" | "proxy_forbidden" | "proxy_rate_limited";
+export type GasProxyErrorCode = "proxy_unauthorized" | "proxy_forbidden" | "proxy_rate_limited";
 
 /**
  * The gas proxy refused the request for this session or DID (HTTP 401, 403 or 429), which
@@ -327,30 +296,18 @@ export class GasProxyError extends AccountSdkError {
   readonly status: 401 | 403 | 429;
   readonly provider: string;
   readonly retryAfterSeconds?: number;
-  constructor(
-    status: 401 | 403 | 429,
-    provider: string,
-    retryAfterSeconds?: number,
-    options?: { cause?: unknown },
-  ) {
+  constructor(status: 401 | 403 | 429, provider: string, retryAfterSeconds?: number, options?: { cause?: unknown }) {
     super(
-      status === 401
-        ? "proxy_unauthorized"
-        : status === 403
-          ? "proxy_forbidden"
-          : "proxy_rate_limited",
+      status === 401 ? "proxy_unauthorized" : status === 403 ? "proxy_forbidden" : "proxy_rate_limited",
       `gas proxy (${provider}) answered HTTP ${status}${
-        retryAfterSeconds === undefined
-          ? ""
-          : `; retry after ${retryAfterSeconds}s`
+        retryAfterSeconds === undefined ? "" : `; retry after ${retryAfterSeconds}s`
       }`,
-      options,
+      options
     );
     this.name = "GasProxyError";
     this.status = status;
     this.provider = provider;
-    if (retryAfterSeconds !== undefined)
-      this.retryAfterSeconds = retryAfterSeconds;
+    if (retryAfterSeconds !== undefined) this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -361,14 +318,9 @@ function brief(cause: unknown): string {
     shortMessage?: unknown;
     status?: unknown;
   } | null;
-  const base =
-    typeof e?.shortMessage === "string"
-      ? e.shortMessage
-      : describe(cause).split("\n")[0]!;
-  const text =
-    typeof e?.status === "number" ? `${base} (HTTP ${e.status})` : base;
-  const name =
-    cause instanceof Error && typeof e?.name === "string" ? `${e.name}: ` : "";
+  const base = typeof e?.shortMessage === "string" ? e.shortMessage : describe(cause).split("\n")[0]!;
+  const text = typeof e?.status === "number" ? `${base} (HTTP ${e.status})` : base;
+  const name = cause instanceof Error && typeof e?.name === "string" ? `${e.name}: ` : "";
   return `${name}${text}`.replace(/https?:\/\/\S+/g, "<url>").slice(0, 200);
 }
 
@@ -385,7 +337,7 @@ export class ProvidersExhaustedError extends AccountSdkError {
       "providers_exhausted",
       `all gas providers failed: ${errors
         .map((e, i) => `${providers[i] ?? `provider ${i + 1}`}: ${brief(e)}`)
-        .join("; ")}`,
+        .join("; ")}`
     );
     this.name = "ProvidersExhaustedError";
     this.errors = errors;

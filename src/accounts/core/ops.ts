@@ -2,11 +2,7 @@ import { PolicyError } from "./errors.js";
 import { assertPersonDid } from "./policy.js";
 import type { UnsignedOperation } from "./types.js";
 
-export function buildGenesis(args: {
-  walletKey: string;
-  signingKey?: string;
-  alias?: string;
-}): UnsignedOperation {
+export function buildGenesis(args: { walletKey: string; signingKey?: string; alias?: string }): UnsignedOperation {
   const verificationMethods: Record<string, string> = {};
   if (args.signingKey) verificationMethods.signing = args.signingKey;
   verificationMethods.wallet = args.walletKey;
@@ -24,8 +20,7 @@ export function buildGenesis(args: {
 
 function walletOf(head: UnsignedOperation): string {
   const wallet = head.verificationMethods.wallet;
-  if (!wallet)
-    throw new PolicyError("wallet_required", "head has no wallet key");
+  if (!wallet) throw new PolicyError("wallet_required", "head has no wallet key");
   return wallet;
 }
 
@@ -36,11 +31,7 @@ function assertHead(head: UnsignedOperation): string {
   return wallet;
 }
 
-function next(
-  head: UnsignedOperation,
-  prevCid: string,
-  patch: Partial<UnsignedOperation>,
-): UnsignedOperation {
+function next(head: UnsignedOperation, prevCid: string, patch: Partial<UnsignedOperation>): UnsignedOperation {
   const wallet = assertHead(head);
   const op: UnsignedOperation = {
     type: "plc_operation",
@@ -66,15 +57,12 @@ export function buildAddKey(
   head: UnsignedOperation,
   prevCid: string,
   didKey: string,
-  fragment?: string,
+  fragment?: string
 ): { op: UnsignedOperation; fragment: string } {
   assertHead(head);
   const frag = fragment ?? freeFragment(head.verificationMethods);
   if (Object.hasOwn(head.verificationMethods, frag)) {
-    throw new PolicyError(
-      "fragment_invalid",
-      `fragment already exists: ${frag}`,
-    );
+    throw new PolicyError("fragment_invalid", `fragment already exists: ${frag}`);
   }
   const op = next(head, prevCid, {
     verificationMethods: { ...head.verificationMethods, [frag]: didKey },
@@ -82,17 +70,9 @@ export function buildAddKey(
   return { op, fragment: frag };
 }
 
-export function buildRemoveKey(
-  head: UnsignedOperation,
-  prevCid: string,
-  fragment: string,
-): UnsignedOperation {
+export function buildRemoveKey(head: UnsignedOperation, prevCid: string, fragment: string): UnsignedOperation {
   assertHead(head);
-  if (fragment === "wallet")
-    throw new PolicyError(
-      "wallet_required",
-      "the wallet key cannot be removed",
-    );
+  if (fragment === "wallet") throw new PolicyError("wallet_required", "the wallet key cannot be removed");
   if (!Object.hasOwn(head.verificationMethods, fragment)) {
     throw new PolicyError("fragment_invalid", `no such fragment: ${fragment}`);
   }
@@ -101,11 +81,7 @@ export function buildRemoveKey(
   return next(head, prevCid, { verificationMethods: rest });
 }
 
-export function buildSetAliases(
-  head: UnsignedOperation,
-  prevCid: string,
-  aliases: string[],
-): UnsignedOperation {
+export function buildSetAliases(head: UnsignedOperation, prevCid: string, aliases: string[]): UnsignedOperation {
   return next(head, prevCid, { alsoKnownAs: [...aliases] });
 }
 

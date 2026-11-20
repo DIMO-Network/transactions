@@ -37,12 +37,7 @@ export function unboundFetch(cfg: { fetchImpl?: typeof fetch }): typeof fetch {
 }
 
 /** Send a request; a rejected fetch becomes a NetworkError for `service`. */
-export async function send(
-  f: typeof fetch,
-  service: SdkService,
-  url: string,
-  init?: RequestInit,
-): Promise<Response> {
+export async function send(f: typeof fetch, service: SdkService, url: string, init?: RequestInit): Promise<Response> {
   try {
     return await f(url, init);
   } catch (cause) {

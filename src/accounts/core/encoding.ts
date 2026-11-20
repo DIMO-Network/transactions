@@ -1,6 +1,7 @@
 import { encode as cborEncode } from "@ipld/dag-cbor";
-import { base32nopad, base58 } from "@scure/base";
 import { sha256 } from "@noble/hashes/sha2.js";
+import { base32nopad, base58 } from "@scure/base";
+
 import { EncodingError } from "./errors.js";
 import type { Operation, UnsignedOperation } from "./types.js";
 
@@ -9,7 +10,7 @@ const enc = new TextEncoder();
 const loneSurrogate = (s: string, i: number): EncodingError =>
   new EncodingError(
     "lone_surrogate",
-    `lone UTF-16 surrogate at index ${i} of ${JSON.stringify(s)}: Go would re-marshal it as U+FFFD, so the signature could never verify`,
+    `lone UTF-16 surrogate at index ${i} of ${JSON.stringify(s)}: Go would re-marshal it as U+FFFD, so the signature could never verify`
   );
 
 // Go json.Marshal string escaping (HTML escaping on). A JS string can hold a lone
@@ -27,14 +28,7 @@ function goString(s: string): string {
     else if (c === 0x09) out += "\\t";
     else if (c === 0x08) out += "\\b";
     else if (c === 0x0c) out += "\\f";
-    else if (
-      c < 0x20 ||
-      c === 0x3c ||
-      c === 0x3e ||
-      c === 0x26 ||
-      c === 0x2028 ||
-      c === 0x2029
-    ) {
+    else if (c < 0x20 || c === 0x3c || c === 0x3e || c === 0x26 || c === 0x2028 || c === 0x2029) {
       out += "\\u" + c.toString(16).padStart(4, "0");
     } else if (c >= 0xd800 && c <= 0xdbff) {
       const d = s.charCodeAt(i + 1);
@@ -81,14 +75,7 @@ export function encodeSigningPayload(op: UnsignedOperation): Uint8Array {
     sortedKeys(op.services)
       .map((k) => {
         const s = op.services[k]!;
-        return (
-          goString(k) +
-          ':{"type":' +
-          goString(s.type) +
-          ',"endpoint":' +
-          goString(s.endpoint) +
-          "}"
-        );
+        return goString(k) + ':{"type":' + goString(s.type) + ',"endpoint":' + goString(s.endpoint) + "}";
       })
       .join(",") +
     "}";

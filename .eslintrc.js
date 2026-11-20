@@ -71,5 +71,25 @@ module.exports = {
         "@typescript-eslint/no-explicit-any": "off",
       },
     },
+    {
+      // @dimo-network/transactions/accounts/core must load no signer or chain code
+      // (scripts/check-dist.mjs checks the built output too).
+      files: ["src/accounts/core/**/*.ts"],
+      rules: {
+        "no-restricted-imports": [
+          "error",
+          {
+            patterns: [
+              {
+                group: ["@turnkey/*", "viem", "viem/*", "@zerodev/*"],
+                message: "src/accounts/core must stay free of signer/chain dependencies.",
+              },
+            ],
+            paths: [{ name: "fetch", message: "src/accounts/core must not use fetch." }],
+          },
+        ],
+        "no-restricted-globals": ["error", { name: "fetch", message: "src/accounts/core must not use fetch." }],
+      },
+    },
   ],
 };

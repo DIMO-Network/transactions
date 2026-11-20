@@ -1,5 +1,6 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { base64url } from "@scure/base";
+
 import { UsageError } from "../errors.js";
 import { assertP256SigningPair } from "../signers/webcrypto.js";
 
@@ -40,11 +41,7 @@ export interface WebCryptoDpopKey extends DpopKey {
 
 /** Generate a non-extractable WebCrypto ECDSA P-256 DPoP key. */
 export async function generateDpopKey(): Promise<WebCryptoDpopKey> {
-  const pair = await crypto.subtle.generateKey(
-    { name: "ECDSA", namedCurve: "P-256" },
-    false,
-    ["sign", "verify"],
-  );
+  const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, false, ["sign", "verify"]);
   return dpopKeyFromKeyPair(pair);
 }
 
@@ -54,14 +51,9 @@ export async function generateDpopKey(): Promise<WebCryptoDpopKey> {
  * P-256 with a non-extractable private key that can sign and a public key that matches it
  * (checked by signing and verifying once); null, undefined and malformed input included.
  */
-export async function dpopKeyFromKeyPair(
-  pair: CryptoKeyPair,
-): Promise<WebCryptoDpopKey> {
+export async function dpopKeyFromKeyPair(pair: CryptoKeyPair): Promise<WebCryptoDpopKey> {
   await assertP256SigningPair(pair, "dpop_key_invalid", "DPoP key pair");
-  const exported = (await crypto.subtle.exportKey(
-    "jwk",
-    pair.publicKey,
-  )) as JsonWebKey;
+  const exported = (await crypto.subtle.exportKey("jwk", pair.publicKey)) as JsonWebKey;
   const jwk: DpopJwk = {
     kty: "EC",
     crv: "P-256",
@@ -75,11 +67,7 @@ export async function dpopKeyFromKeyPair(
     thumbprint: async () => jkt,
     sign: async (data) =>
       new Uint8Array(
-        await crypto.subtle.sign(
-          { name: "ECDSA", hash: "SHA-256" },
-          pair.privateKey,
-          data as BufferSource,
-        ),
+        await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, pair.privateKey, data as BufferSource)
       ),
   };
 }
@@ -93,16 +81,8 @@ export function normalizeHtu(raw: string): string {
 /** The key's public JWK reduced to exactly {kty, crv, x, y}; rejects non EC/P-256 keys. */
 export async function publicJwk(key: DpopKey): Promise<DpopJwk> {
   const j = (await key.jwk()) as unknown as Record<string, unknown>;
-  if (
-    j.kty !== "EC" ||
-    j.crv !== "P-256" ||
-    typeof j.x !== "string" ||
-    typeof j.y !== "string"
-  ) {
-    throw new UsageError(
-      "dpop_key_invalid",
-      "DPoP key must be an EC P-256 JWK with x and y",
-    );
+  if (j.kty !== "EC" || j.crv !== "P-256" || typeof j.x !== "string" || typeof j.y !== "string") {
+    throw new UsageError("dpop_key_invalid", "DPoP key must be an EC P-256 JWK with x and y");
   }
   return { kty: "EC", crv: "P-256", x: j.x, y: j.y };
 }
@@ -113,7 +93,7 @@ export async function createDpopProof(
   method: string,
   url: string,
   accessToken?: string,
-  now: Date = new Date(),
+  now: Date = new Date()
 ): Promise<string> {
   const jwk = await publicJwk(key);
   const header = { typ: "dpop+jwt", alg: "ES256", jwk };
@@ -129,7 +109,7 @@ export async function createDpopProof(
   if (sig.length !== 64) {
     throw new UsageError(
       "dpop_key_invalid",
-      `DpopKey.sign must return a raw 64-byte r||s signature, got ${sig.length} bytes (DER?)`,
+      `DpopKey.sign must return a raw 64-byte r||s signature, got ${sig.length} bytes (DER?)`
     );
   }
   return `${signingInput}.${b64u(sig)}`;

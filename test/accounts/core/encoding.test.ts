@@ -1,14 +1,15 @@
-import { describe, expect, it } from "vitest";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import vectors from "../fixtures/did-ops.json";
+import { describe, expect, it } from "vitest";
+
 import {
   AccountSdkError,
-  EncodingError,
   deriveDid,
   encodeOperationCbor,
   encodeSigningPayload,
+  EncodingError,
   type UnsignedOperation,
 } from "../../../src/accounts/core/index.js";
+import vectors from "../fixtures/did-ops.json";
 
 const cases = vectors.cases as unknown as {
   name: string;
@@ -56,7 +57,7 @@ describe("encodeSigningPayload Go edge cases", () => {
         ...cases[0]!.unsigned,
         alsoKnownAs: [aka],
         ...(vm ? { verificationMethods: vm } : {}),
-      }),
+      })
     );
   it("writes backspace and form feed as \\b and \\f", () => {
     expect(str("a\bb\fc")).toContain('"a\\bb\\fc"');
@@ -78,14 +79,12 @@ describe("encodeSigningPayload Go edge cases", () => {
   });
   it("refuses a lone surrogate in map keys and services too", () => {
     const u = cases[0]!.unsigned;
-    expect(() =>
-      encodeSigningPayload({ ...u, verificationMethods: { "\ud800": "x" } }),
-    ).toThrow(EncodingError);
+    expect(() => encodeSigningPayload({ ...u, verificationMethods: { "\ud800": "x" } })).toThrow(EncodingError);
     expect(() =>
       encodeSigningPayload({
         ...u,
         services: { a: { type: "t", endpoint: "\udc00" } },
-      }),
+      })
     ).toThrow(EncodingError);
   });
   it("orders astral vs BMP map keys by UTF-8 bytes (not UTF-16 units)", () => {
@@ -111,14 +110,11 @@ describe("deriveDid", () => {
 });
 
 describe("encodeSigningPayload field order independence", () => {
-  const rev = <T>(
-    o: Record<string, T>,
-    f: (v: T) => T = (v) => v,
-  ): Record<string, T> =>
+  const rev = <T>(o: Record<string, T>, f: (v: T) => T = (v) => v): Record<string, T> =>
     Object.fromEntries(
       Object.entries(o)
         .reverse()
-        .map(([k, v]) => [k, f(v)]),
+        .map(([k, v]) => [k, f(v)])
     );
   it.each(cases)("shuffled key order gives identical bytes: $name", (c) => {
     const u = c.unsigned;
@@ -128,8 +124,6 @@ describe("encodeSigningPayload field order independence", () => {
       services: rev(u.services, (s) => rev(s) as typeof s),
     }) as unknown as UnsignedOperation;
     expect(Object.keys(shuffled)).not.toEqual(Object.keys(u));
-    expect(bytesToHex(encodeSigningPayload(shuffled))).toBe(
-      (c as unknown as { payloadHex: string }).payloadHex,
-    );
+    expect(bytesToHex(encodeSigningPayload(shuffled))).toBe((c as unknown as { payloadHex: string }).payloadHex);
   });
 });

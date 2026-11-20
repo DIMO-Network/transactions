@@ -1,4 +1,5 @@
 import { keccak_256 } from "@noble/hashes/sha3.js";
+
 import { EncodingError } from "./errors.js";
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
@@ -11,10 +12,7 @@ function toHex(b: Uint8Array): string {
 /** EIP-55 checksum form of a 20-byte hex address (input case is ignored). */
 export function toChecksumAddress(address: string): `0x${string}` {
   if (!ADDRESS.test(address)) {
-    throw new EncodingError(
-      "address_invalid",
-      `not a 20-byte hex address: ${JSON.stringify(address)}`,
-    );
+    throw new EncodingError("address_invalid", `not a 20-byte hex address: ${JSON.stringify(address)}`);
   }
   const lower = address.slice(2).toLowerCase();
   const hash = toHex(keccak_256(enc.encode(lower)));

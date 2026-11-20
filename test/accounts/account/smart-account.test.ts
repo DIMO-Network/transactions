@@ -1,26 +1,31 @@
-import { describe, expect, it, vi } from "vitest";
+import { getKernelAddressFromECDSA } from "@zerodev/ecdsa-validator";
+import { constants, KernelFactoryStakerAbi } from "@zerodev/sdk";
+import { getEntryPoint, KERNEL_V3_1 } from "@zerodev/sdk/constants";
 import {
   concatHex,
   decodeFunctionData,
   encodeAbiParameters,
   encodeErrorResult,
-  keccak256,
   getContractAddress,
+  type Hex,
+  keccak256,
   parseAbi,
   toHex,
   zeroAddress,
-  type Hex,
 } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
 import {
   entryPoint07Address,
   formatUserOperation,
   getUserOperationHash,
   type RpcUserOperation,
 } from "viem/account-abstraction";
-import { getEntryPoint, KERNEL_V3_1 } from "@zerodev/sdk/constants";
-import { constants, KernelFactoryStakerAbi } from "@zerodev/sdk";
-import { getKernelAddressFromECDSA } from "@zerodev/ecdsa-validator";
+import { privateKeyToAccount } from "viem/accounts";
+import { describe, expect, it, vi } from "vitest";
+
+import { deploySmartAccount, sendUserOperation } from "../../../src/accounts/account/smart-account.js";
+import { generateDpopKey } from "../../../src/accounts/auth/dpop.js";
+import type { Session } from "../../../src/accounts/auth/signin.js";
+import type { SdkConfig } from "../../../src/accounts/config.js";
 import {
   GasProxyError,
   ProvidersExhaustedError,
@@ -31,27 +36,16 @@ import {
   UserOperationRevertedError,
   UserOperationUnknownError,
 } from "../../../src/accounts/errors.js";
-import { generateDpopKey } from "../../../src/accounts/auth/dpop.js";
 import { strictReceiver } from "../helpers.js";
-import type { Session } from "../../../src/accounts/auth/signin.js";
-import type { SdkConfig } from "../../../src/accounts/config.js";
-import {
-  deploySmartAccount,
-  sendUserOperation,
-} from "../../../src/accounts/account/smart-account.js";
 
 const CHAIN_ID = 80002;
 const PAYMASTER = "0x0000000000000000000000000000000000000abc";
 const ACCOUNTS = "https://accounts.test";
 const RPC = "https://rpc.test/polygon-amoy";
-const wallet = privateKeyToAccount(
-  "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d",
-);
+const wallet = privateKeyToAccount("0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d");
 
 const sigAbi = parseAbi(["function getSenderAddress(bytes initCode)"]);
-const nonceAbi = parseAbi([
-  "function getNonce(address sender, uint192 key) view returns (uint256)",
-]);
+const nonceAbi = parseAbi(["function getNonce(address sender, uint192 key) view returns (uint256)"]);
 
 /** Emulates the real kernel factory: address = CREATE2(factory, keccak(initData ++ salt), initCodeHash). */
 function counterfactualFromCalldata(calldata: Hex): Hex {
@@ -63,9 +57,7 @@ function counterfactualFromCalldata(calldata: Hex): Hex {
     data: metaFactoryCall,
   });
   const [factory, initData, salt] = dwf as [Hex, Hex, Hex];
-  const impl =
-    constants.KernelVersionToAddressesMap[KERNEL_V3_1]
-      .accountImplementationAddress;
+  const impl = constants.KernelVersionToAddressesMap[KERNEL_V3_1].accountImplementationAddress;
   const initCodeHash = keccak256(
     concatHex([
       "0x603d3d8160223d3973",
@@ -73,7 +65,7 @@ function counterfactualFromCalldata(calldata: Hex): Hex {
       "0x6009",
       "0x5155f3363d3d373d3d363d7f360894a13ba1a3210667c828492db98dca3e2076",
       "0xcc3735a920a3ca505d382bbc545af43d6000803e6038573d6000fd5b3d6000f3",
-    ]),
+    ])
   );
   return getContractAddress({
     bytecodeHash: initCodeHash,
@@ -133,7 +125,7 @@ function harness(
     rpcChainId?: number;
     /** What EntryPoint.getNonce returns. Defaults to key << 64. */
     chainNonce?: bigint;
-  } = {},
+  } = {}
 ) {
   const calls: Call[] = [];
   /** Every eth_sendUserOperation that reached a bundler, with the hash it computes. */
@@ -146,184 +138,166 @@ function harness(
   /** The key of every EntryPoint.getNonce read. */
   const nonceKeys: bigint[] = [];
   let sentSender: Hex | undefined;
-  const fetchImpl = vi.fn(
-    async (input: string | URL | Request, init?: RequestInit) => {
-      const url = String(input);
-      const body = JSON.parse(String(init?.body ?? "{}"));
-      const headers = new Headers(init?.headers);
-      calls.push({ url, method: body.method, params: body.params, headers });
-      const ok = (result: unknown) =>
-        new Response(JSON.stringify({ jsonrpc: "2.0", id: body.id, result }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
-      const rpcErr = (code: number, message: string, data?: unknown) =>
-        new Response(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            id: body.id,
-            error: { code, message, data },
-          }),
-          { status: 200, headers: { "content-type": "application/json" } },
-        );
-
-      if (url === RPC) {
-        switch (body.method) {
-          case "eth_chainId":
-            return ok(toHex(opts.rpcChainId ?? CHAIN_ID));
-          case "eth_getCode":
-            return ok(opts.deployed ? "0x6001" : "0x");
-          case "eth_call": {
-            const data = body.params[0].data ?? body.params[0].input;
-            if (String(data).startsWith("0x9b249f69")) {
-              // EntryPoint.getSenderAddress -> reverts with SenderAddressResult(address)
-              const addr = counterfactualFromCalldata(data);
-              return rpcErr(
-                3,
-                "execution reverted",
-                encodeErrorResult({
-                  abi: [
-                    {
-                      type: "error",
-                      name: "SenderAddressResult",
-                      inputs: [{ name: "sender", type: "address" }],
-                    },
-                  ],
-                  errorName: "SenderAddressResult",
-                  args: [addr],
-                }),
-              );
-            }
-            // EntryPoint.getNonce(sender, key) -> key << 64 | sequence 0, as the EntryPoint does.
-            const { args: nonceArgs } = decodeFunctionData({
-              abi: nonceAbi,
-              data,
-            });
-            nonceKeys.push(nonceArgs[1]);
-            return ok(
-              encodeAbiParameters(
-                [{ type: "uint256" }],
-                [opts.chainNonce ?? nonceArgs[1] << 64n],
-              ),
-            );
-          }
-          default:
-            return rpcErr(-32601, `unexpected chain method ${body.method}`);
-        }
-      }
-
-      const m = url.match(
-        /^https:\/\/accounts\.test\/api\/v2\/bundler\/(\d+)\/(\w+)$/,
+  const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    const body = JSON.parse(String(init?.body ?? "{}"));
+    const headers = new Headers(init?.headers);
+    calls.push({ url, method: body.method, params: body.params, headers });
+    const ok = (result: unknown) =>
+      new Response(JSON.stringify({ jsonrpc: "2.0", id: body.id, result }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    const rpcErr = (code: number, message: string, data?: unknown) =>
+      new Response(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: body.id,
+          error: { code, message, data },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } }
       );
-      if (!m) throw new Error(`unexpected url ${url}`);
-      const provider = m[2]!;
-      const http = opts.proxyHttp?.[provider];
-      if (http) {
-        return new Response(
-          JSON.stringify({ error: { code: "x", message: "m" } }),
-          {
-            status: http.status,
-            headers: http.headers,
-          },
-        );
-      }
-      if (
-        opts.failProviders?.includes(provider) &&
-        body.method === "zd_sponsorUserOperation"
-      ) {
-        return rpcErr(-32000, `${provider} down`);
-      }
+
+    if (url === RPC) {
       switch (body.method) {
-        case "zd_getUserOperationGasPrice":
-          return ok({
-            slow: { maxFeePerGas: "0x1", maxPriorityFeePerGas: "0x1" },
-            standard: { maxFeePerGas: "0x2", maxPriorityFeePerGas: "0x1" },
-            fast: { maxFeePerGas: "0x3", maxPriorityFeePerGas: "0x1" },
-          });
-        case "zd_sponsorUserOperation": {
-          sentSender = body.params[0].userOp.sender;
-          const base: Sponsorship = {
-            callGasLimit: "0x10000",
-            verificationGasLimit: "0x20000",
-            preVerificationGas: "0x5000",
-            paymaster: PAYMASTER,
-            paymasterVerificationGasLimit: "0x8000",
-            paymasterPostOpGasLimit: "0x8000",
-            paymasterData: `0x${provider.length.toString(16).padStart(2, "0")}`,
-          };
-          return ok(opts.sponsor?.[provider]?.(base) ?? base);
-        }
-        case "eth_estimateUserOperationGas":
-          return ok({
-            callGasLimit: "0x10000",
-            verificationGasLimit: "0x20000",
-            preVerificationGas: "0x5000",
-          });
-        case "eth_sendUserOperation": {
-          const hash = hashOf(body.params[0]);
-          sent.push({ provider, userOp: body.params[0], hash });
-          const fail = opts.sendFails?.[provider];
-          if (fail?.kept !== false) known.add(hash);
-          if (fail?.network) throw new TypeError("fetch failed");
-          if (fail?.rpcCode) return rpcErr(fail.rpcCode, "upstream timeout");
-          if (fail?.response) return fail.response();
-          if (fail?.hang) return hangingFetch(init, fail.hang);
-          if (fail?.status) {
-            return new Response(
-              JSON.stringify({ error: { code: "x", message: "m" } }),
-              { status: fail.status },
+        case "eth_chainId":
+          return ok(toHex(opts.rpcChainId ?? CHAIN_ID));
+        case "eth_getCode":
+          return ok(opts.deployed ? "0x6001" : "0x");
+        case "eth_call": {
+          const data = body.params[0].data ?? body.params[0].input;
+          if (String(data).startsWith("0x9b249f69")) {
+            // EntryPoint.getSenderAddress -> reverts with SenderAddressResult(address)
+            const addr = counterfactualFromCalldata(data);
+            return rpcErr(
+              3,
+              "execution reverted",
+              encodeErrorResult({
+                abi: [
+                  {
+                    type: "error",
+                    name: "SenderAddressResult",
+                    inputs: [{ name: "sender", type: "address" }],
+                  },
+                ],
+                errorName: "SenderAddressResult",
+                args: [addr],
+              })
             );
           }
-          return ok(hash);
-        }
-        case "eth_getUserOperationByHash": {
-          const hash = body.params[0] as Hex;
-          const op = sent.find((x) => x.hash === hash);
-          const found =
-            known.has(hash) && op
-              ? {
-                  userOperation: op.userOp,
-                  entryPoint: entryPoint07Address,
-                  blockNumber: null,
-                  blockHash: null,
-                  transactionHash: null,
-                }
-              : null;
-          const rewrite = opts.lookup?.[provider];
-          return ok(rewrite ? rewrite(found) : found);
-        }
-        case "eth_getUserOperationReceipt":
-          return ok({
-            userOpHash: body.params[0],
-            entryPoint: entryPoint07Address,
-            sender: sentSender ?? zeroAddress,
-            nonce: "0x0",
-            actualGasUsed: "0x1",
-            actualGasCost: "0x1",
-            success: true,
-            logs: [],
-            receipt: {
-              transactionHash: `0x${"cd".repeat(32)}`,
-              transactionIndex: "0x0",
-              blockHash: `0x${"ef".repeat(32)}`,
-              blockNumber: "0x1",
-              from: zeroAddress,
-              to: zeroAddress,
-              cumulativeGasUsed: "0x1",
-              gasUsed: "0x1",
-              contractAddress: null,
-              logs: [],
-              logsBloom: `0x${"00".repeat(256)}`,
-              status: "0x1",
-              effectiveGasPrice: "0x1",
-              type: "0x2",
-            },
+          // EntryPoint.getNonce(sender, key) -> key << 64 | sequence 0, as the EntryPoint does.
+          const { args: nonceArgs } = decodeFunctionData({
+            abi: nonceAbi,
+            data,
           });
+          nonceKeys.push(nonceArgs[1]);
+          return ok(encodeAbiParameters([{ type: "uint256" }], [opts.chainNonce ?? nonceArgs[1] << 64n]));
+        }
         default:
-          return rpcErr(-32601, `unexpected bundler method ${body.method}`);
+          return rpcErr(-32601, `unexpected chain method ${body.method}`);
       }
-    },
-  );
+    }
+
+    const m = url.match(/^https:\/\/accounts\.test\/api\/v2\/bundler\/(\d+)\/(\w+)$/);
+    if (!m) throw new Error(`unexpected url ${url}`);
+    const provider = m[2]!;
+    const http = opts.proxyHttp?.[provider];
+    if (http) {
+      return new Response(JSON.stringify({ error: { code: "x", message: "m" } }), {
+        status: http.status,
+        headers: http.headers,
+      });
+    }
+    if (opts.failProviders?.includes(provider) && body.method === "zd_sponsorUserOperation") {
+      return rpcErr(-32000, `${provider} down`);
+    }
+    switch (body.method) {
+      case "zd_getUserOperationGasPrice":
+        return ok({
+          slow: { maxFeePerGas: "0x1", maxPriorityFeePerGas: "0x1" },
+          standard: { maxFeePerGas: "0x2", maxPriorityFeePerGas: "0x1" },
+          fast: { maxFeePerGas: "0x3", maxPriorityFeePerGas: "0x1" },
+        });
+      case "zd_sponsorUserOperation": {
+        sentSender = body.params[0].userOp.sender;
+        const base: Sponsorship = {
+          callGasLimit: "0x10000",
+          verificationGasLimit: "0x20000",
+          preVerificationGas: "0x5000",
+          paymaster: PAYMASTER,
+          paymasterVerificationGasLimit: "0x8000",
+          paymasterPostOpGasLimit: "0x8000",
+          paymasterData: `0x${provider.length.toString(16).padStart(2, "0")}`,
+        };
+        return ok(opts.sponsor?.[provider]?.(base) ?? base);
+      }
+      case "eth_estimateUserOperationGas":
+        return ok({
+          callGasLimit: "0x10000",
+          verificationGasLimit: "0x20000",
+          preVerificationGas: "0x5000",
+        });
+      case "eth_sendUserOperation": {
+        const hash = hashOf(body.params[0]);
+        sent.push({ provider, userOp: body.params[0], hash });
+        const fail = opts.sendFails?.[provider];
+        if (fail?.kept !== false) known.add(hash);
+        if (fail?.network) throw new TypeError("fetch failed");
+        if (fail?.rpcCode) return rpcErr(fail.rpcCode, "upstream timeout");
+        if (fail?.response) return fail.response();
+        if (fail?.hang) return hangingFetch(init, fail.hang);
+        if (fail?.status) {
+          return new Response(JSON.stringify({ error: { code: "x", message: "m" } }), { status: fail.status });
+        }
+        return ok(hash);
+      }
+      case "eth_getUserOperationByHash": {
+        const hash = body.params[0] as Hex;
+        const op = sent.find((x) => x.hash === hash);
+        const found =
+          known.has(hash) && op
+            ? {
+                userOperation: op.userOp,
+                entryPoint: entryPoint07Address,
+                blockNumber: null,
+                blockHash: null,
+                transactionHash: null,
+              }
+            : null;
+        const rewrite = opts.lookup?.[provider];
+        return ok(rewrite ? rewrite(found) : found);
+      }
+      case "eth_getUserOperationReceipt":
+        return ok({
+          userOpHash: body.params[0],
+          entryPoint: entryPoint07Address,
+          sender: sentSender ?? zeroAddress,
+          nonce: "0x0",
+          actualGasUsed: "0x1",
+          actualGasCost: "0x1",
+          success: true,
+          logs: [],
+          receipt: {
+            transactionHash: `0x${"cd".repeat(32)}`,
+            transactionIndex: "0x0",
+            blockHash: `0x${"ef".repeat(32)}`,
+            blockNumber: "0x1",
+            from: zeroAddress,
+            to: zeroAddress,
+            cumulativeGasUsed: "0x1",
+            gasUsed: "0x1",
+            contractAddress: null,
+            logs: [],
+            logsBloom: `0x${"00".repeat(256)}`,
+            status: "0x1",
+            effectiveGasPrice: "0x1",
+            type: "0x2",
+          },
+        });
+      default:
+        return rpcErr(-32601, `unexpected bundler method ${body.method}`);
+    }
+  });
   const cfg: SdkConfig = {
     accountsUrl: ACCOUNTS,
     dauthUrl: "https://dauth.test",
@@ -359,10 +333,7 @@ const noopCall = [{ to: zeroAddress, value: 0n, data: "0x" as Hex }];
 function recordTimers() {
   const real = globalThis.setTimeout;
   const timers: { ms: number | undefined; fn: () => void }[] = [];
-  const spy = vi.spyOn(globalThis, "setTimeout").mockImplementation(((
-    fn: () => void,
-    ms?: number,
-  ) => {
+  const spy = vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void, ms?: number) => {
     timers.push({ ms, fn });
     return real(fn, ms);
   }) as unknown as typeof setTimeout);
@@ -372,28 +343,20 @@ function recordTimers() {
 /** A fetch that only settles when its signal aborts (then like a real fetch: AbortError). */
 const hangingFetch = (init: RequestInit | undefined, onStart: () => void) =>
   new Promise<Response>((_, reject) => {
-    init?.signal?.addEventListener("abort", () =>
-      reject(new DOMException("aborted", "AbortError")),
-    );
+    init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
     onStart();
   });
 
 /** An HTTP 200 carrying a JSON-RPC error, as the proxy and bundlers send them. */
 const json200Error = (id: unknown, code: number, message: string) =>
-  new Response(
-    JSON.stringify({ jsonrpc: "2.0", id, error: { code, message } }),
-    {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    },
-  );
+  new Response(JSON.stringify({ jsonrpc: "2.0", id, error: { code, message } }), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
 const isProxy = (c: Call) => c.url.startsWith(`${ACCOUNTS}/api/v2/bundler/`);
 
 describe("gas proxy failures that are per DID", () => {
-  const run = async (
-    h: ReturnType<typeof harness>,
-    over: { scopes?: string[] } = {},
-  ) => {
+  const run = async (h: ReturnType<typeof harness>, over: { scopes?: string[] } = {}) => {
     const { account, signMessage } = spySigner();
     const sess = {
       ...(await session()),
@@ -412,17 +375,14 @@ describe("gas proxy failures that are per DID", () => {
   it.each([
     [401, "proxy_unauthorized"],
     [403, "proxy_forbidden"],
-  ])(
-    "HTTP %i is fatal: no next provider, nothing signed",
-    async (status, code) => {
-      const h = harness({ proxyHttp: { alchemy: { status } } });
-      const { err, signMessage } = await run(h);
-      expect(err).toBeInstanceOf(GasProxyError);
-      expect(err).toMatchObject({ code, status, provider: "alchemy" });
-      expect(h.calls.some((c) => c.url.endsWith("/gelato"))).toBe(false);
-      expect(signMessage).not.toHaveBeenCalled();
-    },
-  );
+  ])("HTTP %i is fatal: no next provider, nothing signed", async (status, code) => {
+    const h = harness({ proxyHttp: { alchemy: { status } } });
+    const { err, signMessage } = await run(h);
+    expect(err).toBeInstanceOf(GasProxyError);
+    expect(err).toMatchObject({ code, status, provider: "alchemy" });
+    expect(h.calls.some((c) => c.url.endsWith("/gelato"))).toBe(false);
+    expect(signMessage).not.toHaveBeenCalled();
+  });
 
   it("HTTP 429 is a typed error with Retry-After, sent once (no viem retries)", async () => {
     const h = harness({
@@ -481,7 +441,7 @@ describe("gas proxy failures that are per DID", () => {
       status: 503,
     });
     expect(new ProvidersExhaustedError([e], ["alchemy"]).message).toContain(
-      "HttpRequestError: HTTP request failed. (HTTP 503)",
+      "HttpRequestError: HTTP request failed. (HTTP 503)"
     );
   });
 });
@@ -506,8 +466,7 @@ describe("smart account through the gas proxy", () => {
       expect(c.headers.get("dpop")).toBeTruthy();
     }
     // report the methods the flow sends through the proxy
-    expect([...new Set(proxy.map((c) => c.method))].sort())
-      .toMatchInlineSnapshot(`
+    expect([...new Set(proxy.map((c) => c.method))].sort()).toMatchInlineSnapshot(`
       [
         "eth_sendUserOperation",
         "zd_getUserOperationGasPrice",
@@ -541,17 +500,14 @@ describe("smart account through the gas proxy", () => {
     const base = cfg.fetchImpl!;
     cfg.fetchImpl = (async (u: string | URL | Request, i?: RequestInit) => {
       const body = JSON.parse(String(i?.body ?? "{}"));
-      if (
-        String(u).endsWith("/gelato") &&
-        body.method === "eth_sendUserOperation"
-      ) {
+      if (String(u).endsWith("/gelato") && body.method === "eth_sendUserOperation") {
         return new Response(
           JSON.stringify({
             jsonrpc: "2.0",
             id: body.id,
             error: { code: -32000, message: "gelato send failed" },
           }),
-          { status: 200, headers: { "content-type": "application/json" } },
+          { status: 200, headers: { "content-type": "application/json" } }
         );
       }
       return base(u, i);
@@ -569,9 +525,7 @@ describe("smart account through the gas proxy", () => {
     const proxyUrls = calls.filter(isProxy).map((c) => c.url);
     expect(proxyUrls.at(-1)).toMatch(/\/pimlico$/);
     // A JSON-RPC error is an answer: nothing to look up.
-    expect(calls.some((c) => c.method === "eth_getUserOperationByHash")).toBe(
-      false,
-    );
+    expect(calls.some((c) => c.method === "eth_getUserOperationByHash")).toBe(false);
   });
 
   it("throws when every provider fails", async () => {
@@ -585,7 +539,7 @@ describe("smart account through the gas proxy", () => {
         walletViemAccount: account,
         chainId: CHAIN_ID,
         calls: noopCall,
-      }),
+      })
     ).rejects.toThrow();
   });
 
@@ -598,15 +552,8 @@ describe("smart account through the gas proxy", () => {
       chainId: CHAIN_ID,
       calls: noopCall,
     });
-    const chainMethods = new Set([
-      "eth_call",
-      "eth_getCode",
-      "eth_chainId",
-      "eth_getTransactionCount",
-    ]);
-    expect(calls.some((c) => c.url === RPC && c.method === "eth_call")).toBe(
-      true,
-    );
+    const chainMethods = new Set(["eth_call", "eth_getCode", "eth_chainId", "eth_getTransactionCount"]);
+    expect(calls.some((c) => c.url === RPC && c.method === "eth_call")).toBe(true);
     for (const c of calls.filter(isProxy)) {
       expect(chainMethods.has(c.method)).toBe(false);
     }
@@ -632,19 +579,16 @@ describe("smart account through the gas proxy", () => {
       initCodeHash: keccak256(
         concatHex([
           "0x603d3d8160223d3973",
-          constants.KernelVersionToAddressesMap[KERNEL_V3_1]
-            .accountImplementationAddress,
+          constants.KernelVersionToAddressesMap[KERNEL_V3_1].accountImplementationAddress,
           "0x6009",
           "0x5155f3363d3d373d3d363d7f360894a13ba1a3210667c828492db98dca3e2076",
           "0xcc3735a920a3ca505d382bbc545af43d6000803e6038573d6000fd5b3d6000f3",
-        ]),
+        ])
       ),
     });
     expect(r.address.toLowerCase()).toBe(expected.toLowerCase());
     expect(r.provider).toBe("alchemy");
-    expect(
-      [...new Set(calls.filter(isProxy).map((c) => c.method))].sort(),
-    ).toEqual([
+    expect([...new Set(calls.filter(isProxy).map((c) => c.method))].sort()).toEqual([
       "eth_getUserOperationReceipt",
       "eth_sendUserOperation",
       "zd_getUserOperationGasPrice",
@@ -690,10 +634,10 @@ describe("smart account through the gas proxy", () => {
     cfg.fetchImpl = (async (u: string | URL | Request, i?: RequestInit) => {
       const body = JSON.parse(String(i?.body ?? "{}"));
       if (body.method === "eth_getUserOperationReceipt") {
-        return new Response(
-          JSON.stringify({ jsonrpc: "2.0", id: body.id, result: null }),
-          { status: 200, headers: { "content-type": "application/json" } },
-        );
+        return new Response(JSON.stringify({ jsonrpc: "2.0", id: body.id, result: null }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
       }
       return base(u, i);
     }) as typeof fetch;
@@ -708,9 +652,7 @@ describe("smart account through the gas proxy", () => {
     expect(err).toBeInstanceOf(UserOperationPendingError);
     expect((err as UserOperationPendingError).userOpHash).toBe(sent[0]!.hash);
     expect((err as UserOperationPendingError).provider).toBe("alchemy");
-    expect(
-      calls.filter((c) => c.method === "eth_sendUserOperation"),
-    ).toHaveLength(1);
+    expect(calls.filter((c) => c.method === "eth_sendUserOperation")).toHaveLength(1);
   });
 
   it("returns early when code appears between provider attempts", async () => {
@@ -727,7 +669,7 @@ describe("smart account through the gas proxy", () => {
             id: body.id,
             result: codeReads >= 3 ? "0x6001" : "0x",
           }),
-          { status: 200, headers: { "content-type": "application/json" } },
+          { status: 200, headers: { "content-type": "application/json" } }
         );
       }
       return base(u, i);
@@ -760,14 +702,9 @@ describe("smart account through the gas proxy", () => {
   });
 
   it("the message names each provider's error but never leaks a URL; .errors keeps the originals", () => {
-    const raw = new Error(
-      "HTTP request failed. URL: https://rpc.example/v2/SECRETKEY?x=1 Details: boom",
-    );
+    const raw = new Error("HTTP request failed. URL: https://rpc.example/v2/SECRETKEY?x=1 Details: boom");
     raw.name = "HttpRequestError";
-    const err = new ProvidersExhaustedError(
-      [raw, "plain failure"],
-      ["alchemy", "gelato"],
-    );
+    const err = new ProvidersExhaustedError([raw, "plain failure"], ["alchemy", "gelato"]);
     expect(err.message).not.toContain("SECRETKEY");
     expect(err.message).not.toContain("rpc.example");
     expect(err.message).toContain("alchemy: HttpRequestError");
@@ -838,16 +775,11 @@ describe("smart account through the gas proxy", () => {
       return out;
     };
     const sponsorshipCode = (e: unknown) =>
-      (
-        causes(e).find((c) => c instanceof SponsorshipError) as
-          SponsorshipError | undefined
-      )?.code;
+      (causes(e).find((c) => c instanceof SponsorshipError) as SponsorshipError | undefined)?.code;
     const drop =
       (...keys: string[]) =>
       (s: Sponsorship) =>
-        Object.fromEntries(
-          Object.entries(s).filter(([k]) => !keys.includes(k)),
-        );
+        Object.fromEntries(Object.entries(s).filter(([k]) => !keys.includes(k)));
 
     it("no paymaster from one provider: nothing signed for it, the next provider is used", async () => {
       const { cfg, calls, sent } = harness({
@@ -865,43 +797,33 @@ describe("smart account through the gas proxy", () => {
       expect(signMessage).toHaveBeenCalledTimes(1);
       expect(sent.map((x) => x.provider)).toEqual(["gelato"]);
       expect(sent[0]!.userOp.paymaster).toBe(PAYMASTER);
-      expect(
-        calls.filter((c) => c.url.endsWith("/alchemy")).map((c) => c.method),
-      ).not.toContain("eth_sendUserOperation");
+      expect(calls.filter((c) => c.url.endsWith("/alchemy")).map((c) => c.method)).not.toContain(
+        "eth_sendUserOperation"
+      );
     });
 
     it.each([
       ["no paymaster", drop("paymaster")],
-      [
-        "a zero paymaster",
-        (s: Sponsorship) => ({ ...s, paymaster: zeroAddress }),
-      ],
-      [
-        "a malformed paymaster",
-        (s: Sponsorship) => ({ ...s, paymaster: "0x12" }),
-      ],
-    ])(
-      "%s from every provider: ProvidersExhaustedError, never signed",
-      async (_n, rewrite) => {
-        const { cfg, sent } = harness({
-          sponsor: { alchemy: rewrite, gelato: rewrite, pimlico: rewrite },
-        });
-        const { account, signMessage } = spySigner();
-        const err = await sendUserOperation(cfg, {
-          session: await session(),
-          walletViemAccount: account,
-          chainId: CHAIN_ID,
-          calls: noopCall,
-        }).catch((e: unknown) => e);
-        expect(err).toBeInstanceOf(ProvidersExhaustedError);
-        const errors = (err as ProvidersExhaustedError).errors;
-        expect(errors).toHaveLength(3);
-        for (const e of errors)
-          expect(sponsorshipCode(e)).toBe("not_sponsored");
-        expect(signMessage).not.toHaveBeenCalled();
-        expect(sent).toHaveLength(0);
-      },
-    );
+      ["a zero paymaster", (s: Sponsorship) => ({ ...s, paymaster: zeroAddress })],
+      ["a malformed paymaster", (s: Sponsorship) => ({ ...s, paymaster: "0x12" })],
+    ])("%s from every provider: ProvidersExhaustedError, never signed", async (_n, rewrite) => {
+      const { cfg, sent } = harness({
+        sponsor: { alchemy: rewrite, gelato: rewrite, pimlico: rewrite },
+      });
+      const { account, signMessage } = spySigner();
+      const err = await sendUserOperation(cfg, {
+        session: await session(),
+        walletViemAccount: account,
+        chainId: CHAIN_ID,
+        calls: noopCall,
+      }).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(ProvidersExhaustedError);
+      const errors = (err as ProvidersExhaustedError).errors;
+      expect(errors).toHaveLength(3);
+      for (const e of errors) expect(sponsorshipCode(e)).toBe("not_sponsored");
+      expect(signMessage).not.toHaveBeenCalled();
+      expect(sent).toHaveLength(0);
+    });
 
     it("takes only paymaster and gas fields from the proxy: sender, nonce, callData and factory stay the SDK's", async () => {
       const evil = "0x000000000000000000000000000000000000dead";
@@ -926,13 +848,7 @@ describe("smart account through the gas proxy", () => {
       const { cfg, sent } = harness({ sponsor: { alchemy: hostile } });
       await sendUserOperation(cfg, base);
       const [want, got] = [honest.sent[0]!.userOp, sent[0]!.userOp];
-      for (const k of [
-        "sender",
-        "nonce",
-        "callData",
-        "factory",
-        "factoryData",
-      ]) {
+      for (const k of ["sender", "nonce", "callData", "factory", "factoryData"]) {
         expect(got[k], k).toBe(want[k]);
       }
       expect(got.sender).not.toBe(evil);
@@ -952,8 +868,7 @@ describe("smart account through the gas proxy", () => {
         calls: noopCall,
       }).catch((e: unknown) => e);
       expect(err).toBeInstanceOf(ProvidersExhaustedError);
-      for (const e of (err as ProvidersExhaustedError).errors)
-        expect(sponsorshipCode(e)).toBe("paymaster_not_allowed");
+      for (const e of (err as ProvidersExhaustedError).errors) expect(sponsorshipCode(e)).toBe("paymaster_not_allowed");
       expect(signMessage).not.toHaveBeenCalled();
       expect(sent).toHaveLength(0);
 
@@ -970,11 +885,10 @@ describe("smart account through the gas proxy", () => {
 });
 
 describe("a send without an answer is never sent again elsewhere", () => {
-  const lookups = (calls: Call[]) =>
-    calls.filter((c) => c.method === "eth_getUserOperationByHash");
+  const lookups = (calls: Call[]) => calls.filter((c) => c.method === "eth_getUserOperationByHash");
   const send = async (
     h: ReturnType<typeof harness>,
-    providers: ("alchemy" | "gelato" | "pimlico")[] = ["alchemy", "gelato"],
+    providers: ("alchemy" | "gelato" | "pimlico")[] = ["alchemy", "gelato"]
   ) => {
     const { account, signMessage } = spySigner();
     const out = await sendUserOperation(h.cfg, {
@@ -993,9 +907,7 @@ describe("a send without an answer is never sent again elsewhere", () => {
     expect(out).toEqual({ userOpHash: h.sent[0]!.hash, provider: "alchemy" });
     expect(h.sent).toHaveLength(1);
     expect(signMessage).toHaveBeenCalledTimes(1);
-    expect(lookups(h.calls).map((c) => c.url)).toEqual([
-      `${ACCOUNTS}/api/v2/bundler/${CHAIN_ID}/alchemy`,
-    ]);
+    expect(lookups(h.calls).map((c) => c.url)).toEqual([`${ACCOUNTS}/api/v2/bundler/${CHAIN_ID}/alchemy`]);
     expect(h.calls.some((c) => c.url.endsWith("/gelato"))).toBe(false);
   });
 
@@ -1031,14 +943,8 @@ describe("a send without an answer is never sent again elsewhere", () => {
     const base = h.cfg.fetchImpl!;
     h.cfg.fetchImpl = (async (u: string | URL | Request, i?: RequestInit) => {
       const body = JSON.parse(String(i?.body ?? "{}"));
-      if (
-        String(u).endsWith("/alchemy") &&
-        body.method === "zd_sponsorUserOperation"
-      ) {
-        return new Response(
-          JSON.stringify({ error: { code: "x", message: "m" } }),
-          { status: 502 },
-        );
+      if (String(u).endsWith("/alchemy") && body.method === "zd_sponsorUserOperation") {
+        return new Response(JSON.stringify({ error: { code: "x", message: "m" } }), { status: 502 });
       }
       return base(u, i);
     }) as typeof fetch;
@@ -1085,7 +991,7 @@ describe("a send without an answer is never sent again elsewhere", () => {
       expect(out).toMatchObject({ provider: "gelato" });
       expect(signMessage).toHaveBeenCalledTimes(2);
       expect(lookups(h.calls)).toHaveLength(0);
-    },
+    }
   );
 
   it("JSON-RPC -32603 before the send (sponsorship) still falls through, no lookup", async () => {
@@ -1093,10 +999,7 @@ describe("a send without an answer is never sent again elsewhere", () => {
     const base = h.cfg.fetchImpl!;
     h.cfg.fetchImpl = (async (u: string | URL | Request, i?: RequestInit) => {
       const body = JSON.parse(String(i?.body ?? "{}"));
-      if (
-        String(u).endsWith("/alchemy") &&
-        body.method === "zd_sponsorUserOperation"
-      ) {
+      if (String(u).endsWith("/alchemy") && body.method === "zd_sponsorUserOperation") {
         return json200Error(body.id, -32603, "upstream timeout");
       }
       return base(u, i);
@@ -1135,9 +1038,7 @@ describe("a send without an answer is never sent again elsewhere", () => {
     const { out } = await send(h);
     expectAmbiguous(h, out);
     expect((out as Error).cause).toMatchObject({ name: "HttpRequestError" });
-    expect(((out as Error).cause as { status?: unknown }).status).toBe(
-      undefined,
-    );
+    expect(((out as Error).cause as { status?: unknown }).status).toBe(undefined);
   });
 
   it("a body stream that errors mid-read is ambiguous", async () => {
@@ -1150,12 +1051,11 @@ describe("a send without an answer is never sent again elsewhere", () => {
             return new Response(
               new ReadableStream<Uint8Array>({
                 pull(c) {
-                  if (pulls++ === 0)
-                    c.enqueue(new TextEncoder().encode('{"jsonrpc":"2.0",'));
+                  if (pulls++ === 0) c.enqueue(new TextEncoder().encode('{"jsonrpc":"2.0",'));
                   else c.error(new TypeError("terminated"));
                 },
               }),
-              { status: 200, headers: { "content-type": "application/json" } },
+              { status: 200, headers: { "content-type": "application/json" } }
             );
           },
         },
@@ -1218,18 +1118,13 @@ describe("a send without an answer is never sent again elsewhere", () => {
       h.cfg.fetchImpl = (async (u: string | URL | Request, i?: RequestInit) => {
         if (String(u).startsWith(`${ACCOUNTS}/api/v2/bundler/`)) {
           const method = JSON.parse(String(i?.body)).method as string;
-          armed.set(
-            method,
-            (armed.get(method) ?? new Set()).add(timers.at(-1)?.ms),
-          );
+          armed.set(method, (armed.get(method) ?? new Set()).add(timers.at(-1)?.ms));
         }
         return base(u, i);
       }) as typeof fetch;
       const { out } = await send(h);
       expect(out).toMatchObject({ provider: "alchemy" });
-      expect(
-        Object.fromEntries([...armed].map(([m, v]) => [m, [...v]])),
-      ).toEqual({
+      expect(Object.fromEntries([...armed].map(([m, v]) => [m, [...v]]))).toEqual({
         zd_getUserOperationGasPrice: [10_000],
         zd_sponsorUserOperation: [10_000],
         eth_sendUserOperation: [30_000],
@@ -1248,10 +1143,7 @@ describe("a send without an answer is never sent again elsewhere", () => {
       let sponsorTimeout: number | undefined;
       h.cfg.fetchImpl = (async (u: string | URL | Request, i?: RequestInit) => {
         const method = JSON.parse(String(i?.body ?? "{}")).method;
-        if (
-          String(u).endsWith("/alchemy") &&
-          method === "zd_sponsorUserOperation"
-        ) {
+        if (String(u).endsWith("/alchemy") && method === "zd_sponsorUserOperation") {
           return hangingFetch(i, () => {
             const t = timers.at(-1)!;
             sponsorTimeout = t.ms;
@@ -1272,10 +1164,7 @@ describe("a send without an answer is never sent again elsewhere", () => {
 
   describe("a 2xx whose result is not the op's hash is not success", () => {
     const answers: [string, (hash: Hex) => string][] = [
-      [
-        "a null result",
-        () => JSON.stringify({ jsonrpc: "2.0", id: 1, result: null }),
-      ],
+      ["a null result", () => JSON.stringify({ jsonrpc: "2.0", id: 1, result: null })],
       ["no result", () => JSON.stringify({ jsonrpc: "2.0", id: 1 })],
       [
         "another hash",
@@ -1303,29 +1192,23 @@ describe("a send without an answer is never sent again elsewhere", () => {
       return h;
     };
 
-    it.each(answers)(
-      "%s, and the provider has the op: the hash, after one lookup",
-      async (_n, body) => {
-        const h = answering(body, true);
-        const { out } = await send(h);
-        expect(out).toEqual({
-          userOpHash: h.sent[0]!.hash,
-          provider: "alchemy",
-        });
-        expect(lookups(h.calls)).toHaveLength(1);
-        expect(h.calls.some((c) => c.url.endsWith("/gelato"))).toBe(false);
-      },
-    );
+    it.each(answers)("%s, and the provider has the op: the hash, after one lookup", async (_n, body) => {
+      const h = answering(body, true);
+      const { out } = await send(h);
+      expect(out).toEqual({
+        userOpHash: h.sent[0]!.hash,
+        provider: "alchemy",
+      });
+      expect(lookups(h.calls)).toHaveLength(1);
+      expect(h.calls.some((c) => c.url.endsWith("/gelato"))).toBe(false);
+    });
 
-    it.each(answers)(
-      "%s, and the provider does not have it: UserOperationUnknownError",
-      async (_n, body) => {
-        const h = answering(body, false);
-        const { out } = await send(h);
-        expectAmbiguous(h, out);
-        expect((out as Error).message).toContain("instead of the op's hash");
-      },
-    );
+    it.each(answers)("%s, and the provider does not have it: UserOperationUnknownError", async (_n, body) => {
+      const h = answering(body, false);
+      const { out } = await send(h);
+      expectAmbiguous(h, out);
+      expect((out as Error).message).toContain("instead of the op's hash");
+    });
 
     it("the hash in upper case is the same hash: success, no lookup", async () => {
       const h = answering(
@@ -1335,7 +1218,7 @@ describe("a send without an answer is never sent again elsewhere", () => {
             id: 1,
             result: `0x${hash.slice(2).toUpperCase()}`,
           }),
-        true,
+        true
       );
       const { out } = await send(h);
       expect(out).toEqual({
@@ -1364,9 +1247,7 @@ describe("a send without an answer is never sent again elsewhere", () => {
     });
     const { out } = await send(h);
     expect((out as UserOperationUnknownError).nonce).toBe((5n << 64n) | 3n);
-    expect((out as UserOperationUnknownError).nonce).toBe(
-      BigInt(h.sent[0]!.userOp.nonce!),
-    );
+    expect((out as UserOperationUnknownError).nonce).toBe(BigInt(h.sent[0]!.userOp.nonce!));
   });
 
   it("every attempt reads the same nonce key, so two attempts cannot both land", async () => {
@@ -1391,15 +1272,13 @@ describe("a send without an answer is never sent again elsewhere", () => {
         chainId: CHAIN_ID,
       };
       const err = await (
-        which === "send"
-          ? sendUserOperation(h.cfg, { ...base, calls: noopCall })
-          : deploySmartAccount(h.cfg, base)
+        which === "send" ? sendUserOperation(h.cfg, { ...base, calls: noopCall }) : deploySmartAccount(h.cfg, base)
       ).catch((e: unknown) => e);
       expect(err).toBeInstanceOf(UsageError);
       expect(err).toMatchObject({ code: "chain_mismatch" });
       expect(signMessage).not.toHaveBeenCalled();
       expect(h.calls.filter(isProxy)).toHaveLength(0);
-    },
+    }
   );
 
   it("a 400 answering the send is a refusal: falls through, no lookup", async () => {
@@ -1413,17 +1292,14 @@ describe("a send without an answer is never sent again elsewhere", () => {
     [401, "proxy_unauthorized"],
     [403, "proxy_forbidden"],
     [429, "proxy_rate_limited"],
-  ])(
-    "HTTP %i answering the send is still GasProxyError: no lookup, no next provider",
-    async (status, code) => {
-      const h = harness({ sendFails: { alchemy: { status, kept: false } } });
-      const { out } = await send(h);
-      expect(out).toBeInstanceOf(GasProxyError);
-      expect(out).toMatchObject({ code, status, provider: "alchemy" });
-      expect(lookups(h.calls)).toHaveLength(0);
-      expect(h.calls.some((c) => c.url.endsWith("/gelato"))).toBe(false);
-    },
-  );
+  ])("HTTP %i answering the send is still GasProxyError: no lookup, no next provider", async (status, code) => {
+    const h = harness({ sendFails: { alchemy: { status, kept: false } } });
+    const { out } = await send(h);
+    expect(out).toBeInstanceOf(GasProxyError);
+    expect(out).toMatchObject({ code, status, provider: "alchemy" });
+    expect(lookups(h.calls)).toHaveLength(0);
+    expect(h.calls.some((c) => c.url.endsWith("/gelato"))).toBe(false);
+  });
 
   it("deploySmartAccount: a 502 the provider knows waits for that hash's receipt", async () => {
     const h = harness({ sendFails: { alchemy: { status: 502, kept: true } } });
@@ -1435,9 +1311,7 @@ describe("a send without an answer is never sent again elsewhere", () => {
       providers: ["alchemy", "gelato"],
     });
     expect(r.provider).toBe("alchemy");
-    const receipts = h.calls.filter(
-      (c) => c.method === "eth_getUserOperationReceipt",
-    );
+    const receipts = h.calls.filter((c) => c.method === "eth_getUserOperationReceipt");
     expect(receipts.length).toBeGreaterThan(0);
     expect(h.sent).toHaveLength(1);
     expect(h.calls.some((c) => c.url.endsWith("/gelato"))).toBe(false);
@@ -1455,9 +1329,7 @@ describe("a send without an answer is never sent again elsewhere", () => {
     expect(err).toBeInstanceOf(UserOperationUnknownError);
     expect((err as UserOperationUnknownError).userOpHash).toBe(h.sent[0]!.hash);
     expect(h.calls.some((c) => c.url.endsWith("/gelato"))).toBe(false);
-    expect(
-      h.calls.some((c) => c.method === "eth_getUserOperationReceipt"),
-    ).toBe(false);
+    expect(h.calls.some((c) => c.method === "eth_getUserOperationReceipt")).toBe(false);
   });
 
   it("deploySmartAccount builds the kernel once, not once per provider", async () => {
@@ -1475,9 +1347,7 @@ describe("a send without an answer is never sent again elsewhere", () => {
       (c) =>
         c.url === RPC &&
         c.method === "eth_call" &&
-        String((c.params?.[0] as { data?: string })?.data).startsWith(
-          "0x9b249f69",
-        ),
+        String((c.params?.[0] as { data?: string })?.data).startsWith("0x9b249f69")
     );
     expect(getSenderAddress).toHaveLength(1);
   });

@@ -1,7 +1,8 @@
-import { base58 } from "@scure/base";
 import { p256 } from "@noble/curves/nist.js";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
+import { base58 } from "@scure/base";
+
 import { toChecksumAddress } from "./address.js";
 import { EncodingError } from "./errors.js";
 import type { KeyCurve } from "./types.js";
@@ -19,10 +20,8 @@ const invalid = (message: string, cause?: unknown): EncodingError =>
   new EncodingError("did_key_invalid", message, { cause });
 
 function assertValidPoint(curve: KeyCurve, compressed: Uint8Array): void {
-  if (compressed.length !== 33)
-    throw invalid("compressed public key must be 33 bytes");
-  if (compressed[0] !== 0x02 && compressed[0] !== 0x03)
-    throw invalid("invalid compressed point prefix");
+  if (compressed.length !== 33) throw invalid("compressed public key must be 33 bytes");
+  if (compressed[0] !== 0x02 && compressed[0] !== 0x03) throw invalid("invalid compressed point prefix");
   try {
     // Throws if the point is not on the curve.
     (curve === "p256" ? p256 : secp256k1).Point.fromBytes(compressed);
@@ -31,10 +30,7 @@ function assertValidPoint(curve: KeyCurve, compressed: Uint8Array): void {
   }
 }
 
-export function didKeyFromCompressed(
-  curve: KeyCurve,
-  compressed: Uint8Array,
-): string {
+export function didKeyFromCompressed(curve: KeyCurve, compressed: Uint8Array): string {
   assertValidPoint(curve, compressed);
   const prefix = CODEC[curve];
   const buf = new Uint8Array(2 + 33);
@@ -44,8 +40,7 @@ export function didKeyFromCompressed(
 }
 
 export function decodeDidKey(didKey: string): DecodedDidKey {
-  if (!didKey.startsWith(PREFIX))
-    throw invalid("not a did:key with base58btc multibase");
+  if (!didKey.startsWith(PREFIX)) throw invalid("not a did:key with base58btc multibase");
   let raw: Uint8Array;
   try {
     raw = base58.decode(didKey.slice(PREFIX.length));
@@ -71,10 +66,7 @@ function toHex(b: Uint8Array): string {
 /** EIP-55 Ethereum address of a secp256k1 did:key. */
 export function ethAddressFromDidKey(didKey: string): `0x${string}` {
   const { curve, compressed } = decodeDidKey(didKey);
-  if (curve !== "secp256k1")
-    throw invalid("Ethereum address requires a secp256k1 did:key");
+  if (curve !== "secp256k1") throw invalid("Ethereum address requires a secp256k1 did:key");
   const uncompressed = secp256k1.Point.fromBytes(compressed).toBytes(false);
-  return toChecksumAddress(
-    "0x" + toHex(keccak_256(uncompressed.slice(1)).slice(12)),
-  );
+  return toChecksumAddress("0x" + toHex(keccak_256(uncompressed.slice(1)).slice(12)));
 }

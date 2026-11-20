@@ -1,23 +1,12 @@
-import {
-  buildGenesis,
-  deriveDid,
-  encodeSigningPayload,
-  type Operation,
-} from "../core/index.js";
-import { directoryFor, type DirectoryClient } from "../directory/client.js";
-import {
-  AccountsError,
-  DidExistsError,
-  DidNotFoundError,
-  DirectoryRejectedError,
-  UsageError,
-} from "../errors.js";
 import type { DpopKey } from "../auth/dpop.js";
 import { authedFetch } from "../auth/fetch.js";
-import { signIn, type Scope, type Session } from "../auth/signin.js";
-import type { Signer } from "../signers/types.js";
+import { type Scope, type Session, signIn } from "../auth/signin.js";
 import { normalizeUrl, type SdkConfig } from "../config.js";
-import { getMe, isAccountView, type AccountView } from "./accounts.js";
+import { buildGenesis, deriveDid, encodeSigningPayload, type Operation } from "../core/index.js";
+import { type DirectoryClient, directoryFor } from "../directory/client.js";
+import { AccountsError, DidExistsError, DidNotFoundError, DirectoryRejectedError, UsageError } from "../errors.js";
+import type { Signer } from "../signers/types.js";
+import { type AccountView, getMe, isAccountView } from "./accounts.js";
 import { proveKey } from "./keys.js";
 import { accountsJson } from "./response.js";
 
@@ -42,14 +31,14 @@ export async function claimDid(
     dpopKey: DpopKey;
     directory?: DirectoryClient;
     scope?: Scope[];
-  },
+  }
 ): Promise<{ did: string; session: Session; account: AccountView }> {
   const { wallet, signingKey, dpopKey } = args;
   const scope: Scope[] = args.scope ?? ["read", "write"];
   if (!scope.includes("read") || !scope.includes("write")) {
     throw new UsageError(
       "scope_missing",
-      "claimDid needs a session with scopes 'read' and 'write' (write for PUT /me/did, read for the 409 fallback and the caller's next GET /me)",
+      "claimDid needs a session with scopes 'read' and 'write' (write for PUT /me/did, read for the 409 fallback and the caller's next GET /me)"
     );
   }
   const directory = directoryFor(cfg, args.directory);
@@ -66,9 +55,7 @@ export async function claimDid(
   } catch (err) {
     // An existing DID answers 409 on create, or 400 when the directory takes the genesis
     // for an update. Either way, only a verified audit log for this DID proves it exists.
-    const maybeExists =
-      err instanceof DidExistsError ||
-      (err instanceof DirectoryRejectedError && err.status === 400);
+    const maybeExists = err instanceof DidExistsError || (err instanceof DirectoryRejectedError && err.status === 400);
     if (!maybeExists) throw err;
     try {
       await directory.head(did);
@@ -119,18 +106,12 @@ const MAX_RETRY_MS = 5000;
 
 /** The AccountsError's Retry-After (integer seconds, else 1 s), capped at 5 s. */
 const retryDelayMs = (seconds: number | undefined): number =>
-  seconds === undefined
-    ? DEFAULT_RETRY_MS
-    : Math.min(seconds * 1000, MAX_RETRY_MS);
+  seconds === undefined ? DEFAULT_RETRY_MS : Math.min(seconds * 1000, MAX_RETRY_MS);
 
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** GET /api/v2/me's account, or undefined when it cannot be read. */
-async function linkedAccount(
-  cfg: SdkConfig,
-  session: Session,
-): Promise<AccountView | undefined> {
+async function linkedAccount(cfg: SdkConfig, session: Session): Promise<AccountView | undefined> {
   try {
     return (await getMe(cfg, { session })) ?? undefined;
   } catch {

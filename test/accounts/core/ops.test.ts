@@ -1,18 +1,19 @@
 import { describe, expect, it } from "vitest";
-import vectors from "../fixtures/did-ops.json";
+
 import {
   AccountSdkError,
-  PolicyError,
-  SIGNUP_POP_MESSAGE,
-  toChecksumAddress,
   assertPersonDid,
   buildAddKey,
   buildGenesis,
   buildRemoveKey,
   buildSetAliases,
   buildTombstone,
+  PolicyError,
+  SIGNUP_POP_MESSAGE,
+  toChecksumAddress,
   type UnsignedOperation,
 } from "../../../src/accounts/core/index.js";
+import vectors from "../fixtures/did-ops.json";
 
 const cases = vectors.cases as unknown as {
   name: string;
@@ -22,13 +23,10 @@ const cases = vectors.cases as unknown as {
 const byName = (n: string) => cases.find((c) => c.name === n)!;
 const walletOnly = byName("genesis-wallet-only").unsigned;
 const WALLET = walletOnly.rotationKeys[0]!;
-const R1 = byName("genesis-wallet-r1-signing").unsigned.verificationMethods
-  .signing!;
-const K1 = byName("genesis-wallet-k1-signing-alias").unsigned
-  .verificationMethods.signing!;
+const R1 = byName("genesis-wallet-r1-signing").unsigned.verificationMethods.signing!;
+const K1 = byName("genesis-wallet-k1-signing-alias").unsigned.verificationMethods.signing!;
 // The vectors' alias is EIP-55 (did-directory ece6b07), so the policy takes them as-is.
-const ALIAS = byName("genesis-wallet-k1-signing-alias").unsigned
-  .alsoKnownAs[0]!;
+const ALIAS = byName("genesis-wallet-k1-signing-alias").unsigned.alsoKnownAs[0]!;
 // Spec §5 requires EIP-55: the same alias in lowercase is refused.
 const LOWER_ALIAS = ALIAS.toLowerCase();
 
@@ -47,14 +45,12 @@ describe("builders match the Go vectors", () => {
     expect(buildGenesis({ walletKey: WALLET })).toEqual(walletOnly);
   });
   it("buildGenesis wallet + r1 signing", () => {
-    expect(buildGenesis({ walletKey: WALLET, signingKey: R1 })).toEqual(
-      byName("genesis-wallet-r1-signing").unsigned,
-    );
+    expect(buildGenesis({ walletKey: WALLET, signingKey: R1 })).toEqual(byName("genesis-wallet-r1-signing").unsigned);
   });
   it("buildGenesis wallet + k1 signing + alias (vector shape, EIP-55 alias)", () => {
-    expect(
-      buildGenesis({ walletKey: WALLET, signingKey: K1, alias: ALIAS }),
-    ).toEqual(byName("genesis-wallet-k1-signing-alias").unsigned);
+    expect(buildGenesis({ walletKey: WALLET, signingKey: K1, alias: ALIAS })).toEqual(
+      byName("genesis-wallet-k1-signing-alias").unsigned
+    );
   });
   it("buildGenesis refuses a lowercase alias", () => {
     expect(
@@ -63,8 +59,8 @@ describe("builders match the Go vectors", () => {
           walletKey: WALLET,
           signingKey: K1,
           alias: LOWER_ALIAS,
-        }),
-      ),
+        })
+      )
     ).toBe("alias_invalid");
   });
   it("buildAddKey equals update-add-device", () => {
@@ -75,26 +71,18 @@ describe("builders match the Go vectors", () => {
   });
   it("buildRemoveKey equals update-remove-device", () => {
     const head = byName("update-add-device");
-    expect(buildRemoveKey(head.unsigned, head.cid, "signing")).toEqual(
-      byName("update-remove-device").unsigned,
-    );
+    expect(buildRemoveKey(head.unsigned, head.cid, "signing")).toEqual(byName("update-remove-device").unsigned);
   });
   it("buildTombstone equals tombstone", () => {
-    expect(buildTombstone(byName("update-remove-device").cid)).toEqual(
-      byName("tombstone").unsigned,
-    );
+    expect(buildTombstone(byName("update-remove-device").cid)).toEqual(byName("tombstone").unsigned);
   });
   it("buildSetAliases equals update-set-alias (EIP-55 alias)", () => {
     const head = byName("genesis-wallet-only");
-    expect(buildSetAliases(head.unsigned, head.cid, [ALIAS])).toEqual(
-      byName("update-set-alias").unsigned,
-    );
+    expect(buildSetAliases(head.unsigned, head.cid, [ALIAS])).toEqual(byName("update-set-alias").unsigned);
   });
   it("buildSetAliases refuses a lowercase alias", () => {
     const head = byName("genesis-wallet-only");
-    expect(
-      codeOf(() => buildSetAliases(head.unsigned, head.cid, [LOWER_ALIAS])),
-    ).toBe("alias_invalid");
+    expect(codeOf(() => buildSetAliases(head.unsigned, head.cid, [LOWER_ALIAS]))).toBe("alias_invalid");
   });
 });
 
@@ -106,20 +94,11 @@ describe("fragment selection and removal", () => {
     expect(b.fragment).toBe("device-2");
   });
   it("refuses to remove #wallet", () => {
-    expect(codeOf(() => buildRemoveKey(walletOnly, "cid0", "wallet"))).toBe(
-      "wallet_required",
-    );
+    expect(codeOf(() => buildRemoveKey(walletOnly, "cid0", "wallet"))).toBe("wallet_required");
   });
   it("treats inherited Object.prototype names as absent fragments", () => {
-    for (const frag of [
-      "toString",
-      "constructor",
-      "hasOwnProperty",
-      "__proto__",
-    ]) {
-      expect(codeOf(() => buildRemoveKey(walletOnly, "cid0", frag))).toBe(
-        "fragment_invalid",
-      );
+    for (const frag of ["toString", "constructor", "hasOwnProperty", "__proto__"]) {
+      expect(codeOf(() => buildRemoveKey(walletOnly, "cid0", frag))).toBe("fragment_invalid");
     }
     const { op, fragment } = buildAddKey(walletOnly, "cid0", R1, "constructor");
     expect(fragment).toBe("constructor");
@@ -143,68 +122,38 @@ describe("assertPersonDid", () => {
     expect(() => assertPersonDid(ok, WALLET)).not.toThrow();
   });
   it("rotation_locked", () => {
-    expect(
-      codeOf(() =>
-        assertPersonDid({ ...ok, rotationKeys: [WALLET, R1] }, WALLET),
-      ),
-    ).toBe("rotation_locked");
-    expect(
-      codeOf(() => assertPersonDid({ ...ok, rotationKeys: [] }, WALLET)),
-    ).toBe("rotation_locked");
+    expect(codeOf(() => assertPersonDid({ ...ok, rotationKeys: [WALLET, R1] }, WALLET))).toBe("rotation_locked");
+    expect(codeOf(() => assertPersonDid({ ...ok, rotationKeys: [] }, WALLET))).toBe("rotation_locked");
   });
   it("wallet_required", () => {
     const rest = { ...ok.verificationMethods };
     delete rest.wallet;
-    expect(
-      codeOf(() =>
-        assertPersonDid({ ...ok, verificationMethods: rest }, WALLET),
-      ),
-    ).toBe("wallet_required");
-    expect(codeOf(() => assertPersonDid(withVm("wallet", R1), WALLET))).toBe(
-      "wallet_required",
-    );
+    expect(codeOf(() => assertPersonDid({ ...ok, verificationMethods: rest }, WALLET))).toBe("wallet_required");
+    expect(codeOf(() => assertPersonDid(withVm("wallet", R1), WALLET))).toBe("wallet_required");
   });
   it("fragment_reserved", () => {
-    expect(codeOf(() => assertPersonDid(withVm("dimo_org"), WALLET))).toBe(
-      "fragment_reserved",
-    );
+    expect(codeOf(() => assertPersonDid(withVm("dimo_org"), WALLET))).toBe("fragment_reserved");
   });
   it("fragment_invalid", () => {
-    expect(codeOf(() => assertPersonDid(withVm("bad frag!"), WALLET))).toBe(
-      "fragment_invalid",
-    );
-    expect(codeOf(() => assertPersonDid(withVm("a".repeat(65)), WALLET))).toBe(
-      "fragment_invalid",
-    );
+    expect(codeOf(() => assertPersonDid(withVm("bad frag!"), WALLET))).toBe("fragment_invalid");
+    expect(codeOf(() => assertPersonDid(withVm("a".repeat(65)), WALLET))).toBe("fragment_invalid");
   });
   it("key_invalid", () => {
-    expect(
-      codeOf(() => assertPersonDid(withVm("x", "did:key:zNope"), WALLET)),
-    ).toBe("key_invalid");
+    expect(codeOf(() => assertPersonDid(withVm("x", "did:key:zNope"), WALLET))).toBe("key_invalid");
   });
   it("alias_invalid", () => {
-    expect(
-      codeOf(() =>
-        assertPersonDid(
-          { ...ok, alsoKnownAs: ["did:web:example.com"] },
-          WALLET,
-        ),
-      ),
-    ).toBe("alias_invalid");
+    expect(codeOf(() => assertPersonDid({ ...ok, alsoKnownAs: ["did:web:example.com"] }, WALLET))).toBe(
+      "alias_invalid"
+    );
   });
   it("aliases must be EIP-55 checksummed", () => {
-    expect(
-      codeOf(() => assertPersonDid({ ...ok, alsoKnownAs: [ALIAS] }, WALLET)),
-    ).toBeUndefined();
+    expect(codeOf(() => assertPersonDid({ ...ok, alsoKnownAs: [ALIAS] }, WALLET))).toBeUndefined();
     const lower = ALIAS.toLowerCase();
-    const upper =
-      "did:ethr:137:0x" + ALIAS.slice("did:ethr:137:0x".length).toUpperCase();
+    const upper = "did:ethr:137:0x" + ALIAS.slice("did:ethr:137:0x".length).toUpperCase();
     const flipped = ALIAS.replace(/[a-f]/, (c) => c.toUpperCase());
     for (const bad of [lower, upper, flipped]) {
       expect(bad).not.toBe(ALIAS);
-      expect(
-        codeOf(() => assertPersonDid({ ...ok, alsoKnownAs: [bad] }, WALLET)),
-      ).toBe("alias_invalid");
+      expect(codeOf(() => assertPersonDid({ ...ok, alsoKnownAs: [bad] }, WALLET))).toBe("alias_invalid");
     }
   });
   it("EIP-55 reference vectors", () => {
@@ -219,14 +168,9 @@ describe("assertPersonDid", () => {
     expect(() => toChecksumAddress("0x123")).toThrow();
   });
   it("services_not_allowed", () => {
-    expect(
-      codeOf(() =>
-        assertPersonDid(
-          { ...ok, services: { a: { type: "t", endpoint: "e" } } },
-          WALLET,
-        ),
-      ),
-    ).toBe("services_not_allowed");
+    expect(codeOf(() => assertPersonDid({ ...ok, services: { a: { type: "t", endpoint: "e" } } }, WALLET))).toBe(
+      "services_not_allowed"
+    );
   });
 });
 
@@ -242,9 +186,7 @@ describe("error hierarchy", () => {
 
 describe("SIGNUP_POP_MESSAGE", () => {
   it("uses real newlines", () => {
-    expect(SIGNUP_POP_MESSAGE("a@b.c", "did:key:x")).toBe(
-      "DIMO accounts v2 signup\nemail: a@b.c\nkey: did:key:x",
-    );
+    expect(SIGNUP_POP_MESSAGE("a@b.c", "did:key:x")).toBe("DIMO accounts v2 signup\nemail: a@b.c\nkey: did:key:x");
   });
 });
 
@@ -253,21 +195,9 @@ describe("builders refuse non-conforming heads", () => {
   const rest = { ...good.verificationMethods };
   delete rest.wallet;
   const bads: [string, UnsignedOperation, string][] = [
-    [
-      "missing #wallet",
-      { ...good, verificationMethods: rest },
-      "wallet_required",
-    ],
-    [
-      "extra rotation key",
-      { ...good, rotationKeys: [...good.rotationKeys, K1] },
-      "rotation_locked",
-    ],
-    [
-      "services on the head",
-      { ...good, services: { a: { type: "t", endpoint: "e" } } },
-      "services_not_allowed",
-    ],
+    ["missing #wallet", { ...good, verificationMethods: rest }, "wallet_required"],
+    ["extra rotation key", { ...good, rotationKeys: [...good.rotationKeys, K1] }, "rotation_locked"],
+    ["services on the head", { ...good, services: { a: { type: "t", endpoint: "e" } } }, "services_not_allowed"],
   ];
   const builders: [string, (h: UnsignedOperation) => unknown][] = [
     ["buildAddKey", (h) => buildAddKey(h, "cid0", K1)],

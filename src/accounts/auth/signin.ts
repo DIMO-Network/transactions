@@ -1,12 +1,7 @@
-import { normalizeUrl, send, unboundFetch, type SdkConfig } from "../config.js";
+import { normalizeUrl, type SdkConfig, send, unboundFetch } from "../config.js";
 import { SigninError, UsageError } from "../errors.js";
 import type { Signer } from "../signers/types.js";
-import {
-  createDpopProof,
-  jwkThumbprint,
-  publicJwk,
-  type DpopKey,
-} from "./dpop.js";
+import { createDpopProof, type DpopKey, jwkThumbprint, publicJwk } from "./dpop.js";
 
 export type Scope = "read" | "write" | "approve";
 
@@ -40,7 +35,7 @@ async function post(
   f: typeof fetch,
   url: string,
   body: unknown,
-  headers: Record<string, string> = {},
+  headers: Record<string, string> = {}
 ): Promise<Record<string, unknown>> {
   const res = await send(f, "dauth", url, {
     method: "POST",
@@ -55,24 +50,16 @@ async function post(
     data = undefined;
   }
   const obj =
-    typeof data === "object" && data !== null && !Array.isArray(data)
-      ? (data as Record<string, unknown>)
-      : undefined;
+    typeof data === "object" && data !== null && !Array.isArray(data) ? (data as Record<string, unknown>) : undefined;
   if (!res.ok) {
     throw new SigninError(
       typeof obj?.error === "string" ? obj.error : "server_error",
-      typeof obj?.error_description === "string"
-        ? obj.error_description
-        : `HTTP ${res.status}`,
-      res.status,
+      typeof obj?.error_description === "string" ? obj.error_description : `HTTP ${res.status}`,
+      res.status
     );
   }
   if (!obj) {
-    throw new SigninError(
-      "server_error",
-      "response is not a JSON object",
-      res.status,
-    );
+    throw new SigninError("server_error", "response is not a JSON object", res.status);
   }
   return obj;
 }
@@ -88,55 +75,37 @@ function validateChallenge(
   challenge: string,
   nonce: string,
   args: { did: string; scope: Scope[]; audience: string[] },
-  jkt: string,
+  jkt: string
 ): void {
   const bad = (why: string): never => {
     throw new SigninError("invalid_challenge", why, 200);
   };
   const lines = challenge.split("\n");
-  if (
-    !lines[0]!.endsWith(" wants you to sign in as") ||
-    lines[0]!.startsWith("{")
-  )
+  if (!lines[0]!.endsWith(" wants you to sign in as") || lines[0]!.startsWith("{"))
     bad("challenge does not start with the sign-in preamble");
   if (lines[1] !== args.did) bad("challenge names a different DID");
-  const scope = SCOPE_ORDER.filter((x) =>
-    (args.scope as string[]).includes(x),
-  ).join(" ");
+  const scope = SCOPE_ORDER.filter((x) => (args.scope as string[]).includes(x)).join(" ");
   const body = "\n" + lines.slice(2).join("\n") + "\n";
   if (!body.includes(`\nKey: ${jkt}\n`)) bad("challenge names a different key");
   if (!body.includes(`\nNonce: ${nonce}\n`)) bad("challenge nonce mismatch");
   if (!body.includes(`\nScope: ${scope}\n`)) bad("challenge scope mismatch");
   const forLine = lines.find((l) => l.startsWith("For: "));
-  if (forLine !== `For: ${args.audience.join(", ")}`)
-    bad("challenge audience mismatch");
+  if (forLine !== `For: ${args.audience.join(", ")}`) bad("challenge audience mismatch");
 }
 
 /** Sign in to dauth (cfg.dauthUrl) with a DID key and get a DPoP-bound access token. */
-export async function signIn(
-  cfg: SdkConfig,
-  args: SignInOptions,
-): Promise<Session> {
+export async function signIn(cfg: SdkConfig, args: SignInOptions): Promise<Session> {
   if (args.scope.length === 0) {
-    throw new UsageError(
-      "scope_missing",
-      "signIn needs at least one scope ('read', 'write' or 'approve')",
-    );
+    throw new UsageError("scope_missing", "signIn needs at least one scope ('read', 'write' or 'approve')");
   }
   if (args.audience?.length === 0) {
-    throw new UsageError(
-      "audience_empty",
-      "audience must not be empty; omit it for the default",
-    );
+    throw new UsageError("audience_empty", "audience must not be empty; omit it for the default");
   }
   const base = normalizeUrl(cfg.dauthUrl);
   const audience = args.audience ?? [normalizeUrl(cfg.accountsUrl)];
   const jkt = await jwkThumbprint(await publicJwk(args.dpopKey));
   if (jkt !== (await args.dpopKey.thumbprint())) {
-    throw new UsageError(
-      "dpop_key_invalid",
-      "DpopKey.thumbprint() does not match its jwk()",
-    );
+    throw new UsageError("dpop_key_invalid", "DpopKey.thumbprint() does not match its jwk()");
   }
   const challengeReq = {
     did: args.did,
@@ -151,21 +120,11 @@ export async function signIn(
   if (typeof challenge !== "string" || typeof nonce !== "string") {
     throw new SigninError("server_error", "malformed challenge response", 200);
   }
-  validateChallenge(
-    challenge,
-    nonce,
-    { did: args.did, scope: args.scope, audience },
-    jkt,
-  );
+  validateChallenge(challenge, nonce, { did: args.did, scope: args.scope, audience }, jkt);
   const signature = await args.signer.sign(new TextEncoder().encode(challenge));
   const tokenUrl = `${base}/signin/token`;
   const proof = await createDpopProof(args.dpopKey, "POST", tokenUrl);
-  const tok = await post(
-    f,
-    tokenUrl,
-    { nonce, signature, key: args.fragment },
-    { DPoP: proof },
-  );
+  const tok = await post(f, tokenUrl, { nonce, signature, key: args.fragment }, { DPoP: proof });
   if (
     typeof tok.token !== "string" ||
     typeof tok.expires_in !== "number" ||
@@ -173,10 +132,7 @@ export async function signIn(
   ) {
     throw new SigninError("server_error", "malformed token response", 200);
   }
-  const granted =
-    typeof tok.scope === "string"
-      ? tok.scope.split(" ").filter(Boolean)
-      : [...args.scope];
+  const granted = typeof tok.scope === "string" ? tok.scope.split(" ").filter(Boolean) : [...args.scope];
   return {
     did: args.did,
     token: tok.token,

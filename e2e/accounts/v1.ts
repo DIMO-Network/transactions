@@ -1,8 +1,9 @@
 /** v1 account creation (setup for E8 and E9): POST /api/account. */
 import { randomBytes } from "node:crypto";
+
 import { normalizeUrl } from "../../src/accounts/index.js";
+import { type Ctx, Failure } from "./harness.js";
 import { makePasskey } from "./software-authenticator.js";
-import { Failure, type Ctx } from "./harness.js";
 
 /**
  * A passkey made in software, with the registration challenge and clientDataJSON a
@@ -17,7 +18,7 @@ export function softwareAttestation(ctx: Ctx) {
       challenge,
       origin: ctx.env.origin,
       crossOrigin: false,
-    }),
+    })
   ).toString("base64url");
   return {
     encodedChallenge: challenge,
@@ -31,22 +32,16 @@ export function softwareAttestation(ctx: Ctx) {
 }
 
 /** v1 POST /api/account; returns the sub-organization id from the 201 body. */
-export async function v1Create(
-  ctx: Ctx,
-  body: Record<string, unknown>,
-): Promise<{ subOrganizationId: string }> {
-  const res = await globalThis.fetch(
-    `${normalizeUrl(ctx.env.ACCOUNTS_URL)}/api/account`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ targetChain: "POLYGON", ...body }),
-    },
-  );
+export async function v1Create(ctx: Ctx, body: Record<string, unknown>): Promise<{ subOrganizationId: string }> {
+  const res = await globalThis.fetch(`${normalizeUrl(ctx.env.ACCOUNTS_URL)}/api/account`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ targetChain: "POLYGON", ...body }),
+  });
   const text = await res.text();
   if (res.status !== 201) {
     throw new Failure(
-      `setup: v1 POST /api/account answered ${res.status} (expected 201; 401 means ACCOUNT_CREATE_REQUIRE_PROOF is on): ${text.slice(0, 200)}`,
+      `setup: v1 POST /api/account answered ${res.status} (expected 201; 401 means ACCOUNT_CREATE_REQUIRE_PROOF is on): ${text.slice(0, 200)}`
     );
   }
   const out = JSON.parse(text) as { subOrganizationId?: unknown };

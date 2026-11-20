@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  EnvError,
-  REQUIRED,
-  isDevUrl,
-  parsePartnerKey,
-  readEnv,
-} from "../../e2e/accounts/env.js";
+
+import { EnvError, isDevUrl, parsePartnerKey, readEnv, REQUIRED } from "../../e2e/accounts/env.js";
 import { GATED_ELSEWHERE, SCENARIOS } from "../../e2e/accounts/scenarios.js";
 
 const devEnv = (): Record<string, string> => ({
@@ -105,9 +100,7 @@ describe("e2e suite (offline smoke)", () => {
     expect(isDevUrl("https://accounts.dev.dimo.org")).toBe(true);
     expect(isDevUrl("https://did.dev.dimo.zone")).toBe(true);
     expect(isDevUrl("https://stage.example.com")).toBe(false);
-    expect(isDevUrl("https://stage.example.com", ["stage.example.com"])).toBe(
-      true,
-    );
+    expect(isDevUrl("https://stage.example.com", ["stage.example.com"])).toBe(true);
   });
 
   it("requires the WebAuthn rp id and origin", () => {

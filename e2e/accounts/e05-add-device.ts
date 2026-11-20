@@ -1,14 +1,5 @@
-import { WebCryptoP256Signer, addDeviceKey } from "../../src/accounts/index.js";
-import {
-  check,
-  eq,
-  multibaseOf,
-  resolveDoc,
-  sameSet,
-  signInWith,
-  signup,
-  type Scenario,
-} from "./harness.js";
+import { addDeviceKey, WebCryptoP256Signer } from "../../src/accounts/index.js";
+import { check, eq, multibaseOf, resolveDoc, sameSet, type Scenario, signInWith, signup } from "./harness.js";
 
 /**
  * E5. Add a device through the SDK.
@@ -20,10 +11,7 @@ export const e05: Scenario = {
   title: "add a device",
   async run(ctx) {
     const user = await signup(ctx, "e05");
-    check(
-      ctx.accountsRequests > 0,
-      "control: the accounts request counter did not move during signup",
-    );
+    check(ctx.accountsRequests > 0, "control: the accounts request counter did not move during signup");
     const before = (await ctx.directory.head(user.did)).op.rotationKeys;
     const newKey = await WebCryptoP256Signer.generate();
 
@@ -37,23 +25,10 @@ export const e05: Scenario = {
     eq(toAccounts, 0, "requests to accountsUrl during addDeviceKey");
 
     const doc = await resolveDoc(ctx, user.did);
-    const vm = doc.verificationMethod.find((v) =>
-      v.id.endsWith(`#${fragment}`),
-    );
-    check(
-      vm,
-      `the new key's fragment #${fragment} is not in the resolved document`,
-    );
-    eq(
-      vm.publicKeyMultibase,
-      multibaseOf(newKey.didKey),
-      "new key in the document",
-    );
-    sameSet(
-      (await ctx.directory.head(user.did)).op.rotationKeys,
-      before,
-      "rotationKeys",
-    );
+    const vm = doc.verificationMethod.find((v) => v.id.endsWith(`#${fragment}`));
+    check(vm, `the new key's fragment #${fragment} is not in the resolved document`);
+    eq(vm.publicKeyMultibase, multibaseOf(newKey.didKey), "new key in the document");
+    sameSet((await ctx.directory.head(user.did)).op.rotationKeys, before, "rotationKeys");
 
     const session = await signInWith(ctx, user.did, newKey, fragment, ["read"]);
     check(session.token, "the new key cannot sign in");

@@ -72,15 +72,9 @@ export class EnvError extends Error {}
  * suffixes (and is longer than the suffix), or equals an exact host from E2E_EXTRA_DEV_HOSTS.
  * A substring match would accept accounts.dimo.org.dev.evil.com.
  */
-export const DEV_HOST_SUFFIXES: readonly string[] = [
-  ".dev.dimo.org",
-  ".dev.dimo.zone",
-];
+export const DEV_HOST_SUFFIXES: readonly string[] = [".dev.dimo.org", ".dev.dimo.zone"];
 
-export function isDevUrl(
-  raw: string,
-  extraHosts: readonly string[] = [],
-): boolean {
+export function isDevUrl(raw: string, extraHosts: readonly string[] = []): boolean {
   let u: URL;
   try {
     u = new URL(raw);
@@ -89,20 +83,13 @@ export function isDevUrl(
   }
   if (u.protocol !== "https:") return false;
   const h = u.hostname.toLowerCase();
-  return (
-    extraHosts.includes(h) ||
-    DEV_HOST_SUFFIXES.some((s) => h.endsWith(s) && h.length > s.length)
-  );
+  return extraHosts.includes(h) || DEV_HOST_SUFFIXES.some((s) => h.endsWith(s) && h.length > s.length);
 }
 
-function assertDevUrl(
-  name: string,
-  raw: string,
-  extra: readonly string[],
-): void {
+function assertDevUrl(name: string, raw: string, extra: readonly string[]): void {
   if (!isDevUrl(raw, extra)) {
     throw new EnvError(
-      `${name} (${raw}) is not an allowed dev URL: refusing to run. It must be https with a host ending in ${DEV_HOST_SUFFIXES.join(" or ")} (or listed exactly in E2E_EXTRA_DEV_HOSTS)`,
+      `${name} (${raw}) is not an allowed dev URL: refusing to run. It must be https with a host ending in ${DEV_HOST_SUFFIXES.join(" or ")} (or listed exactly in E2E_EXTRA_DEV_HOSTS)`
     );
   }
 }
@@ -124,7 +111,7 @@ export function parsePartnerKey(raw: string): PartnerKey {
     typeof o.privateKeyJwk.d !== "string"
   ) {
     throw new EnvError(
-      'E2E_PARTNER_DID_KEY must be JSON {"did":"did:dimo:...","fragment":"signing","privateKeyJwk":{ECDSA P-256 private JWK}}',
+      'E2E_PARTNER_DID_KEY must be JSON {"did":"did:dimo:...","fragment":"signing","privateKeyJwk":{ECDSA P-256 private JWK}}'
     );
   }
   return { did: o.did, fragment: o.fragment, privateKeyJwk: o.privateKeyJwk };
@@ -135,13 +122,13 @@ export function readEnv(src: NodeJS.ProcessEnv = process.env): E2eEnv {
   const missing = REQUIRED.filter((k) => !src[k]?.trim());
   if (missing.length > 0) {
     throw new EnvError(
-      `missing required environment variables: ${missing.join(", ")}.\nSee e2e/accounts/env.example; pass a file with: npm run e2e:accounts -- --env path/to/file`,
+      `missing required environment variables: ${missing.join(", ")}.\nSee e2e/accounts/env.example; pass a file with: npm run e2e:accounts -- --env path/to/file`
     );
   }
   const get = (k: (typeof REQUIRED)[number]): string => src[k]!.trim();
   if (/vercel\.app/i.test(get("ACCOUNTS_URL"))) {
     throw new EnvError(
-      "ACCOUNTS_URL must be the dev host (https://accounts.dev.dimo.org), never a Vercel preview: the token audience would not match",
+      "ACCOUNTS_URL must be the dev host (https://accounts.dev.dimo.org), never a Vercel preview: the token audience would not match"
     );
   }
   const extraHosts = (src.E2E_EXTRA_DEV_HOSTS ?? "")
@@ -153,9 +140,7 @@ export function readEnv(src: NodeJS.ProcessEnv = process.env): E2eEnv {
   }
   const signMode = src.E2E_TURNKEY_SIGN_MODE?.trim() || "sha256-text";
   if (signMode !== "sha256-text" && signMode !== "noop-digest") {
-    throw new EnvError(
-      "E2E_TURNKEY_SIGN_MODE must be sha256-text or noop-digest",
-    );
+    throw new EnvError("E2E_TURNKEY_SIGN_MODE must be sha256-text or noop-digest");
   }
   const gas = src.E2E_GAS_PROVIDER?.trim() || "alchemy";
   if (gas !== "alchemy" && gas !== "gelato" && gas !== "pimlico") {

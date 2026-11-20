@@ -6,12 +6,13 @@
 import { createActivityPoller, type TurnkeyClient } from "@turnkey/http";
 import { hashMessage, hashTypedData, type Hex, type LocalAccount } from "viem";
 import { toAccount } from "viem/accounts";
+
 import { Failure } from "./harness.js";
 
 export function turnkeyViemAccount(
   client: TurnkeyClient,
   organizationId: string,
-  address: `0x${string}`,
+  address: `0x${string}`
 ): LocalAccount {
   const signHash = async (hash: Hex): Promise<Hex> => {
     const poller = createActivityPoller({
@@ -37,8 +38,7 @@ export function turnkeyViemAccount(
   return toAccount({
     address,
     signMessage: ({ message }) => signHash(hashMessage(message)),
-    signTypedData: (typedData) =>
-      signHash(hashTypedData(typedData as Parameters<typeof hashTypedData>[0])),
+    signTypedData: (typedData) => signHash(hashTypedData(typedData as Parameters<typeof hashTypedData>[0])),
     signTransaction: () => {
       throw new Failure("the e2e wallet account does not sign transactions");
     },

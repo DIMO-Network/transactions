@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { PolicyError as CorePolicyError } from "../../../src/accounts/core/errors.js";
+import { buildAddKey, computeCid, encodeSigningPayload, type Operation } from "../../../src/accounts/core/index.js";
 import { DirectoryClient } from "../../../src/accounts/directory/client.js";
 import { verifyAuditLog } from "../../../src/accounts/directory/verify.js";
 import {
@@ -14,22 +17,15 @@ import {
   NetworkError,
   PolicyError,
 } from "../../../src/accounts/errors.js";
-import { PolicyError as CorePolicyError } from "../../../src/accounts/core/errors.js";
-import {
-  buildAddKey,
-  computeCid,
-  encodeSigningPayload,
-  type Operation,
-} from "../../../src/accounts/core/index.js";
 import {
   FakeDirectory,
-  VECTOR_CHAIN_DID,
   json,
   k1Signer,
   router,
   signedVector,
   strictReceiver,
   vector,
+  VECTOR_CHAIN_DID,
   vectorChain,
 } from "../helpers.js";
 
@@ -37,9 +33,9 @@ const BASE = "https://dir.test";
 const DID = VECTOR_CHAIN_DID;
 
 function client(res: Response | (() => Response)) {
-  const fetchImpl = vi.fn<
-    (url: string, init?: RequestInit) => Promise<Response>
-  >(async () => (typeof res === "function" ? res() : res));
+  const fetchImpl = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async () =>
+    typeof res === "function" ? res() : res
+  );
   return {
     c: new DirectoryClient(BASE + "/", fetchImpl as unknown as typeof fetch),
     fetchImpl,
@@ -76,9 +72,7 @@ describe("DirectoryClient.resolve", () => {
 
   it("maps 404 to null and 410 to DeactivatedError", async () => {
     expect(await client(json({ error: "nf" }, 404)).c.resolve(DID)).toBeNull();
-    await expect(
-      client(json({ error: "gone" }, 410)).c.resolve(DID),
-    ).rejects.toBeInstanceOf(DeactivatedError);
+    await expect(client(json({ error: "gone" }, 410)).c.resolve(DID)).rejects.toBeInstanceOf(DeactivatedError);
   });
 
   it("refuses a 200 that is not JSON or names another DID", async () => {
@@ -100,9 +94,7 @@ describe("DirectoryClient.head (verified audit chain)", () => {
 
   it("verifies the genesis alone", async () => {
     const { c } = chainClient(1);
-    expect((await c.head(DID)).cid).toBe(
-      vector("genesis-wallet-r1-signing").cid,
-    );
+    expect((await c.head(DID)).cid).toBe(vector("genesis-wallet-r1-signing").cid);
   });
 
   it("throws DeactivatedError when the log ends in a tombstone (did-directory answers 200, not 410)", async () => {
@@ -112,22 +104,13 @@ describe("DirectoryClient.head (verified audit chain)", () => {
     expect((e as DeactivatedError).did).toBe(DID);
     const log = await c.auditLog(DID);
     expect(log.map((x) => x.cid)).toEqual(
-      [
-        "genesis-wallet-r1-signing",
-        "update-add-device",
-        "update-remove-device",
-        "tombstone",
-      ].map((n) => vector(n).cid),
+      ["genesis-wallet-r1-signing", "update-add-device", "update-remove-device", "tombstone"].map((n) => vector(n).cid)
     );
   });
 
   it("throws DidNotFoundError on 404 and on an empty log", async () => {
-    await expect(
-      client(json({ error: "nf" }, 404)).c.head(DID),
-    ).rejects.toBeInstanceOf(DidNotFoundError);
-    await expect(client(json([])).c.head(DID)).rejects.toBeInstanceOf(
-      DidNotFoundError,
-    );
+    await expect(client(json({ error: "nf" }, 404)).c.head(DID)).rejects.toBeInstanceOf(DidNotFoundError);
+    await expect(client(json([])).c.head(DID)).rejects.toBeInstanceOf(DidNotFoundError);
   });
 
   it("refuses a log that is not an array or not JSON", async () => {
@@ -162,8 +145,7 @@ describe("DirectoryClient.head (verified audit chain)", () => {
     [
       "an injected extra verification method",
       (e) => {
-        e[2]!.operation.verificationMethods.evil =
-          e[0]!.operation.rotationKeys[0]!;
+        e[2]!.operation.verificationMethods.evil = e[0]!.operation.rotationKeys[0]!;
         return e;
       },
       /is not the operation's cid/,
@@ -171,28 +153,15 @@ describe("DirectoryClient.head (verified audit chain)", () => {
     [
       "an injected verification method with a recomputed cid",
       (e) => {
-        e[2]!.operation.verificationMethods.evil =
-          e[0]!.operation.rotationKeys[0]!;
+        e[2]!.operation.verificationMethods.evil = e[0]!.operation.rotationKeys[0]!;
         e[2]!.cid = computeCid(e[2]!.operation);
         return e;
       },
       /signature does not verify/,
     ],
-    [
-      "a dropped middle entry (broken prev link)",
-      (e) => [e[0], e[2]],
-      /prev .* is not entry 0's cid/,
-    ],
-    [
-      "entries out of order",
-      (e) => [e[1], e[0], e[2]],
-      /genesis must be a plc_operation with prev null/,
-    ],
-    [
-      "an operation after a tombstone",
-      (e) => [...e, e[2]],
-      /after a tombstone/,
-    ],
+    ["a dropped middle entry (broken prev link)", (e) => [e[0], e[2]], /prev .* is not entry 0's cid/],
+    ["entries out of order", (e) => [e[1], e[0], e[2]], /genesis must be a plc_operation with prev null/],
+    ["an operation after a tombstone", (e) => [...e, e[2]], /after a tombstone/],
     [
       "an entry naming another DID",
       (e) => {
@@ -237,21 +206,14 @@ describe("DirectoryClient.head (verified audit chain)", () => {
     const dir = new FakeDirectory(BASE);
     const other = "did:dimo:aaaaaaaaaaaaaaaaaaaaaaaa";
     dir.seed(other, vectorChain().slice(0, 2));
-    const c = new DirectoryClient(
-      BASE,
-      router({ [BASE]: dir.fetch }) as unknown as typeof fetch,
-    );
+    const c = new DirectoryClient(BASE, router({ [BASE]: dir.fetch }) as unknown as typeof fetch);
     await integrity(c.head(other), /does not derive/);
   });
 
   it("refuses an update signed by a key that is not a rotation key", async () => {
     const { c, dir } = chainClient(2);
     const stranger = k1Signer("22".repeat(32));
-    await dir.append(
-      DID,
-      stranger,
-      (head, cid) => buildAddKey(head, cid, stranger.didKey).op,
-    );
+    await dir.append(DID, stranger, (head, cid) => buildAddKey(head, cid, stranger.didKey).op);
     await integrity(c.head(DID), /previous state's rotation keys/);
   });
 
@@ -270,36 +232,26 @@ describe("DirectoryClient.head (verified audit chain)", () => {
       rotationKeys: [second.didKey],
       prev: cid,
     }));
-    const c = new DirectoryClient(
-      BASE,
-      router({ [BASE]: dir.fetch }) as unknown as typeof fetch,
-    );
+    const c = new DirectoryClient(BASE, router({ [BASE]: dir.fetch }) as unknown as typeof fetch);
     expect((await c.head(did)).cid).toBe(dir.head(did).cid);
   });
 });
 
 describe("verifyAuditLog", () => {
   it("an empty log is not verified: DirectoryIntegrityError", () => {
-    expect(() => verifyAuditLog(VECTOR_CHAIN_DID, [])).toThrow(
-      DirectoryIntegrityError,
-    );
+    expect(() => verifyAuditLog(VECTOR_CHAIN_DID, [])).toThrow(DirectoryIntegrityError);
   });
 });
 
 describe("DirectoryClient.submit", () => {
   it("posts the op and returns did and the verified cid", async () => {
     const op = signedVector("update-add-device");
-    const { c, fetchImpl } = client(
-      json({ did: DID, cid: vector("update-add-device").cid }),
-    );
+    const { c, fetchImpl } = client(json({ did: DID, cid: vector("update-add-device").cid }));
     expect(await c.submit(DID, op)).toEqual({
       did: DID,
       cid: vector("update-add-device").cid,
     });
-    const [url, init] = fetchImpl.mock.calls[0] as unknown as [
-      string,
-      RequestInit,
-    ];
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe(`${BASE}/${DID}`);
     expect(init.method).toBe("POST");
     expect(JSON.parse(init.body as string)).toEqual(op);
@@ -307,12 +259,7 @@ describe("DirectoryClient.submit", () => {
 
   it("refuses a 200 whose cid is not the operation's", async () => {
     const op = signedVector("update-add-device");
-    await integrity(
-      client(json({ did: DID, cid: vector("tombstone").cid })).c.submit(
-        DID,
-        op,
-      ),
-    );
+    await integrity(client(json({ did: DID, cid: vector("tombstone").cid })).c.submit(DID, op));
     await integrity(client(json({ did: DID })).c.submit(DID, op));
     await integrity(client(() => new Response("ok")).c.submit(DID, op));
   });
@@ -321,16 +268,9 @@ describe("DirectoryClient.submit", () => {
     const wallet = k1Signer();
     const dir = new FakeDirectory(BASE);
     const did = await dir.seedGenesis(wallet);
-    const c = new DirectoryClient(
-      BASE,
-      router({ [BASE]: dir.fetch }) as unknown as typeof fetch,
-    );
+    const c = new DirectoryClient(BASE, router({ [BASE]: dir.fetch }) as unknown as typeof fetch);
     const head = await c.head(did);
-    const { op } = buildAddKey(
-      head.op,
-      head.cid,
-      k1Signer("44".repeat(32)).didKey,
-    );
+    const { op } = buildAddKey(head.op, head.cid, k1Signer("44".repeat(32)).didKey);
     const signed = { ...op, sig: await wallet.sign(encodeSigningPayload(op)) };
     const res = await c.submit(did, signed);
     expect(res.cid).toBe(dir.head(did).cid);
@@ -339,12 +279,12 @@ describe("DirectoryClient.submit", () => {
   it("maps 409 to HeadMovedError for updates and DidExistsError for a genesis", async () => {
     const update = signedVector("update-add-device");
     const genesis = signedVector("genesis-wallet-r1-signing");
-    await expect(
-      client(json({ error: "prev mismatch" }, 409)).c.submit(DID, update),
-    ).rejects.toBeInstanceOf(HeadMovedError);
-    await expect(
-      client(json({ error: "DID already exists" }, 409)).c.submit(DID, genesis),
-    ).rejects.toBeInstanceOf(DidExistsError);
+    await expect(client(json({ error: "prev mismatch" }, 409)).c.submit(DID, update)).rejects.toBeInstanceOf(
+      HeadMovedError
+    );
+    await expect(client(json({ error: "DID already exists" }, 409)).c.submit(DID, genesis)).rejects.toBeInstanceOf(
+      DidExistsError
+    );
   });
 
   it("maps 400 to DirectoryRejectedError with status and body", async () => {
@@ -359,9 +299,7 @@ describe("DirectoryClient.submit", () => {
   });
 
   it("handles a non-JSON error body", async () => {
-    const e = await client(
-      () => new Response("<html>nope</html>", { status: 400 }),
-    )
+    const e = await client(() => new Response("<html>nope</html>", { status: 400 }))
       .c.submit(DID, signedVector("update-add-device"))
       .catch((x: unknown) => x);
     expect(e).toBeInstanceOf(DirectoryRejectedError);
@@ -373,18 +311,16 @@ describe("DirectoryClient.submit", () => {
 describe("DirectoryClient transport", () => {
   const op = signedVector("update-add-device");
 
-  it.each([
-    "did:dimo:x/../../export",
-    "did:dimo:abc?x=1",
-    "did:dimo:abc#frag",
-    "did:dimo:abcdefghijklmnopqrstuvw",
-  ])("rejects bad DID %s with no fetch", async (bad) => {
-    const { c, fetchImpl } = client(json({}));
-    await expect(c.resolve(bad)).rejects.toBeInstanceOf(InvalidDidError);
-    await expect(c.head(bad)).rejects.toBeInstanceOf(InvalidDidError);
-    await expect(c.submit(bad, op)).rejects.toBeInstanceOf(InvalidDidError);
-    expect(fetchImpl).not.toHaveBeenCalled();
-  });
+  it.each(["did:dimo:x/../../export", "did:dimo:abc?x=1", "did:dimo:abc#frag", "did:dimo:abcdefghijklmnopqrstuvw"])(
+    "rejects bad DID %s with no fetch",
+    async (bad) => {
+      const { c, fetchImpl } = client(json({}));
+      await expect(c.resolve(bad)).rejects.toBeInstanceOf(InvalidDidError);
+      await expect(c.head(bad)).rejects.toBeInstanceOf(InvalidDidError);
+      await expect(c.submit(bad, op)).rejects.toBeInstanceOf(InvalidDidError);
+      expect(fetchImpl).not.toHaveBeenCalled();
+    }
+  );
 
   it("maps 5xx to DirectoryUnavailableError with status", async () => {
     const e = await client(json({ error: "down" }, 503))
@@ -393,12 +329,8 @@ describe("DirectoryClient transport", () => {
     expect(e).toBeInstanceOf(DirectoryUnavailableError);
     expect((e as DirectoryUnavailableError).status).toBe(503);
     expect((e as DirectoryUnavailableError).code).toBe("directory_unavailable");
-    await expect(client(json({}, 500)).c.head(DID)).rejects.toBeInstanceOf(
-      DirectoryUnavailableError,
-    );
-    await expect(
-      client(json({}, 502)).c.submit(DID, op),
-    ).rejects.toBeInstanceOf(DirectoryUnavailableError);
+    await expect(client(json({}, 500)).c.head(DID)).rejects.toBeInstanceOf(DirectoryUnavailableError);
+    await expect(client(json({}, 502)).c.submit(DID, op)).rejects.toBeInstanceOf(DirectoryUnavailableError);
   });
 
   it("wraps a fetch rejection in NetworkError with cause", async () => {
@@ -417,19 +349,13 @@ describe("DirectoryClient transport", () => {
 
   it("calls an injected fetch unbound (browsers throw Illegal invocation otherwise)", async () => {
     const { dir, fetchImpl } = chainClient(3);
-    const c = new DirectoryClient(
-      BASE,
-      strictReceiver(fetchImpl as unknown as typeof fetch),
-    );
+    const c = new DirectoryClient(BASE, strictReceiver(fetchImpl as unknown as typeof fetch));
     expect((await c.head(DID)).cid).toBe(dir.head(DID).cid);
   });
 
   it("calls the default global fetch unbound", async () => {
     const { dir, fetchImpl } = chainClient(3);
-    vi.stubGlobal(
-      "fetch",
-      strictReceiver(fetchImpl as unknown as typeof fetch),
-    );
+    vi.stubGlobal("fetch", strictReceiver(fetchImpl as unknown as typeof fetch));
     const c = new DirectoryClient(BASE);
     expect((await c.head(DID)).cid).toBe(dir.head(DID).cid);
   });

@@ -1,16 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { generateDpopKey } from "../../../src/accounts/auth/dpop.js";
 import { authedFetch } from "../../../src/accounts/auth/fetch.js";
 import { signIn } from "../../../src/accounts/auth/signin.js";
 import { verifyOpSignature } from "../../../src/accounts/core/index.js";
-import { WebCryptoP256Signer } from "../../../src/accounts/signers/webcrypto.js";
 import { NetworkError, SigninError, UsageError } from "../../../src/accounts/errors.js";
+import { WebCryptoP256Signer } from "../../../src/accounts/signers/webcrypto.js";
 import { cfgFor, fakeDauth, json, router } from "../helpers.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
-const claims = (proof: string) =>
-  JSON.parse(atob(proof.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/")));
+const claims = (proof: string) => JSON.parse(atob(proof.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/")));
 
 describe("signIn", () => {
   it("posts challenge with jkt then token with DPoP proof; signs challenge bytes", async () => {
@@ -21,14 +21,9 @@ describe("signIn", () => {
     let verified = false;
     vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
       calls.push({ url, init });
-      if (url.endsWith("/signin/challenge"))
-        return json({ challenge, nonce: "n1" });
+      if (url.endsWith("/signin/challenge")) return json({ challenge, nonce: "n1" });
       const body = JSON.parse(init.body as string);
-      verified = verifyOpSignature(
-        new TextEncoder().encode(challenge),
-        body.signature,
-        signer.didKey,
-      );
+      verified = verifyOpSignature(new TextEncoder().encode(challenge), body.signature, signer.didKey);
       return json({ token: "jwt", expires_in: 600, scope: "read write" });
     });
     const before = Date.now();
@@ -74,28 +69,23 @@ describe("signIn", () => {
         fragment: "wallet",
         scope: ["read"],
         dpopKey: await generateDpopKey(),
-      },
+      }
     );
-    const body = JSON.parse(
-      (f.mock.calls[0]![1] as RequestInit).body as string,
-    );
+    const body = JSON.parse((f.mock.calls[0]![1] as RequestInit).body as string);
     expect(body.audience).toEqual(["https://accounts.test"]);
   });
 
   it("audience: [] is a UsageError before any network call", async () => {
     const f = vi.fn();
     vi.stubGlobal("fetch", f);
-    const err = await signIn(
-      cfgFor({ fetchImpl: f as unknown as typeof fetch }),
-      {
-        did: "did:dimo:x",
-        signer: await WebCryptoP256Signer.generate(),
-        fragment: "wallet",
-        scope: ["read"],
-        audience: [],
-        dpopKey: await generateDpopKey(),
-      },
-    ).catch((e: unknown) => e);
+    const err = await signIn(cfgFor({ fetchImpl: f as unknown as typeof fetch }), {
+      did: "did:dimo:x",
+      signer: await WebCryptoP256Signer.generate(),
+      fragment: "wallet",
+      scope: ["read"],
+      audience: [],
+      dpopKey: await generateDpopKey(),
+    }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(UsageError);
     expect(err).toMatchObject({
       code: "audience_empty",
@@ -118,16 +108,13 @@ describe("signIn", () => {
         return json(body);
       },
     });
-    const err = await signIn(
-      cfgFor({ fetchImpl: f as unknown as typeof fetch }),
-      {
-        did: "did:dimo:x",
-        signer,
-        fragment: "wallet",
-        scope: ["read"],
-        dpopKey: await generateDpopKey(),
-      },
-    ).catch((e: unknown) => e);
+    const err = await signIn(cfgFor({ fetchImpl: f as unknown as typeof fetch }), {
+      did: "did:dimo:x",
+      signer,
+      fragment: "wallet",
+      scope: ["read"],
+      dpopKey: await generateDpopKey(),
+    }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(SigninError);
     expect(err).toMatchObject({ code: "invalid_challenge" });
     expect(sign).not.toHaveBeenCalled();
@@ -149,9 +136,7 @@ describe("signIn", () => {
   });
 
   it("surfaces the dauth error body", async () => {
-    vi.stubGlobal("fetch", async () =>
-      json({ error: "invalid_grant", error_description: "nope" }, 401),
-    );
+    vi.stubGlobal("fetch", async () => json({ error: "invalid_grant", error_description: "nope" }, 401));
     const err = await signIn(cfgFor({ dauthUrl: "https://d" }), {
       did: "did:dimo:x",
       signer: await WebCryptoP256Signer.generate(),
@@ -209,16 +194,13 @@ describe("signIn", () => {
 describe("signIn with an empty scope", () => {
   it("is a UsageError before any network call", async () => {
     const f = vi.fn();
-    const e = await signIn(
-      cfgFor({ fetchImpl: f as unknown as typeof fetch }),
-      {
-        did: "did:dimo:x",
-        signer: await WebCryptoP256Signer.generate(),
-        fragment: "wallet",
-        scope: [],
-        dpopKey: await generateDpopKey(),
-      },
-    ).catch((x: unknown) => x);
+    const e = await signIn(cfgFor({ fetchImpl: f as unknown as typeof fetch }), {
+      did: "did:dimo:x",
+      signer: await WebCryptoP256Signer.generate(),
+      fragment: "wallet",
+      scope: [],
+      dpopKey: await generateDpopKey(),
+    }).catch((x: unknown) => x);
     expect(e).toBeInstanceOf(UsageError);
     expect(e).toMatchObject({ code: "scope_missing" });
     expect(f).not.toHaveBeenCalled();
@@ -276,7 +258,7 @@ describe("signIn challenge validation", () => {
   const did = "did:dimo:x";
   async function run(
     mk: (jkt: string) => { challenge: string; nonce: string },
-    scope: Array<"read" | "write" | "approve"> = ["read"],
+    scope: Array<"read" | "write" | "approve"> = ["read"]
   ) {
     const real = await WebCryptoP256Signer.generate();
     let signed = 0;
@@ -290,9 +272,7 @@ describe("signIn challenge validation", () => {
     const dpopKey = await generateDpopKey();
     const jkt = await dpopKey.thumbprint();
     vi.stubGlobal("fetch", async (url: string) =>
-      url.endsWith("/signin/challenge")
-        ? json(mk(jkt))
-        : json({ token: "t", expires_in: 1 }),
+      url.endsWith("/signin/challenge") ? json(mk(jkt)) : json({ token: "t", expires_in: 1 })
     );
     const r = await signIn(cfgFor({ dauthUrl: "https://d" }), {
       did,
@@ -331,17 +311,9 @@ describe("signIn challenge validation", () => {
     }
   });
   it("the For: line must equal the audience exactly, not merely contain it", async () => {
-    for (const forLine of [
-      "dimo.org.evil.example",
-      "evil.example, dimo.org",
-      "dimo.org, evil.example",
-      "xdimo.org",
-    ]) {
+    for (const forLine of ["dimo.org.evil.example", "evil.example, dimo.org", "dimo.org, evil.example", "xdimo.org"]) {
       const { r, signed } = await run((j) => ({
-        challenge: text(did, j, "n").replace(
-          "For: dimo.org",
-          `For: ${forLine}`,
-        ),
+        challenge: text(did, j, "n").replace("For: dimo.org", `For: ${forLine}`),
         nonce: "n",
       }));
       expect(r, forLine).toBeInstanceOf(SigninError);
@@ -353,7 +325,7 @@ describe("signIn challenge validation", () => {
   it("accepts scopes in any order against dauth's canonical order", async () => {
     const { r, signed } = await run(
       (j) => ({ challenge: text(did, j, "n", "read write"), nonce: "n" }),
-      ["write", "read"],
+      ["write", "read"]
     );
     expect(r.token).toBe("t");
     expect(signed).toBe(1);

@@ -1,19 +1,15 @@
+import type { SdkConfig } from "../config.js";
 import {
   buildAddKey,
   buildRemoveKey,
   buildSetAliases,
   encodeSigningPayload,
   isValidFragment,
-  verifyOpSignature,
   type Operation,
   type UnsignedOperation,
+  verifyOpSignature,
 } from "../core/index.js";
-import type { SdkConfig } from "../config.js";
-import {
-  directoryFor,
-  type AuditEntry,
-  type DirectoryClient,
-} from "../directory/client.js";
+import { type AuditEntry, type DirectoryClient, directoryFor } from "../directory/client.js";
 import { DeactivatedError, HeadMovedError, PolicyError } from "../errors.js";
 import type { Signer } from "../signers/types.js";
 
@@ -32,15 +28,8 @@ type Step<T> = {
    * Already applied on this head? Then return without signing. `log` is the verified
    * audit log the head came from (read once per attempt).
    */
-  done?: (
-    head: UnsignedOperation,
-    cid: string,
-    log: readonly AuditEntry[],
-  ) => T | undefined;
-  build: (
-    head: UnsignedOperation,
-    prevCid: string,
-  ) => { op: UnsignedOperation; extra: T };
+  done?: (head: UnsignedOperation, cid: string, log: readonly AuditEntry[]) => T | undefined;
+  build: (head: UnsignedOperation, prevCid: string) => { op: UnsignedOperation; extra: T };
   prove?: (payload: Uint8Array) => Promise<void>;
 };
 
@@ -50,11 +39,7 @@ type Step<T> = {
  * Idempotent: if the head already has the change, returns its cid without signing, so a
  * call whose outcome was unknown (NetworkError, DirectoryUnavailableError) can be repeated.
  */
-async function change<T>(
-  cfg: SdkConfig,
-  args: KeyChangeArgs,
-  step: Step<T>,
-): Promise<{ cid: string } & T> {
+async function change<T>(cfg: SdkConfig, args: KeyChangeArgs, step: Step<T>): Promise<{ cid: string } & T> {
   const directory = directoryFor(cfg, args.directory);
   const { did, wallet } = args;
   for (let attempt = 1; ; attempt++) {
@@ -62,15 +47,11 @@ async function change<T>(
     // last entry of this same log, so reading it separately would fetch the log twice).
     const log = await directory.auditLog(did);
     const last = log.at(-1)!;
-    if (last.operation.type === "plc_tombstone")
-      throw new DeactivatedError(did);
+    if (last.operation.type === "plc_tombstone") throw new DeactivatedError(did);
     const { cid: prevCid, operation: headOp } = last;
     // Only a rotation key of the head can sign an update: a wrong wallet never signs.
     if (!headOp.rotationKeys.includes(wallet.didKey)) {
-      throw new PolicyError(
-        "rotation_locked",
-        "wallet is not a rotation key of this DID",
-      );
+      throw new PolicyError("rotation_locked", "wallet is not a rotation key of this DID");
     }
     // Builders copy only the unsigned fields, so the head's sig is not carried over.
     const head: UnsignedOperation = headOp;
@@ -91,16 +72,10 @@ async function change<T>(
 }
 
 /** Have `key` sign `payload` and check the signature verifies under its did:key. */
-export async function proveKey(
-  key: Signer,
-  payload: Uint8Array,
-): Promise<void> {
+export async function proveKey(key: Signer, payload: Uint8Array): Promise<void> {
   const proof = await key.sign(payload);
   if (!verifyOpSignature(payload, proof, key.didKey)) {
-    throw new PolicyError(
-      "proof_invalid",
-      `key ${key.didKey} failed proof of possession`,
-    );
+    throw new PolicyError("proof_invalid", `key ${key.didKey} failed proof of possession`);
   }
 }
 
@@ -120,11 +95,10 @@ export async function addDeviceKey(
     fragment?: string;
     /** Add newKey even though an earlier entry of the audit log had it (it was removed). */
     allowReAdd?: boolean;
-  },
+  }
 ): Promise<{ cid: string; fragment: string }> {
   const { newKey, fragment } = args;
-  const has = (vms: Readonly<Record<string, string>>) =>
-    Object.entries(vms).find(([, key]) => key === newKey.didKey);
+  const has = (vms: Readonly<Record<string, string>>) => Object.entries(vms).find(([, key]) => key === newKey.didKey);
   return change(cfg, args, {
     done: (head, prevCid, log) => {
       const existing = has(head.verificationMethods);
@@ -133,20 +107,12 @@ export async function addDeviceKey(
       const headIndex = log.findIndex((e) => e.cid === prevCid);
       const earlier = log.slice(0, headIndex === -1 ? log.length : headIndex);
       if (earlier.some((e) => has(e.operation.verificationMethods))) {
-        throw new PolicyError(
-          "key_removed",
-          "key was removed from this DID; pass allowReAdd to add it again",
-        );
+        throw new PolicyError("key_removed", "key was removed from this DID; pass allowReAdd to add it again");
       }
       return undefined;
     },
     build: (head, prevCid) => {
-      const { op, fragment: frag } = buildAddKey(
-        head,
-        prevCid,
-        newKey.didKey,
-        fragment,
-      );
+      const { op, fragment: frag } = buildAddKey(head, prevCid, newKey.didKey, fragment);
       return { op, extra: { fragment: frag } };
     },
     prove: (payload) => proveKey(newKey, payload),
@@ -169,40 +135,28 @@ export async function addDeviceKey(
  */
 export async function removeDeviceKey(
   cfg: SdkConfig,
-  args: KeyChangeArgs & { fragment: string; key?: string },
+  args: KeyChangeArgs & { fragment: string; key?: string }
 ): Promise<{ cid: string }> {
   const { fragment, key } = args;
   // Fail fast, before any network call.
   if (!isValidFragment(fragment))
     throw new PolicyError(
       "fragment_invalid",
-      `invalid fragment ${JSON.stringify(fragment)}: pass the fragment only (for example "device-2"), without "#" or a DID`,
+      `invalid fragment ${JSON.stringify(fragment)}: pass the fragment only (for example "device-2"), without "#" or a DID`
     );
-  if (fragment === "wallet")
-    throw new PolicyError(
-      "wallet_required",
-      "the wallet key cannot be removed",
-    );
+  if (fragment === "wallet") throw new PolicyError("wallet_required", "the wallet key cannot be removed");
   const holds = (vms: Readonly<Record<string, string>>): boolean =>
-    Object.hasOwn(vms, fragment) &&
-    (key === undefined || vms[fragment] === key);
+    Object.hasOwn(vms, fragment) && (key === undefined || vms[fragment] === key);
   return change(cfg, args, {
     done: (head, prevCid, log) => {
       if (Object.hasOwn(head.verificationMethods, fragment)) {
         if (holds(head.verificationMethods)) return undefined;
-        throw new PolicyError(
-          "fragment_invalid",
-          "fragment now holds a different key",
-        );
+        throw new PolicyError("fragment_invalid", "fragment now holds a different key");
       }
       const headIndex = log.findIndex((e) => e.cid === prevCid);
       const earlier = log.slice(0, headIndex === -1 ? log.length : headIndex);
-      if (earlier.some((e) => holds(e.operation.verificationMethods)))
-        return {};
-      throw new PolicyError(
-        "fragment_invalid",
-        `fragment ${JSON.stringify(fragment)} does not exist on this DID`,
-      );
+      if (earlier.some((e) => holds(e.operation.verificationMethods))) return {};
+      throw new PolicyError("fragment_invalid", `fragment ${JSON.stringify(fragment)} does not exist on this DID`);
     },
     build: (head, prevCid) => ({
       op: buildRemoveKey(head, prevCid, fragment),
@@ -212,8 +166,7 @@ export async function removeDeviceKey(
 }
 
 const sameSet = (a: readonly string[], b: readonly string[]): boolean =>
-  a.length === b.length &&
-  [...a].sort().every((x, i) => x === [...b].sort()[i]);
+  a.length === b.length && [...a].sort().every((x, i) => x === [...b].sort()[i]);
 
 /**
  * Replace alsoKnownAs (did:ethr:<chainId>:<EIP-55 address> entries). If the head already
@@ -221,7 +174,7 @@ const sameSet = (a: readonly string[], b: readonly string[]): boolean =>
  */
 export async function setAliases(
   cfg: SdkConfig,
-  args: KeyChangeArgs & { aliases: string[] },
+  args: KeyChangeArgs & { aliases: string[] }
 ): Promise<{ cid: string }> {
   const { aliases } = args;
   return change(cfg, args, {

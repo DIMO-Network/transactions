@@ -1,7 +1,8 @@
-import { createActivityPoller, type TurnkeyClient } from "@turnkey/http";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
+import { createActivityPoller, type TurnkeyClient } from "@turnkey/http";
+
 import {
   didKeyFromCompressed,
   EncodingError,
@@ -30,11 +31,7 @@ function utf8(payload: Uint8Array): string {
   try {
     return new TextDecoder("utf-8", { fatal: true }).decode(payload);
   } catch (cause) {
-    throw new EncodingError(
-      "utf8_invalid",
-      "sha256-text mode needs a UTF-8 payload",
-      { cause },
-    );
+    throw new EncodingError("utf8_invalid", "sha256-text mode needs a UTF-8 payload", { cause });
   }
 }
 
@@ -77,14 +74,10 @@ export class TurnkeyWalletSigner implements Signer {
       parameters: { signWith: this.walletAddress, ...params },
     });
     const res = activity.result.signRawPayloadResult;
-    if (!res)
-      throw new TurnkeyError("no_signature", "Turnkey returned no signature");
+    if (!res) throw new TurnkeyError("no_signature", "Turnkey returned no signature");
     const sig = rsToSig(res.r, res.s);
     if (!verifyOpSignature(payload, sig, this.didKey)) {
-      throw new TurnkeyError(
-        "signature_invalid",
-        "Turnkey signature failed verification against the wallet did:key",
-      );
+      throw new TurnkeyError("signature_invalid", "Turnkey signature failed verification against the wallet did:key");
     }
     return sig;
   }
@@ -100,7 +93,7 @@ export async function turnkeyWalletDidKey(
   client: TurnkeyClient,
   organizationId: string,
   walletAddress: `0x${string}`,
-  opts: { walletId?: string } = {},
+  opts: { walletId?: string } = {}
 ): Promise<string> {
   const { accounts } = await client.getWalletAccounts({
     organizationId,
@@ -108,35 +101,18 @@ export async function turnkeyWalletDidKey(
   });
   const want = walletAddress.toLowerCase();
   const toDidKey = (raw: string): string =>
-    didKeyFromCompressed(
-      "secp256k1",
-      secp256k1.Point.fromBytes(hexToBytes(raw.replace(/^0x/i, ""))).toBytes(
-        true,
-      ),
-    );
-  const matches = (didKey: string): boolean =>
-    ethAddressFromDidKey(didKey).toLowerCase() === want;
+    didKeyFromCompressed("secp256k1", secp256k1.Point.fromBytes(hexToBytes(raw.replace(/^0x/i, ""))).toBytes(true));
+  const matches = (didKey: string): boolean => ethAddressFromDidKey(didKey).toLowerCase() === want;
 
-  const eth = accounts.find(
-    (a) =>
-      a.addressFormat === "ADDRESS_FORMAT_ETHEREUM" &&
-      a.address.toLowerCase() === want,
-  );
+  const eth = accounts.find((a) => a.addressFormat === "ADDRESS_FORMAT_ETHEREUM" && a.address.toLowerCase() === want);
   if (eth?.publicKey) {
     const didKey = toDidKey(eth.publicKey);
     if (!matches(didKey))
-      throw new TurnkeyError(
-        "public_key_mismatch",
-        `public key does not match wallet address ${walletAddress}`,
-      );
+      throw new TurnkeyError("public_key_mismatch", `public key does not match wallet address ${walletAddress}`);
     return didKey;
   }
   for (const a of accounts) {
-    if (
-      a.addressFormat !== "ADDRESS_FORMAT_COMPRESSED" ||
-      a.path !== "m/44'/60'/0'/0/0"
-    )
-      continue;
+    if (a.addressFormat !== "ADDRESS_FORMAT_COMPRESSED" || a.path !== "m/44'/60'/0'/0/0") continue;
     try {
       const didKey = toDidKey(a.address);
       if (matches(didKey)) return didKey;
@@ -146,6 +122,6 @@ export async function turnkeyWalletDidKey(
   }
   throw new TurnkeyError(
     "public_key_missing",
-    `no public key for ${walletAddress}: the Ethereum account has no publicKey and no ADDRESS_FORMAT_COMPRESSED account on m/44'/60'/0'/0/0 matches it`,
+    `no public key for ${walletAddress}: the Ethereum account has no publicKey and no ADDRESS_FORMAT_COMPRESSED account on m/44'/60'/0'/0/0 matches it`
   );
 }
