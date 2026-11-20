@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { claimDid } from "../../src/account/claim.js";
-import { generateDpopKey } from "../../src/auth/dpop.js";
-import { WebCryptoP256Signer } from "../../src/signers/webcrypto.js";
-import { buildGenesis, deriveDid } from "../../src/core/index.js";
+import { claimDid } from "../../../src/accounts/account/claim.js";
+import { generateDpopKey } from "../../../src/accounts/auth/dpop.js";
+import { WebCryptoP256Signer } from "../../../src/accounts/signers/webcrypto.js";
+import { buildGenesis, deriveDid } from "../../../src/accounts/core/index.js";
 import {
   AccountsError,
   DeactivatedError,
   DirectoryRejectedError,
   PolicyError,
-} from "../../src/errors.js";
+} from "../../../src/accounts/errors.js";
 import {
   FakeDirectory,
   cfgFor,
@@ -205,7 +205,7 @@ describe("claimDid", () => {
     const wallet = await WebCryptoP256Signer.generate();
     const genesis = buildGenesis({ walletKey: wallet.didKey });
     const did = deriveDid(genesis);
-    const { cfg, calls } = setup(async (url, init) =>
+    const { cfg, calls } = setup(async (_url, init) =>
       init.method === "PUT"
         ? json({ error: { code: "did_already_linked", message: "x" } }, 409)
         : json(viewFor(did)),
@@ -221,7 +221,7 @@ describe("claimDid", () => {
 
   it("a 409 is still an AccountsError when GET /me shows another DID", async () => {
     const wallet = await WebCryptoP256Signer.generate();
-    const { cfg } = setup(async (url, init) =>
+    const { cfg } = setup(async (_url, init) =>
       init.method === "PUT"
         ? json({ error: { code: "did_taken", message: "taken" } }, 409)
         : json(viewFor("did:dimo:someoneelseentirelyxxx")),

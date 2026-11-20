@@ -1,4 +1,4 @@
-import { generateDpopKey, getMe } from "../src/index.js";
+import { generateDpopKey, getMe } from "../../src/accounts/index.js";
 import { check, eq, signInWith, signup, type Scenario } from "./harness.js";
 
 /**

@@ -1,4 +1,4 @@
-import { normalizeUrl } from "../src/index.js";
+import { normalizeUrl } from "../../src/accounts/index.js";
 import {
   Failure,
   Skip,

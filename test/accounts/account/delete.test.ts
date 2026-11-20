@@ -6,9 +6,9 @@ import {
   encodeSigningPayload,
   toChecksumAddress,
   verifyOpSignature,
-} from "../../src/core/index.js";
-import { generateDpopKey } from "../../src/auth/dpop.js";
-import type { Session } from "../../src/auth/signin.js";
+} from "../../../src/accounts/core/index.js";
+import { generateDpopKey } from "../../../src/accounts/auth/dpop.js";
+import type { Session } from "../../../src/accounts/auth/signin.js";
 import {
   AccountsError,
   DeactivatedError,
@@ -16,14 +16,14 @@ import {
   HeadMovedError,
   NetworkError,
   UsageError,
-} from "../../src/errors.js";
+} from "../../../src/accounts/errors.js";
 import {
   deleteAccount,
   resumeDelete,
   DeleteHeadMovedError,
   DeleteIncompleteError,
   type PendingDeletion,
-} from "../../src/account/delete.js";
+} from "../../../src/accounts/account/delete.js";
 import {
   FakeDirectory,
   cfgFor,

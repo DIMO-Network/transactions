@@ -1,6 +1,6 @@
 /** v1 account creation (setup for E8 and E9): POST /api/account. */
 import { randomBytes } from "node:crypto";
-import { normalizeUrl } from "../src/index.js";
+import { normalizeUrl } from "../../src/accounts/index.js";
 import { makePasskey } from "./software-authenticator.js";
 import { Failure, type Ctx } from "./harness.js";
 

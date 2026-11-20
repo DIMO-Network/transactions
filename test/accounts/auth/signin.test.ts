@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { generateDpopKey } from "../../src/auth/dpop.js";
-import { authedFetch } from "../../src/auth/fetch.js";
-import { signIn } from "../../src/auth/signin.js";
-import { verifyOpSignature } from "../../src/core/index.js";
-import { WebCryptoP256Signer } from "../../src/signers/webcrypto.js";
-import { NetworkError, SigninError, UsageError } from "../../src/errors.js";
+import { generateDpopKey } from "../../../src/accounts/auth/dpop.js";
+import { authedFetch } from "../../../src/accounts/auth/fetch.js";
+import { signIn } from "../../../src/accounts/auth/signin.js";
+import { verifyOpSignature } from "../../../src/accounts/core/index.js";
+import { WebCryptoP256Signer } from "../../../src/accounts/signers/webcrypto.js";
+import { NetworkError, SigninError, UsageError } from "../../../src/accounts/errors.js";
 import { cfgFor, fakeDauth, json, router } from "../helpers.js";
 
 afterEach(() => vi.unstubAllGlobals());

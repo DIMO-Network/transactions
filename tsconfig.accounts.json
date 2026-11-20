@@ -1,5 +1,5 @@
 {
-  // Type-checks the accounts modules with the compiler options they were
+  // Type-checks the accounts modules, their tests and e2e suite with the compiler options they were
   // written against (ES2022, bundler resolution, noUncheckedIndexedAccess). tsup builds
   // src/accounts with it too. The rest of the repo uses tsconfig.json / tsconfig.build.json.
   "compilerOptions": {
@@ -22,5 +22,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["src/accounts", "tsup.config.ts"]
+  "include": ["src/accounts", "test/accounts", "e2e/accounts", "tsup.config.ts"]
 }

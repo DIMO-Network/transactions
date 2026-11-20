@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DirectoryClient } from "../../src/directory/client.js";
-import { verifyAuditLog } from "../../src/directory/verify.js";
+import { DirectoryClient } from "../../../src/accounts/directory/client.js";
+import { verifyAuditLog } from "../../../src/accounts/directory/verify.js";
 import {
   AccountSdkError,
   DeactivatedError,
@@ -13,14 +13,14 @@ import {
   InvalidDidError,
   NetworkError,
   PolicyError,
-} from "../../src/errors.js";
-import { PolicyError as CorePolicyError } from "../../src/core/errors.js";
+} from "../../../src/accounts/errors.js";
+import { PolicyError as CorePolicyError } from "../../../src/accounts/core/errors.js";
 import {
   buildAddKey,
   computeCid,
   encodeSigningPayload,
   type Operation,
-} from "../../src/core/index.js";
+} from "../../../src/accounts/core/index.js";
 import {
   FakeDirectory,
   VECTOR_CHAIN_DID,

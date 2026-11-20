@@ -7,8 +7,8 @@ import {
   dpopKeyFromKeyPair,
   generateDpopKey,
   jwkThumbprint,
-} from "../../src/auth/dpop.js";
-import { authedFetch } from "../../src/auth/fetch.js";
+} from "../../../src/accounts/auth/dpop.js";
+import { authedFetch } from "../../../src/accounts/auth/fetch.js";
 
 const b64u = (b: Uint8Array) => base64url.encode(b).replace(/=+$/, "");
 const fromB64u = (s: string) =>

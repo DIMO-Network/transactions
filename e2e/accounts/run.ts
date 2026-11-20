@@ -1,8 +1,8 @@
 /**
- * End-to-end suite for accounts v2 (dev only). `npm run e2e [-- --env file] [--only E1,E5]`.
+ * End-to-end suite for accounts v2 (dev only). `npm run e2e:accounts [-- --env file] [--only E1,E5]`.
  * Prints one PASS / FAIL / SKIP line per scenario and exits 1 on any FAIL, 2 on bad setup.
  */
-import { AccountSdkError } from "../src/index.js";
+import { AccountSdkError } from "../../src/accounts/index.js";
 import { EnvError, loadEnvFile, readEnv } from "./env.js";
 import {
   Failure,

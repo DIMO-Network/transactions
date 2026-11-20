@@ -5,7 +5,7 @@ import {
   generateDpopKey,
   getMe,
   authedFetch,
-} from "../src/index.js";
+} from "../../src/accounts/index.js";
 import {
   CHAIN_ID,
   accountsApi,

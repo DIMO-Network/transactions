@@ -1,4 +1,4 @@
-import { authedFetch, lookupByWallet, normalizeUrl } from "../src/index.js";
+import { authedFetch, lookupByWallet, normalizeUrl } from "../../src/accounts/index.js";
 import {
   accountsRaw,
   deleteUser,

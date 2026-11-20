@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { decodeDidKey, verifyOpSignature } from "../../src/core/index.js";
-import { WebCryptoP256Signer } from "../../src/signers/webcrypto.js";
-import { dpopKeyFromKeyPair } from "../../src/auth/dpop.js";
+import { decodeDidKey, verifyOpSignature } from "../../../src/accounts/core/index.js";
+import { WebCryptoP256Signer } from "../../../src/accounts/signers/webcrypto.js";
+import { dpopKeyFromKeyPair } from "../../../src/accounts/auth/dpop.js";
 
 describe("WebCryptoP256Signer", () => {
   it("produces a p256 did:key and signatures that verify", async () => {

@@ -1,4 +1,4 @@
-import { generateDpopKey, getMe, recordSignIn } from "../src/index.js";
+import { generateDpopKey, getMe, recordSignIn } from "../../src/accounts/index.js";
 import {
   check,
   eq,

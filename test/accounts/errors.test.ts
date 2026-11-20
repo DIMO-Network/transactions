@@ -1,8 +1,8 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import * as sdk from "../src/index.js";
-import * as core from "../src/core/index.js";
+import * as sdk from "../../src/accounts/index.js";
+import * as core from "../../src/accounts/core/index.js";
 
 const errorClasses = (mod: Record<string, unknown>) =>
   Object.entries(mod).filter(
@@ -158,7 +158,7 @@ describe("error hierarchy", () => {
   });
 
   it("src throws no plain Error or AggregateError", () => {
-    const offenders = files(join(__dirname, "../src"))
+    const offenders = files(join(__dirname, "../../src/accounts"))
       .filter((f) => f.endsWith(".ts"))
       .filter((f) =>
         /new (Error|AggregateError|TypeError)\(/.test(readFileSync(f, "utf8")),

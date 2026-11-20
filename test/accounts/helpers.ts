@@ -13,9 +13,9 @@ import {
   verifyOpSignature,
   type Operation,
   type UnsignedOperation,
-} from "../src/core/index.js";
-import type { SdkConfig } from "../src/config.js";
-import type { Signer } from "../src/signers/types.js";
+} from "../../src/accounts/core/index.js";
+import type { SdkConfig } from "../../src/accounts/config.js";
+import type { Signer } from "../../src/accounts/signers/types.js";
 
 export type VectorCase = {
   name: string;

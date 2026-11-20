@@ -1,4 +1,4 @@
-import { AccountsError, createAccount } from "../src/index.js";
+import { AccountsError, createAccount } from "../../src/accounts/index.js";
 import {
   Failure,
   assertDimoOnlyRoot,

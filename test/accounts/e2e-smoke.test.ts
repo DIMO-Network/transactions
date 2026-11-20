@@ -5,8 +5,8 @@ import {
   isDevUrl,
   parsePartnerKey,
   readEnv,
-} from "../e2e/env.js";
-import { GATED_ELSEWHERE, SCENARIOS } from "../e2e/scenarios.js";
+} from "../../e2e/accounts/env.js";
+import { GATED_ELSEWHERE, SCENARIOS } from "../../e2e/accounts/scenarios.js";
 
 const devEnv = (): Record<string, string> => ({
   ...Object.fromEntries(REQUIRED.map((k) => [k, "x"])),

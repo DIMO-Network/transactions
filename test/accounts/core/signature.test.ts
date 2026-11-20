@@ -10,7 +10,7 @@ import {
   didKeyFromCompressed,
   rsToSig,
   verifyOpSignature,
-} from "../../src/core/index.js";
+} from "../../../src/accounts/core/index.js";
 
 const cases = vectors.cases as unknown as {
   name: string;

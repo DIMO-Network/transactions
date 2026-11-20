@@ -30,15 +30,15 @@ import {
   UserOperationPendingError,
   UserOperationRevertedError,
   UserOperationUnknownError,
-} from "../../src/errors.js";
-import { generateDpopKey } from "../../src/auth/dpop.js";
+} from "../../../src/accounts/errors.js";
+import { generateDpopKey } from "../../../src/accounts/auth/dpop.js";
 import { strictReceiver } from "../helpers.js";
-import type { Session } from "../../src/auth/signin.js";
-import type { SdkConfig } from "../../src/config.js";
+import type { Session } from "../../../src/accounts/auth/signin.js";
+import type { SdkConfig } from "../../../src/accounts/config.js";
 import {
   deploySmartAccount,
   sendUserOperation,
-} from "../../src/account/smart-account.js";
+} from "../../../src/accounts/account/smart-account.js";
 
 const CHAIN_ID = 80002;
 const PAYMASTER = "0x0000000000000000000000000000000000000abc";

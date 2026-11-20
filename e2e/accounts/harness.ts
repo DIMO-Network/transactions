@@ -28,7 +28,7 @@ import {
   type Session,
   type Scope,
   type Signer,
-} from "../src/index.js";
+} from "../../src/accounts/index.js";
 import type { E2eEnv } from "./env.js";
 
 export const CHAIN_ID = 80002;

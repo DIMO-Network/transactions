@@ -2,16 +2,16 @@
 // but the global. Every module must call cfg.fetchImpl (or the default global fetch) unbound.
 import type { TurnkeyClient } from "@turnkey/http";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { claimDid } from "../src/account/claim.js";
-import { deleteAccount } from "../src/account/delete.js";
-import { addDeviceKey } from "../src/account/keys.js";
-import { requestEmailCode } from "../src/account/login.js";
-import { generateDpopKey } from "../src/auth/dpop.js";
-import { authedFetch } from "../src/auth/fetch.js";
-import { signIn } from "../src/auth/signin.js";
-import type { SdkConfig } from "../src/config.js";
-import { DirectoryClient } from "../src/directory/client.js";
-import { WebCryptoP256Signer } from "../src/signers/webcrypto.js";
+import { claimDid } from "../../src/accounts/account/claim.js";
+import { deleteAccount } from "../../src/accounts/account/delete.js";
+import { addDeviceKey } from "../../src/accounts/account/keys.js";
+import { requestEmailCode } from "../../src/accounts/account/login.js";
+import { generateDpopKey } from "../../src/accounts/auth/dpop.js";
+import { authedFetch } from "../../src/accounts/auth/fetch.js";
+import { signIn } from "../../src/accounts/auth/signin.js";
+import type { SdkConfig } from "../../src/accounts/config.js";
+import { DirectoryClient } from "../../src/accounts/directory/client.js";
+import { WebCryptoP256Signer } from "../../src/accounts/signers/webcrypto.js";
 import {
   FakeDirectory,
   cfgFor,
@@ -29,7 +29,7 @@ async function world() {
   const routes = router({
     [dir.base]: dir.fetch,
     "https://dauth.test": fakeDauth(),
-    "https://accounts.test": async (url, init) =>
+    "https://accounts.test": async (_url, init) =>
       init.method === "POST"
         ? json({ codeId: "c1" }, 202)
         : init.method === "PUT"

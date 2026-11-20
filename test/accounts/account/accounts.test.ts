@@ -6,11 +6,11 @@ import {
   recordSignIn,
   type AccountView,
   type CreateAccountInput,
-} from "../../src/account/accounts.js";
-import { generateDpopKey } from "../../src/auth/dpop.js";
-import type { Session } from "../../src/auth/signin.js";
-import { SIGNUP_POP_MESSAGE, verifyOpSignature } from "../../src/core/index.js";
-import { WebCryptoP256Signer } from "../../src/signers/webcrypto.js";
+} from "../../../src/accounts/account/accounts.js";
+import { generateDpopKey } from "../../../src/accounts/auth/dpop.js";
+import type { Session } from "../../../src/accounts/auth/signin.js";
+import { SIGNUP_POP_MESSAGE, verifyOpSignature } from "../../../src/accounts/core/index.js";
+import { WebCryptoP256Signer } from "../../../src/accounts/signers/webcrypto.js";
 import { cfgFor, json, router } from "./../helpers.js";
 
 const ACCOUNTS = "https://accounts.test";

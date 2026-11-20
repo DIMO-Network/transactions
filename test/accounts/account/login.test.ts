@@ -4,9 +4,9 @@ import {
   loginWithEmail,
   loginWithPasskey,
   requestEmailCode,
-} from "../../src/account/login.js";
-import { AccountsError, NetworkError, TurnkeyError } from "../../src/errors.js";
-import type { SdkConfig } from "../../src/config.js";
+} from "../../../src/accounts/account/login.js";
+import { AccountsError, NetworkError, TurnkeyError } from "../../../src/accounts/errors.js";
+import type { SdkConfig } from "../../../src/accounts/config.js";
 
 const base: SdkConfig = {
   accountsUrl: "https://accounts.test/",

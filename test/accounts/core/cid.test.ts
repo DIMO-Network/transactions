@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import vectors from "../fixtures/did-ops.json";
-import { computeCid, type UnsignedOperation } from "../../src/core/index.js";
+import { computeCid, type UnsignedOperation } from "../../../src/accounts/core/index.js";
 
 const cases = vectors.cases as unknown as {
   name: string;

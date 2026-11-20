@@ -1,4 +1,4 @@
-import { WebCryptoP256Signer } from "../src/index.js";
+import { WebCryptoP256Signer } from "../../src/accounts/index.js";
 import {
   check,
   eq,
@@ -14,7 +14,7 @@ import {
   walletDidKeyOf,
   type Scenario,
 } from "./harness.js";
-import { createAccount } from "../src/index.js";
+import { createAccount } from "../../src/accounts/index.js";
 
 /**
  * E2. Creation for a new email with an email code and an r1 phone key.

@@ -5,7 +5,7 @@ import {
   generateDpopKey,
   getMe,
   lookupByWallet,
-} from "../src/index.js";
+} from "../../src/accounts/index.js";
 import {
   Failure,
   assertEndUserIsRoot,

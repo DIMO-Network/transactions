@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TurnkeyClient } from "@turnkey/http";
-import { addPasskey, removePasskey } from "../../src/account/passkeys.js";
+import { addPasskey, removePasskey } from "../../../src/accounts/account/passkeys.js";
 
 const att = {
   credentialId: "c",

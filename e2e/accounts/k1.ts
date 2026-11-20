@@ -1,9 +1,9 @@
 /** A secp256k1 signer for a real key that no account owns (E9's "stranger" wallet). */
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { base64url } from "@scure/base";
-import type { Signer } from "../src/index.js";
+import type { Signer } from "../../src/accounts/index.js";
 // Not in the public index: the did:key encoder is only needed to name this throwaway key.
-import { didKeyFromCompressed } from "../src/core/index.js";
+import { didKeyFromCompressed } from "../../src/accounts/core/index.js";
 
 export function strangerWallet(): Signer {
   const priv = secp256k1.utils.randomSecretKey();

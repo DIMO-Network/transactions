@@ -3,7 +3,7 @@ import {
   generateDpopKey,
   signIn,
   type Session,
-} from "../src/index.js";
+} from "../../src/accounts/index.js";
 import type { Ctx } from "./harness.js";
 
 /** A P-256 signer over the partner's private JWK (E2E_PARTNER_DID_KEY). */

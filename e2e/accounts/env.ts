@@ -135,7 +135,7 @@ export function readEnv(src: NodeJS.ProcessEnv = process.env): E2eEnv {
   const missing = REQUIRED.filter((k) => !src[k]?.trim());
   if (missing.length > 0) {
     throw new EnvError(
-      `missing required environment variables: ${missing.join(", ")}.\nSee e2e/env.example; pass a file with: npm run e2e -- --env path/to/file`,
+      `missing required environment variables: ${missing.join(", ")}.\nSee e2e/accounts/env.example; pass a file with: npm run e2e:accounts -- --env path/to/file`,
     );
   }
   const get = (k: (typeof REQUIRED)[number]): string => src[k]!.trim();

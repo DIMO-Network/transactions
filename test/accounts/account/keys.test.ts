@@ -6,8 +6,8 @@ import {
   toChecksumAddress,
   verifyOpSignature,
   type Operation,
-} from "../../src/core/index.js";
-import { WebCryptoP256Signer } from "../../src/signers/webcrypto.js";
+} from "../../../src/accounts/core/index.js";
+import { WebCryptoP256Signer } from "../../../src/accounts/signers/webcrypto.js";
 import {
   DirectoryIntegrityError,
   DirectoryRejectedError,
@@ -15,13 +15,13 @@ import {
   HeadMovedError,
   NetworkError,
   PolicyError,
-} from "../../src/errors.js";
+} from "../../../src/accounts/errors.js";
 import {
   addDeviceKey,
   removeDeviceKey,
   setAliases,
-} from "../../src/account/keys.js";
-import { DirectoryClient } from "../../src/directory/client.js";
+} from "../../../src/accounts/account/keys.js";
+import { DirectoryClient } from "../../../src/accounts/directory/client.js";
 import {
   FakeDirectory,
   VECTOR_CHAIN_DID,

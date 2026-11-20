@@ -2,7 +2,7 @@ import {
   WebCryptoP256Signer,
   addDeviceKey,
   removeDeviceKey,
-} from "../src/index.js";
+} from "../../src/accounts/index.js";
 import {
   check,
   eq,

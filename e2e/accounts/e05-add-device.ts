@@ -1,4 +1,4 @@
-import { WebCryptoP256Signer, addDeviceKey } from "../src/index.js";
+import { WebCryptoP256Signer, addDeviceKey } from "../../src/accounts/index.js";
 import {
   check,
   eq,

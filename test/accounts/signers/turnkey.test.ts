@@ -7,11 +7,11 @@ import {
   didKeyFromCompressed,
   ethAddressFromDidKey,
   verifyOpSignature,
-} from "../../src/core/index.js";
+} from "../../../src/accounts/core/index.js";
 import {
   TurnkeyWalletSigner,
   turnkeyWalletDidKey,
-} from "../../src/signers/turnkey.js";
+} from "../../../src/accounts/signers/turnkey.js";
 
 type SignArg = {
   type: string;

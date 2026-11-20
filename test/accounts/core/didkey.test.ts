@@ -9,7 +9,7 @@ import {
   decodeDidKey,
   didKeyFromCompressed,
   ethAddressFromDidKey,
-} from "../../src/core/index.js";
+} from "../../../src/accounts/core/index.js";
 
 const WALLET = vectors.cases[0]!.signerDidKey;
 const PHONE = "did:key:zDnaex62me84JZnkEzmeYRa8FCLNe7y1asoSwBMK26GBYpL7c";
