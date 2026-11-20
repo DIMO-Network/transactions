@@ -1,8 +1,9 @@
-// Asserts the published build keeps core light and shares one copy of it:
-//  1. dist/core (ESM and CJS, plus every local chunk they load) imports or requires
+// Asserts the published accounts build (dist/accounts, from tsup) keeps core light and shares
+// one copy of it:
+//  1. dist/accounts/core (ESM and CJS, plus every local chunk they load) imports or requires
 //     no external module at all: noble, scure and dag-cbor are bundled in, so viem,
-//     @zerodev/*, @turnkey/* (or anything else) can never be reached from ./core.
-//  2. The main entry and ./core export the very same classes (CJS and ESM), so
+//     @zerodev/*, @turnkey/* (or anything else) can never be reached from ./accounts/core.
+//  2. ./accounts and ./accounts/core export the very same classes (CJS and ESM), so
 //     `err instanceof PolicyError` holds whichever entry the app imported.
 import console from "node:console";
 import { createRequire } from "node:module";
@@ -12,7 +13,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const dist = resolve(root, "dist");
+const dist = resolve(root, "dist/accounts");
 const failures = [];
 const fail = (msg) => failures.push(msg);
 
@@ -45,10 +46,10 @@ for (const entry of ["core/index.js", "core/index.cjs"]) {
   for (const [spec, file] of external) {
     // node: builtins would be fine; nothing else may load at runtime from core.
     if (!spec.startsWith("node:"))
-      fail(`dist/${entry} reaches external "${spec}" (via ${file})`);
+      fail(`dist/accounts/${entry} reaches external "${spec}" (via ${file})`);
   }
   console.log(
-    `dist/${entry}: ${files.length} file(s) [${files.join(", ")}], externals: ${[...external.keys()].join(", ") || "none"}`,
+    `dist/accounts/${entry}: ${files.length} file(s) [${files.join(", ")}], externals: ${[...external.keys()].join(", ") || "none"}`,
   );
 }
 

@@ -9,16 +9,50 @@
   ],
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./accounts": {
+      "import": {
+        "types": "./dist/accounts/index.d.ts",
+        "default": "./dist/accounts/index.js"
+      },
+      "require": {
+        "types": "./dist/accounts/index.d.cts",
+        "default": "./dist/accounts/index.cjs"
+      }
+    },
+    "./accounts/core": {
+      "import": {
+        "types": "./dist/accounts/core/index.d.ts",
+        "default": "./dist/accounts/core/index.js"
+      },
+      "require": {
+        "types": "./dist/accounts/core/index.d.cts",
+        "default": "./dist/accounts/core/index.cjs"
+      }
+    },
+    "./dist/*.js": "./dist/*.js",
+    "./dist/*.cjs": "./dist/*.cjs",
+    "./dist/*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
+    "./package.json": "./package.json"
+  },
   "sideEffects": false,
   "type": "module",
   "scripts": {
     "format": "prettier --write .",
     "prebuild": "rm -rf ./dist && node -p \"'export const LIB_VERSION = \\'' + require('./package.json').version + '\\';'\" > src/version.ts && npm i --package-lock-only",
-    "build": "tsc -p ./tsconfig.build.json && tsc-alias",
+    "build": "tsc -p ./tsconfig.build.json && tsc-alias && tsup && node scripts/check-dist.mjs",
     "dev": "tsc --watch & nodemon --watch dist --delay 1 --exec tsc-alias",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.accounts.json",
     "lint": "eslint . --ext .ts,.tsx --fix",
-    "test": "vitest"
+    "test": "vitest",
+    "check:dist": "node scripts/check-dist.mjs"
   },
   "dependencies": {
     "@turnkey/api-key-stamper": "^0.6.17",

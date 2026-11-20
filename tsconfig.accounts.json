@@ -1,4 +1,7 @@
 {
+  // Type-checks the accounts modules with the compiler options they were
+  // written against (ES2022, bundler resolution, noUncheckedIndexedAccess). tsup builds
+  // src/accounts with it too. The rest of the repo uses tsconfig.json / tsconfig.build.json.
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
@@ -6,13 +9,18 @@
     "lib": ["ES2022", "DOM"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
+    // As tsconfig.base.json.
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "ignoreDeprecations": "6.0",
     "types": ["node"]
   },
-  "include": ["src", "test", "spike", "e2e", "*.config.ts"]
+  "include": ["src/accounts", "tsup.config.ts"]
 }
