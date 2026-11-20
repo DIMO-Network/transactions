@@ -42,6 +42,16 @@
     },
     "./package.json": "./package.json"
   },
+  "typesVersions": {
+    "*": {
+      "accounts": [
+        "./dist/accounts/index.d.ts"
+      ],
+      "accounts/core": [
+        "./dist/accounts/core/index.d.ts"
+      ]
+    }
+  },
   "sideEffects": false,
   "type": "module",
   "scripts": {
