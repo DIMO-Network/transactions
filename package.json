@@ -29,12 +29,17 @@
     "@uniswap/sdk-core": "^7.8.0",
     "@zerodev/ecdsa-validator": "^5.4.9",
     "@zerodev/sdk": "5.5.6",
-    "viem": "^2.38.6"
+    "viem": "^2.56.8"
   },
   "devDependencies": {
+    "@ipld/dag-cbor": "^11.0.0",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@scure/base": "^2.4.0",
     "@types/node": "^24.10.0",
     "@typescript-eslint/eslint-plugin": "^8.46.3",
     "@typescript-eslint/parser": "^8.46.3",
+    "esbuild": "^0.27.7",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.4.0",
@@ -43,6 +48,8 @@
     "nodemon": "^3.1.10",
     "prettier": "^3.5.3",
     "tsc-alias": "^1.8.16",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^4.0.7"
   },
