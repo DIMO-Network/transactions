@@ -1,9 +1,11 @@
-# @dimo-network/account-sdk
+# Accounts v2
 
-TypeScript SDK for running DIMO accounts non-custodially. Node 20+, browsers and React Native.
+TypeScript SDK for running DIMO accounts non-custodially, shipped as two subpath modules of `@dimo-network/transactions`. Node 20+, browsers and React Native. Both are ESM and CommonJS, with types for each.
 
-- `@dimo-network/account-sdk/core`: pure encoding and verification code. No `@turnkey/*`, `viem`, `@zerodev/*` or `fetch` imports (enforced by ESLint, and in the build output by `check:dist`).
-- `@dimo-network/account-sdk`: signers and account flows. `viem`, `@zerodev/sdk`, `@zerodev/ecdsa-validator` and `@turnkey/http` are required peer dependencies: install them alongside (npm 7 and later does so on its own). The main entry imports all four when it loads; `@dimo-network/account-sdk/core` imports none of them, so code that only needs encoding and verification should import `/core` and keep the peers out of its bundle.
+- `@dimo-network/transactions/accounts/core`: pure encoding and verification code. No `@turnkey/*`, `viem`, `@zerodev/*` or `fetch` imports (checked in the build output by `check:dist`, which `npm run build` runs, and restricted in `src/accounts/core` by `.eslintrc.js`).
+- `@dimo-network/transactions/accounts`: signers and account flows. It imports `viem`, `@zerodev/sdk`, `@zerodev/ecdsa-validator` and `@turnkey/http` when it loads (all four are dependencies of this package, so they install with it); `@dimo-network/transactions/accounts/core` imports none of them, so code that only needs encoding and verification should import `/accounts/core` and keep them out of its bundle.
+
+The package's main entry, `@dimo-network/transactions`, does not re-export either module, and the accounts modules do not load it.
 
 ## Usage
 
@@ -16,7 +18,7 @@ import {
   generateDpopKey,
   signIn,
   addDeviceKey,
-} from "@dimo-network/account-sdk";
+} from "@dimo-network/transactions/accounts";
 
 const cfg: SdkConfig = {
   accountsUrl: "<accounts base URL>",
@@ -50,13 +52,7 @@ Fragments are reused (recovery removes `signing` and adds a new device key under
 ### Account helpers
 
 ```ts
-import {
-  createAccount,
-  getMe,
-  recordSignIn,
-  lookupByWallet,
-  claimDid,
-} from "@dimo-network/account-sdk";
+import { createAccount, getMe, recordSignIn, lookupByWallet, claimDid } from "@dimo-network/transactions/accounts";
 
 // Sign up (public route). With `signingKey` the SDK signs the proof of possession over
 // "DIMO accounts v2 signup\nemail: <trimmed, lowercased>\nkey: <didKey>", verifies it
@@ -95,7 +91,7 @@ import {
   dpopKeyFromKeyPair,
   type Session,
   type WebCryptoDpopKey,
-} from "@dimo-network/account-sdk";
+} from "@dimo-network/transactions/accounts";
 
 // Save (idb-keyval shown; any IndexedDB wrapper works).
 await set("device-key", device.keyPair);
@@ -126,27 +122,7 @@ The token is bound to the DPoP key's thumbprint (`cnf.jkt`), so a restored token
 
 ## Scripts
 
-`npm run build` (tsup, then `check:dist`), `npm test`, `npm run typecheck`, `npm run lint`.
-`npm run check:dist` checks the built output: `dist/core` (ESM and CJS, with every chunk it loads) imports no external module, and the main entry and `./core` export the very same error classes under both `require` and `import`.
-`npm run vectors:sync` copies `testdata/vectors/did-ops.json` from the local `feat/v2-prereqs` branch of `../did-directory` (switch to the tag once it exists).
-
-## Turnkey spike
-
-Status: not yet run (no Turnkey API keys on the machine that scaffolded this).
-
-Question: does Turnkey's `SIGN_RAW_PAYLOAD_V2` produce a secp256k1 signature that verifies over `sha256(payload)`? The spike creates a throwaway sub-org with one secp256k1 wallet, signs the `genesis-wallet-only` vector payload, verifies r||s with noble, then deletes the sub-org.
-
-```bash
-TURNKEY_API_PUBLIC_KEY=... TURNKEY_API_PRIVATE_KEY=... TURNKEY_ORGANIZATION_ID=<dev parent org> \
-  npx tsx spike/turnkey-sha256.ts
-# or: npx tsx spike/turnkey-sha256.ts --env /path/to/.env.dev
-```
-
-`TURNKEY_BASE_URL` defaults to `https://api.turnkey.com`. Output is `VERIFIED mode=<mode>`, `FAILED <reason>` (Turnkey signing or verification failed), or `INCONCLUSIVE <reason>` (no usable public key, or it did not match the ETH address; says nothing about SHA-256 support). The wallet gets a second ADDRESS_FORMAT_COMPRESSED account so the public key is available even if the ETH account omits it.
-
-Modes tried in order:
-
-1. `sha256-utf8`: `PAYLOAD_ENCODING_TEXT_UTF8` + `HASH_FUNCTION_SHA256` over the payload text.
-2. `noop-hex-digest`: `PAYLOAD_ENCODING_HEXADECIMAL` + `HASH_FUNCTION_NO_OP` over the hex SHA-256 digest.
-
-Result: _not yet recorded_. Task 6 uses whichever mode prints VERIFIED. If both fail, the k1 Turnkey path is blocked; report to Yev.
+`npm run build` (tsc for the main entry, then tsup for `dist/accounts`, then `check:dist`), `npm test` (vitest; the accounts tests are in `test/accounts`), `npm run typecheck` (`tsconfig.json`, then `tsconfig.accounts.json` for `src/accounts`, `test/accounts` and `e2e/accounts`).
+`npm run check:dist` checks the built output: `dist/accounts/core` (ESM and CJS, with every chunk it loads) imports no external module, and `./accounts` and `./accounts/core` export the very same error classes under both `require` and `import`.
+`npm run vectors:sync` copies `testdata/vectors/did-ops.json` from the local `feat/v2-prereqs` branch of `../did-directory` to `test/accounts/fixtures/did-ops.json` (switch to the tag once it exists).
+`npm run e2e:accounts` runs the end-to-end suite against dev. It is opt-in and never part of `npm test`; `e2e/accounts/env.example` lists its variables, opt-ins and preconditions.
