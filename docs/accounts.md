@@ -124,5 +124,5 @@ The token is bound to the DPoP key's thumbprint (`cnf.jkt`), so a restored token
 
 `npm run build` (tsc for the main entry, then tsup for `dist/accounts`, then `check:dist`), `npm test` (vitest; the accounts tests are in `test/accounts`), `npm run typecheck` (`tsconfig.json`, then `tsconfig.accounts.json` for `src/accounts`, `test/accounts` and `e2e/accounts`).
 `npm run check:dist` checks the built output: `dist/accounts/core` (ESM and CJS, with every chunk it loads) imports no external module, and `./accounts` and `./accounts/core` export the very same error classes under both `require` and `import`.
-`npm run vectors:sync` copies `testdata/vectors/did-ops.json` from the local `feat/v2-prereqs` branch of `../did-directory` to `test/accounts/fixtures/did-ops.json` (switch to the tag once it exists).
+`npm run vectors:sync` copies `testdata/vectors/did-ops.json` from `origin/main` of a `../did-directory` checkout (run `git fetch` there first) to `test/accounts/fixtures/did-ops.json`. It fails, leaving the fixture as it is, until did-directory #30 is on main.
 `npm run e2e:accounts` runs the end-to-end suite against dev. It is opt-in and never part of `npm test`; `e2e/accounts/env.example` lists its variables, opt-ins and preconditions.
