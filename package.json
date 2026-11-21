@@ -63,7 +63,7 @@
     "lint": "eslint . --ext .ts,.tsx --fix",
     "test": "vitest",
     "check:dist": "node scripts/check-dist.mjs",
-    "vectors:sync": "git -C ../did-directory show feat/v2-prereqs:testdata/vectors/did-ops.json > test/accounts/fixtures/did-ops.json",
+    "vectors:sync": "git -C ../did-directory show origin/main:testdata/vectors/did-ops.json > test/accounts/fixtures/did-ops.json",
     "e2e:accounts": "tsx e2e/accounts/run.ts"
   },
   "dependencies": {
