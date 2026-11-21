@@ -1,5 +1,5 @@
 import { normalizeUrl, type SdkConfig, send, unboundFetch } from "../config.js";
-import { SigninError, UsageError } from "../errors.js";
+import { parseRetryAfter, SigninError, UsageError } from "../errors.js";
 import type { Signer } from "../signers/types.js";
 import { createDpopProof, type DpopKey, jwkThumbprint, publicJwk } from "./dpop.js";
 
@@ -31,17 +31,35 @@ export interface SignInOptions {
   dpopKey: DpopKey;
 }
 
+const MAX_ATTEMPTS = 3;
+const DEFAULT_RETRY_MS = 1000;
+const MAX_RETRY_MS = 5000;
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * POST with a retry on 503/429 (dauth's directory-unavailable, rate-limit and replay-cache
+ * answers; the challenge stays valid), up to 3 attempts. `headers` is called per attempt so
+ * a DPoP proof is fresh each time (dauth records each proof's jti). Other statuses are final.
+ */
 async function post(
   f: typeof fetch,
   url: string,
   body: unknown,
-  headers: Record<string, string> = {}
+  headers: () => Promise<Record<string, string>> | Record<string, string> = () => ({})
 ): Promise<Record<string, unknown>> {
-  const res = await send(f, "dauth", url, {
-    method: "POST",
-    headers: { "content-type": "application/json", ...headers },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  for (let attempt = 1; ; attempt++) {
+    res = await send(f, "dauth", url, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...(await headers()) },
+      body: JSON.stringify(body),
+    });
+    if ((res.status !== 503 && res.status !== 429) || attempt >= MAX_ATTEMPTS) break;
+    const seconds = parseRetryAfter(res.headers.get("retry-after"));
+    await res.body?.cancel().catch(() => {});
+    await sleep(seconds === undefined ? DEFAULT_RETRY_MS : Math.min(seconds * 1000, MAX_RETRY_MS));
+  }
   const text = await res.text();
   let data: unknown;
   try {
@@ -55,7 +73,8 @@ async function post(
     throw new SigninError(
       typeof obj?.error === "string" ? obj.error : "server_error",
       typeof obj?.error_description === "string" ? obj.error_description : `HTTP ${res.status}`,
-      res.status
+      res.status,
+      parseRetryAfter(res.headers.get("retry-after"))
     );
   }
   if (!obj) {
@@ -123,8 +142,9 @@ export async function signIn(cfg: SdkConfig, args: SignInOptions): Promise<Sessi
   validateChallenge(challenge, nonce, { did: args.did, scope: args.scope, audience }, jkt);
   const signature = await args.signer.sign(new TextEncoder().encode(challenge));
   const tokenUrl = `${base}/signin/token`;
-  const proof = await createDpopProof(args.dpopKey, "POST", tokenUrl);
-  const tok = await post(f, tokenUrl, { nonce, signature, key: args.fragment }, { DPoP: proof });
+  const tok = await post(f, tokenUrl, { nonce, signature, key: args.fragment }, async () => ({
+    DPoP: await createDpopProof(args.dpopKey, "POST", tokenUrl),
+  }));
   if (
     typeof tok.token !== "string" ||
     typeof tok.expires_in !== "number" ||

@@ -112,13 +112,19 @@ export class DirectoryIntegrityError extends AccountSdkError {
   }
 }
 
-/** dauth rejected a sign-in step. `code` is dauth's OAuth-style error code (e.g. invalid_grant). */
+/**
+ * dauth rejected a sign-in step. `code` is dauth's OAuth-style error code (e.g. invalid_grant).
+ * For 503 and 429 (which signIn retries before giving up), `retryAfterSeconds` is dauth's
+ * Retry-After when it was an integer number of seconds.
+ */
 export class SigninError extends AccountSdkError {
   readonly status: number;
-  constructor(code: string, description: string, status: number) {
+  readonly retryAfterSeconds?: number;
+  constructor(code: string, description: string, status: number, retryAfterSeconds?: number) {
     super(code, `${code}: ${description}`);
     this.name = "SigninError";
     this.status = status;
+    if (retryAfterSeconds !== undefined) this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 

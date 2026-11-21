@@ -331,3 +331,92 @@ describe("signIn challenge validation", () => {
     expect(signed).toBe(1);
   });
 });
+
+describe("signIn retry on 503/429", () => {
+  afterEach(() => vi.useRealTimers());
+
+  const failing = (fail: { path: string; statuses: number[]; retryAfter?: string }) => {
+    const dauth = fakeDauth();
+    const proofs: string[] = [];
+    let n = 0;
+    const handler = async (url: string, init: RequestInit) => {
+      if (url.endsWith("/signin/token")) proofs.push(new Headers(init.headers).get("DPoP")!);
+      if (url.endsWith(fail.path) && n < fail.statuses.length) {
+        const status = fail.statuses[n++]!;
+        return new Response(JSON.stringify({ error: status === 429 ? "rate_limited" : "unavailable" }), {
+          status,
+          headers: fail.retryAfter === undefined ? {} : { "retry-after": fail.retryAfter },
+        });
+      }
+      return dauth(url, init);
+    };
+    const f = router({ "https://dauth.test": handler });
+    return { f, proofs, calls: () => n };
+  };
+
+  /** Awaits p while advancing fake timers, so each retry sleep elapses once it is registered. */
+  const settle = async <T>(p: Promise<T>): Promise<T> => {
+    let done = false;
+    void p.then(
+      () => (done = true),
+      () => (done = true)
+    );
+    for (let i = 0; i < 200 && !done; i++) {
+      await vi.advanceTimersByTimeAsync(1000);
+      await new Promise<void>((r) => setImmediate(r));
+    }
+    return p;
+  };
+
+  const run = async (f: unknown, signer: WebCryptoP256Signer) =>
+    signIn(cfgFor({ fetchImpl: f as unknown as typeof fetch }), {
+      did: "did:dimo:x",
+      signer,
+      fragment: "wallet",
+      scope: ["read"],
+      dpopKey: await generateDpopKey(),
+    });
+
+  it("token 503 then 200: one signature, two distinct DPoP proofs", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const signer = await WebCryptoP256Signer.generate();
+    const sign = vi.spyOn(signer, "sign");
+    const { f, proofs } = failing({ path: "/signin/token", statuses: [503], retryAfter: "1" });
+    const p = run(f, signer);
+    await expect(settle(p)).resolves.toMatchObject({ token: "jwt" });
+    expect(sign).toHaveBeenCalledTimes(1);
+    expect(proofs).toHaveLength(2);
+    expect(claims(proofs[0]!).jti).not.toBe(claims(proofs[1]!).jti);
+  });
+
+  it("challenge 429 then success", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const signer = await WebCryptoP256Signer.generate();
+    const sign = vi.spyOn(signer, "sign");
+    const { f } = failing({ path: "/signin/challenge", statuses: [429], retryAfter: "1" });
+    const p = run(f, signer);
+    await expect(settle(p)).resolves.toMatchObject({ token: "jwt" });
+    expect(sign).toHaveBeenCalledTimes(1);
+  });
+
+  it("3x 503 throws SigninError with status and retryAfterSeconds (clamped delay)", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const signer = await WebCryptoP256Signer.generate();
+    const { f, proofs } = failing({ path: "/signin/token", statuses: [503, 503, 503], retryAfter: "30" });
+    const p = run(f, signer).catch((e: unknown) => e);
+    const err = await settle(p);
+    expect(err).toBeInstanceOf(SigninError);
+    expect(err).toMatchObject({ status: 503, retryAfterSeconds: 30 });
+    expect(proofs).toHaveLength(3);
+  });
+
+  it("does not retry a 401", async () => {
+    const signer = await WebCryptoP256Signer.generate();
+    const { f, proofs, calls } = failing({ path: "/signin/token", statuses: [401] });
+    const err = await run(f, signer).catch((e: unknown) => e);
+    expect(err).toMatchObject({ status: 401 });
+    expect(err).toBeInstanceOf(SigninError);
+    expect(proofs).toHaveLength(1);
+    expect(calls()).toBe(1);
+  });
+});
