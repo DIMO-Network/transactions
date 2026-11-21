@@ -57,18 +57,49 @@ async function readJson(did: string, res: Response): Promise<unknown> {
   }
 }
 
+const MAX_RETRIES = 3;
+const BASE_DELAY_MS = 200;
+const MAX_RETRY_AFTER_MS = 5000;
+
+/** Retry-After as delta-seconds or an HTTP-date, clamped to [0, 5000] ms; null when absent or unparseable. */
+function retryAfterMs(res: Response): number | null {
+  const h = res.headers.get("retry-after")?.trim();
+  if (!h) return null;
+  let ms: number;
+  if (/^\d+$/.test(h)) ms = Number(h) * 1000;
+  else {
+    const t = Date.parse(h);
+    if (Number.isNaN(t)) return null;
+    ms = t - Date.now();
+  }
+  return Math.min(Math.max(ms, 0), MAX_RETRY_AFTER_MS);
+}
+
+/** Options for DirectoryClient. */
+export type DirectoryClientOptions = {
+  /** Delay between 429 retries (ms). Defaults to setTimeout; tests inject a stub. */
+  sleep?: (ms: number) => Promise<void>;
+};
+
 /**
  * did-directory client. Trusts nothing it reads: head() and auditLog() verify the whole
  * audit chain, and submit() checks the returned cid is the operation's.
+ *
+ * The directory's ingress rate-limits per client IP and answers 429 before the request
+ * reaches the service, so a 429 is retried (at most 3 times, after Retry-After clamped to
+ * 5 s, else 200 ms * 2^attempt), POSTs included. A 429 that outlasts the retries throws
+ * DirectoryUnavailableError (status 429). Other 5xx throw it immediately.
  */
 export class DirectoryClient {
   private readonly baseUrl: string;
   private readonly fetch: typeof fetch;
+  private readonly sleep: (ms: number) => Promise<void>;
 
   /** `fetchImpl` defaults to the global fetch; it is always called unbound. */
-  constructor(baseUrl: string, fetchImpl?: typeof fetch) {
+  constructor(baseUrl: string, fetchImpl?: typeof fetch, options?: DirectoryClientOptions) {
     this.baseUrl = normalizeUrl(baseUrl);
     this.fetch = unboundFetch({ fetchImpl });
+    this.sleep = options?.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
 
   private url(did: string, suffix = ""): string {
@@ -77,8 +108,12 @@ export class DirectoryClient {
   }
 
   private async request(url: string, init?: RequestInit): Promise<Response> {
-    const res = await send(this.fetch, "directory", url, init);
-    if (res.status >= 500) {
+    let res = await send(this.fetch, "directory", url, init);
+    for (let attempt = 0; res.status === 429 && attempt < MAX_RETRIES; attempt++) {
+      await this.sleep(retryAfterMs(res) ?? BASE_DELAY_MS * 2 ** attempt);
+      res = await send(this.fetch, "directory", url, init);
+    }
+    if (res.status >= 500 || res.status === 429) {
       const { message } = await readBody(res);
       throw new DirectoryUnavailableError(message, res.status);
     }

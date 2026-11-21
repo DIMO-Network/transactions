@@ -333,6 +333,45 @@ describe("DirectoryClient transport", () => {
     await expect(client(json({}, 502)).c.submit(DID, op)).rejects.toBeInstanceOf(DirectoryUnavailableError);
   });
 
+  describe("429 retry", () => {
+    const rl = (retryAfter?: string) =>
+      new Response(JSON.stringify({ error: "slow down" }), {
+        status: 429,
+        headers: retryAfter === undefined ? {} : { "retry-after": retryAfter },
+      });
+    const seq = (...rs: Response[]) => {
+      const q = [...rs];
+      const fetchImpl = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async () => q.shift()!);
+      const sleep = vi.fn(async (_ms: number) => {});
+      return { fetchImpl, sleep, c: new DirectoryClient(BASE, fetchImpl as unknown as typeof fetch, { sleep }) };
+    };
+
+    it("retries 429 then succeeds, honouring Retry-After and clamping it", async () => {
+      const { c, sleep, fetchImpl } = seq(rl("2"), rl("60"), rl(), json({ id: DID }));
+      await expect(c.resolve(DID)).resolves.toMatchObject({ id: DID });
+      expect(fetchImpl).toHaveBeenCalledTimes(4);
+      expect(sleep.mock.calls.map((x) => x[0])).toEqual([2000, 5000, 200 * 4]);
+    });
+
+    it("throws DirectoryUnavailableError(429) after 3 retries", async () => {
+      const { c, sleep, fetchImpl } = seq(rl(), rl(), rl(), rl());
+      const e = await c.resolve(DID).catch((x: unknown) => x);
+      expect(e).toBeInstanceOf(DirectoryUnavailableError);
+      expect((e as DirectoryUnavailableError).status).toBe(429);
+      expect(fetchImpl).toHaveBeenCalledTimes(4);
+      expect(sleep.mock.calls.map((x) => x[0])).toEqual([200, 400, 800]);
+    });
+
+    it("retries a POST submit after 429 with the same body", async () => {
+      const genesis = vectorChain()[0]!;
+      const { c, fetchImpl } = seq(rl("0"), json({ did: DID, cid: computeCid(genesis) }));
+      await expect(c.submit(DID, genesis)).resolves.toEqual({ did: DID, cid: computeCid(genesis) });
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+      expect(fetchImpl.mock.calls[1]![1]!.body).toBe(fetchImpl.mock.calls[0]![1]!.body);
+      expect(fetchImpl.mock.calls[1]![1]!.method).toBe("POST");
+    });
+  });
+
   it("wraps a fetch rejection in NetworkError with cause", async () => {
     const boom = new TypeError("fetch failed");
     const c = new DirectoryClient(BASE, (async () => {
