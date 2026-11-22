@@ -163,6 +163,23 @@ export class SigninError extends AccountSdkError {
   }
 }
 
+/**
+ * dauth refused the token because the key that signed in may not get a scope it asked for
+ * (403 `key_not_allowed`, "approve needs a rotation key"): dauth grants `approve` only when
+ * that key is also one of the DID's rotation keys. A person gets `approve` by signing in
+ * with `#wallet`, an org with `#signing` (its root). `fragment` is the key that signed in.
+ * The SDK never switches keys for you: sign in again with the right one.
+ */
+export class KeyNotAllowedError extends SigninError {
+  declare readonly code: "key_not_allowed";
+  readonly fragment: string;
+  constructor(description: string, status: number, fragment: string) {
+    super("key_not_allowed", `${description} (signed in with #${fragment})`, status);
+    this.name = "KeyNotAllowedError";
+    this.fragment = fragment;
+  }
+}
+
 /** Retry-After as whole seconds. An HTTP-date, a negative or any other value is ignored (undefined). */
 export function parseRetryAfter(header: string | null | undefined): number | undefined {
   const h = header?.trim();

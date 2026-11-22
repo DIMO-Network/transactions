@@ -4,9 +4,9 @@ import { generateDpopKey } from "../../../src/accounts/auth/dpop.js";
 import { authedFetch } from "../../../src/accounts/auth/fetch.js";
 import { signIn } from "../../../src/accounts/auth/signin.js";
 import { verifyOpSignature } from "../../../src/accounts/core/index.js";
-import { NetworkError, SigninError, UsageError } from "../../../src/accounts/errors.js";
+import { KeyNotAllowedError, NetworkError, SigninError, UsageError } from "../../../src/accounts/errors.js";
 import { WebCryptoP256Signer } from "../../../src/accounts/signers/webcrypto.js";
-import { cfgFor, fakeDauth, json, router } from "../helpers.js";
+import { cfgFor, fakeDauth, type Handler, json, router } from "../helpers.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -418,5 +418,55 @@ describe("signIn retry on 503/429", () => {
     expect(err).toBeInstanceOf(SigninError);
     expect(proofs).toHaveLength(1);
     expect(calls()).toBe(1);
+  });
+});
+
+describe("approve needs a rotation key (contract 1)", () => {
+  const keyNotAllowed: Handler = async (url, init) => {
+    if (url.endsWith("/signin/token")) {
+      return json({ error: "key_not_allowed", error_description: "approve needs a rotation key" }, 403);
+    }
+    return fakeDauth()(url, init);
+  };
+
+  it("dauth's 403 key_not_allowed is a KeyNotAllowedError (a SigninError) naming the key that signed", async () => {
+    const f = router({ "https://dauth.test": keyNotAllowed });
+    const err = await signIn(cfgFor({ fetchImpl: f as unknown as typeof fetch }), {
+      did: "did:dimo:x",
+      signer: await WebCryptoP256Signer.generate(),
+      fragment: "signing",
+      scope: ["read", "approve"],
+      dpopKey: await generateDpopKey(),
+    }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(KeyNotAllowedError);
+    expect(err).toBeInstanceOf(SigninError);
+    expect(err).toMatchObject({
+      name: "KeyNotAllowedError",
+      code: "key_not_allowed",
+      status: 403,
+      fragment: "signing",
+    });
+    expect((err as Error).message).toContain("approve needs a rotation key");
+    expect((err as Error).message).toContain("#signing");
+    // Not retried: one token request.
+    expect(f.mock.calls.filter(([u]) => String(u).endsWith("/signin/token"))).toHaveLength(1);
+  });
+
+  it("other token errors stay plain SigninErrors", async () => {
+    const f = router({
+      "https://dauth.test": async (url, init) =>
+        url.endsWith("/signin/token")
+          ? json({ error: "invalid_grant", error_description: "nope" }, 401)
+          : fakeDauth()(url, init),
+    });
+    const err = await signIn(cfgFor({ fetchImpl: f as unknown as typeof fetch }), {
+      did: "did:dimo:x",
+      signer: await WebCryptoP256Signer.generate(),
+      fragment: "signing",
+      scope: ["read"],
+      dpopKey: await generateDpopKey(),
+    }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SigninError);
+    expect(err).not.toBeInstanceOf(KeyNotAllowedError);
   });
 });

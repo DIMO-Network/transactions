@@ -1,5 +1,5 @@
 import { normalizeUrl, type SdkConfig, send, unboundFetch } from "../config.js";
-import { parseRetryAfter, SigninError, UsageError } from "../errors.js";
+import { KeyNotAllowedError, parseRetryAfter, SigninError, UsageError } from "../errors.js";
 import type { Signer } from "../signers/types.js";
 import { createDpopProof, type DpopKey, jwkThumbprint, publicJwk } from "./dpop.js";
 
@@ -12,7 +12,8 @@ export interface Session {
   dpopKey: DpopKey;
   /**
    * Scopes dauth granted (its token response's `scope`), or the requested ones when the
-   * response omits it. "approve" is needed to delete the account.
+   * response omits it. "approve" is needed to delete the account, and dauth grants it only
+   * to a key that is also a rotation key of the DID (`#wallet` for a person).
    */
   scopes: string[];
 }
@@ -112,7 +113,13 @@ function validateChallenge(
   if (forLine !== `For: ${args.audience.join(", ")}`) bad("challenge audience mismatch");
 }
 
-/** Sign in to dauth (cfg.dauthUrl) with a DID key and get a DPoP-bound access token. */
+/**
+ * Sign in to dauth (cfg.dauthUrl) with a DID key and get a DPoP-bound access token.
+ * Scope `approve` is granted only when the signing key is also a rotation key of the DID
+ * (a person signs in with `#wallet`, an org with `#signing`); otherwise dauth answers 403
+ * `key_not_allowed` and signIn throws KeyNotAllowedError. Other dauth refusals are
+ * SigninError.
+ */
 export async function signIn(cfg: SdkConfig, args: SignInOptions): Promise<Session> {
   if (args.scope.length === 0) {
     throw new UsageError("scope_missing", "signIn needs at least one scope ('read', 'write' or 'approve')");
@@ -144,7 +151,12 @@ export async function signIn(cfg: SdkConfig, args: SignInOptions): Promise<Sessi
   const tokenUrl = `${base}/signin/token`;
   const tok = await post(f, tokenUrl, { nonce, signature, key: args.fragment }, async () => ({
     DPoP: await createDpopProof(args.dpopKey, "POST", tokenUrl),
-  }));
+  })).catch((err: unknown) => {
+    if (err instanceof SigninError && err.code === "key_not_allowed") {
+      throw new KeyNotAllowedError(err.message.replace(/^key_not_allowed: /, ""), err.status, args.fragment);
+    }
+    throw err;
+  });
   if (
     typeof tok.token !== "string" ||
     typeof tok.expires_in !== "number" ||

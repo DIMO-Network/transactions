@@ -61,6 +61,7 @@ export {
   type GasProxyErrorCode,
   HeadMovedError,
   InvalidDidError,
+  KeyNotAllowedError,
   NetworkError,
   PolicyError,
   type PolicyErrorCode,
