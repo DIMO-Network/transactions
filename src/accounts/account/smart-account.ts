@@ -376,7 +376,8 @@ async function knowsUserOperation(client: ProxyClient, hash: Hex): Promise<boole
 
 /**
  * One provider attempt: prepare (gas, sponsorship; the nonce is the call's, read once by
- * Kernel.nonce), sign, then send the signed op with eth_sendUserOperation. Returns the op's hash, computed locally before the send.
+ * Kernel.nonce), sign, then send the signed op with eth_sendUserOperation. Returns the
+ * op's hash, computed locally before the send.
  * A failure before the send, or a refusal of the send (isRefusedSend), throws for
  * withProviders to classify (usually: try the next provider). Any other send failure,
  * and a 2xx whose result is not the op's hash, is looked up once on the same provider by

@@ -390,7 +390,10 @@ function brief(cause: unknown): string {
  * No gas provider took the UserOp: each attempt failed before its send, or its provider
  * refused the send (a JSON-RPC error other than -32603, or an HTTP 4xx). `errors` holds
  * one error per provider, in order, untouched. The message lists `provider: <error name
- * and short message>` with URLs redacted, so it is safe to log.
+ * and short message>` with URLs redacted, so it is safe to log. Every attempt of the call
+ * signed the same nonce, so at most one of them can have been included; if a refusal was
+ * wrong (its bundler took the op after all), the later attempts were refused for that
+ * used nonce. Before sending the same calls again, check the account's EntryPoint nonce.
  */
 export class ProvidersExhaustedError extends AccountSdkError {
   readonly errors: unknown[];
