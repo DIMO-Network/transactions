@@ -13,7 +13,7 @@ tsconfig.build.json
 tsconfig.accounts.json
 tsup.config.ts
 .eslintignore
-.eslintrc.js
+.eslintrc.cjs
 .prettierignore
 babel.config.js
 release.sh

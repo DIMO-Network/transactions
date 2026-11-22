@@ -589,14 +589,15 @@ describe("claimDid re-checks the log after the link (fix round 2)", () => {
       const signingKey = await WebCryptoP256Signer.generate();
       const planted = await WebCryptoP256Signer.generate();
       const did = deriveDid(buildGenesis({ walletKey: wallet.didKey }));
-      let dir: FakeDirectory | undefined;
+      const ref: { dir?: FakeDirectory } = {};
       const s = setup(async (_u, init) => {
         // The pre-link signer appends while accounts' link check reads a stale log.
         if (init.method === "PUT")
-          await dir!.append(did, wallet, (h, cid) => buildAddKey(h, cid, planted.didKey, "device-2").op);
+          await ref.dir!.append(did, wallet, (h, cid) => buildAddKey(h, cid, planted.didKey, "device-2").op);
         return json(viewFor(did));
       });
-      dir = s.dir;
+      ref.dir = s.dir;
+      const dir = s.dir;
       const e = await claimDid(s.cfg, {
         wallet,
         ...(withSigning ? { signingKey } : {}),

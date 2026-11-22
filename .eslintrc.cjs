@@ -66,6 +66,15 @@ module.exports = {
   },
   overrides: [
     {
+      // npm run lint:accounts. The accounts code follows .prettierrc (npm run format), not
+      // the inline prettier options above: rule options replace rather than merge, so {}
+      // here makes eslint-plugin-prettier read .prettierrc alone for these files.
+      files: ["src/accounts/**/*.ts", "test/accounts/**/*.ts", "e2e/accounts/**/*.ts"],
+      rules: {
+        "prettier/prettier": ["error", {}],
+      },
+    },
+    {
       files: ["**/*.test.*"],
       rules: {
         "@typescript-eslint/no-explicit-any": "off",

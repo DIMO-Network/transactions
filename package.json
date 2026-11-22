@@ -87,6 +87,7 @@
     "dev": "tsc --watch & nodemon --watch dist --delay 1 --exec tsc-alias",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.accounts.json",
     "lint": "eslint . --ext .ts,.tsx --fix",
+    "lint:accounts": "ESLINT_USE_FLAT_CONFIG=false eslint --ext .ts src/accounts test/accounts e2e/accounts",
     "test": "vitest",
     "check:dist": "node scripts/check-dist.mjs",
     "vectors:sync": "git -C ../did-directory show origin/main:testdata/vectors/did-ops.json > test/accounts/fixtures/did-ops.json.tmp && mv test/accounts/fixtures/did-ops.json.tmp test/accounts/fixtures/did-ops.json || (rm -f test/accounts/fixtures/did-ops.json.tmp; exit 1)",
