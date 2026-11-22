@@ -1,12 +1,20 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import { generateDpopKey } from "../../../src/accounts/auth/dpop.js";
 import { authedFetch } from "../../../src/accounts/auth/fetch.js";
 import { signIn } from "../../../src/accounts/auth/signin.js";
+import type { SdkConfig } from "../../../src/accounts/config.js";
 import { verifyOpSignature } from "../../../src/accounts/core/index.js";
-import { NetworkError, SigninError, UsageError } from "../../../src/accounts/errors.js";
+import {
+  AccountSdkError,
+  ClockSkewError,
+  KeyNotAllowedError,
+  NetworkError,
+  SigninError,
+  UsageError,
+} from "../../../src/accounts/errors.js";
 import { WebCryptoP256Signer } from "../../../src/accounts/signers/webcrypto.js";
-import { cfgFor, fakeDauth, json, router } from "../helpers.js";
+import { cfgFor, fakeDauth, type Handler, json, router } from "../helpers.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -418,5 +426,200 @@ describe("signIn retry on 503/429", () => {
     expect(err).toBeInstanceOf(SigninError);
     expect(proofs).toHaveLength(1);
     expect(calls()).toBe(1);
+  });
+});
+
+describe("approve needs a rotation key (contract 1)", () => {
+  const keyNotAllowed: Handler = async (url, init) => {
+    if (url.endsWith("/signin/token")) {
+      return json({ error: "key_not_allowed", error_description: "approve needs a rotation key" }, 403);
+    }
+    return fakeDauth()(url, init);
+  };
+
+  it("dauth's 403 key_not_allowed is a KeyNotAllowedError (a SigninError) naming the key that signed", async () => {
+    const f = router({ "https://dauth.test": keyNotAllowed });
+    const err = await signIn(cfgFor({ fetchImpl: f as unknown as typeof fetch }), {
+      did: "did:dimo:x",
+      signer: await WebCryptoP256Signer.generate(),
+      fragment: "signing",
+      scope: ["read", "approve"],
+      dpopKey: await generateDpopKey(),
+    }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(KeyNotAllowedError);
+    expect(err).toBeInstanceOf(SigninError);
+    expect(err).toMatchObject({
+      name: "KeyNotAllowedError",
+      code: "key_not_allowed",
+      status: 403,
+      fragment: "signing",
+    });
+    expect((err as Error).message).toContain("approve needs a rotation key");
+    expect((err as Error).message).toContain("#signing");
+    // Not retried: one token request.
+    expect(f.mock.calls.filter(([u]) => String(u).endsWith("/signin/token"))).toHaveLength(1);
+  });
+
+  it("other token errors stay plain SigninErrors", async () => {
+    const f = router({
+      "https://dauth.test": async (url, init) =>
+        url.endsWith("/signin/token")
+          ? json({ error: "invalid_grant", error_description: "nope" }, 401)
+          : fakeDauth()(url, init),
+    });
+    const err = await signIn(cfgFor({ fetchImpl: f as unknown as typeof fetch }), {
+      did: "did:dimo:x",
+      signer: await WebCryptoP256Signer.generate(),
+      fragment: "signing",
+      scope: ["read"],
+      dpopKey: await generateDpopKey(),
+    }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SigninError);
+    expect(err).not.toBeInstanceOf(KeyNotAllowedError);
+  });
+});
+
+describe("DPoP iat follows dauth's clock, not the device's (R6-F6)", () => {
+  afterEach(() => vi.useRealTimers());
+
+  /** A dauth whose clock is `skewMs` ahead of the device, stated in the challenge's Issued At. */
+  const skewedDauth = (skewMs: number) => {
+    const proofs: string[] = [];
+    const handler: Handler = async (url, init) => {
+      if (url.endsWith("/signin/token")) proofs.push(new Headers(init.headers).get("DPoP")!);
+      const res = await fakeDauth()(url, init);
+      if (!url.endsWith("/signin/challenge")) return res;
+      const body = await res.json();
+      const issued = new Date(Date.now() + skewMs).toISOString().replace(/\.\d{3}Z$/, "Z");
+      body.challenge = body.challenge.replace("Issued At: a", `Issued At: ${issued}`);
+      return json(body);
+    };
+    return { f: router({ "https://dauth.test": handler }), proofs };
+  };
+  const run = async (f: unknown) =>
+    signIn(cfgFor({ fetchImpl: f as unknown as typeof fetch }), {
+      did: "did:dimo:x",
+      signer: await WebCryptoP256Signer.generate(),
+      fragment: "wallet",
+      scope: ["read"],
+      dpopKey: await generateDpopKey(),
+    });
+  const serverSeconds = (skewMs: number) => (Date.now() + skewMs) / 1000;
+
+  it.each([
+    ["2 minutes fast", -120_000],
+    ["10 minutes slow", 600_000],
+  ])("a device clock %s: the token proof and later authed proofs carry dauth's time", async (_n, skewMs) => {
+    const { f, proofs } = skewedDauth(skewMs);
+    const session = await run(f);
+    expect(Math.abs(claims(proofs[0]!).iat - serverSeconds(skewMs))).toBeLessThan(3);
+    expect(Math.abs(session.clockOffsetMs! - skewMs)).toBeLessThan(2000);
+    let proof = "";
+    await authedFetch(
+      {
+        fetchImpl: (async (_u: string, init: RequestInit) => {
+          proof = new Headers(init.headers).get("DPoP")!;
+          return json({});
+        }) as typeof fetch,
+      },
+      session
+    )("https://accounts.test/api/v2/me");
+    expect(Math.abs(claims(proof).iat - serverSeconds(skewMs))).toBeLessThan(3);
+  });
+
+  it("a clock within a few seconds of dauth's is left alone (no offset)", async () => {
+    const { f, proofs } = skewedDauth(0);
+    const session = await run(f);
+    expect(session.clockOffsetMs).toBeUndefined();
+    expect(Math.abs(claims(proofs[0]!).iat - Date.now() / 1000)).toBeLessThan(2);
+  });
+
+  it("an unreadable Issued At leaves the device clock alone", async () => {
+    const f = router({ "https://dauth.test": fakeDauth() });
+    const session = await run(f);
+    expect(session.clockOffsetMs).toBeUndefined();
+  });
+});
+
+describe("Issued At is parsed strictly, and a skew above 24 h is refused (R6-F6, fix round 1)", () => {
+  const dauthWith = (issuedAt: string) => {
+    const tokens: string[] = [];
+    const handler: Handler = async (url, init) => {
+      if (url.endsWith("/signin/token")) tokens.push(new Headers(init.headers).get("DPoP")!);
+      const res = await fakeDauth()(url, init);
+      if (!url.endsWith("/signin/challenge")) return res;
+      const body = await res.json();
+      body.challenge = body.challenge.replace("Issued At: a", `Issued At: ${issuedAt}`);
+      return json(body);
+    };
+    return { f: router({ "https://dauth.test": handler }), tokens };
+  };
+  const signInWith = async (f: unknown, signer?: WebCryptoP256Signer) =>
+    signIn(cfgFor({ fetchImpl: f as unknown as typeof fetch }), {
+      did: "did:dimo:x",
+      signer: signer ?? (await WebCryptoP256Signer.generate()),
+      fragment: "wallet",
+      scope: ["read"],
+      dpopKey: await generateDpopKey(),
+    });
+  const rfc3339 = (ms: number) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z");
+
+  it.each([
+    ["an RFC 2822 date", (ms: number) => new Date(ms).toUTCString()],
+    ["no time zone", (ms: number) => rfc3339(ms).replace("Z", "")],
+    ["a space instead of T", (ms: number) => rfc3339(ms).replace("T", " ")],
+    ["trailing text", (ms: number) => `${rfc3339(ms)} UTC`],
+  ])("%s is not read as dauth's clock", async (_n, format) => {
+    const { f, tokens } = dauthWith(format(Date.now() + 120_000));
+    const session = await signInWith(f);
+    expect(session.clockOffsetMs).toBeUndefined();
+    expect(Math.abs(claims(tokens[0]!).iat - Date.now() / 1000)).toBeLessThan(2);
+  });
+
+  it("accepts fractional seconds and a numeric offset", async () => {
+    const at = new Date(Date.now() + 120_000);
+    const plusOne = new Date(at.getTime() + 3_600_000).toISOString().replace("Z", "+01:00");
+    const { f } = dauthWith(plusOne);
+    const session = await signInWith(f);
+    expect(Math.abs(session.clockOffsetMs! - 120_000)).toBeLessThan(2000);
+  });
+
+  it("an offset above 24 h is ClockSkewError, before signing, and is not applied", async () => {
+    const signer = await WebCryptoP256Signer.generate();
+    const sign = vi.spyOn(signer, "sign");
+    const { f, tokens } = dauthWith(rfc3339(Date.now() + 2 * 86_400_000));
+    const err = await signInWith(f, signer).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ClockSkewError);
+    expect(err).toBeInstanceOf(AccountSdkError);
+    expect(err).toMatchObject({ name: "ClockSkewError", code: "clock_skew" });
+    expect(Math.abs((err as ClockSkewError).offsetMs - 2 * 86_400_000)).toBeLessThan(2000);
+    expect(sign).not.toHaveBeenCalled();
+    expect(tokens).toHaveLength(0);
+  });
+
+  it("24 h or less is still applied", async () => {
+    const { f } = dauthWith(rfc3339(Date.now() - 23 * 3_600_000));
+    const session = await signInWith(f);
+    expect(Math.abs(session.clockOffsetMs! + 23 * 3_600_000)).toBeLessThan(2000);
+  });
+});
+
+describe("signIn's config (fix round 1)", () => {
+  it("needs only dauthUrl, accountsUrl and fetchImpl, as authedFetch needs only fetchImpl", async () => {
+    const f = router({ "https://dauth.test": fakeDauth() });
+    const cfg = {
+      dauthUrl: "https://dauth.test",
+      accountsUrl: "https://accounts.test",
+      fetchImpl: f as unknown as typeof fetch,
+    };
+    const session = await signIn(cfg, {
+      did: "did:dimo:x",
+      signer: await WebCryptoP256Signer.generate(),
+      fragment: "wallet",
+      scope: ["read"],
+      dpopKey: await generateDpopKey(),
+    });
+    expect(session.token).toBe("jwt");
+    expectTypeOf(signIn).parameter(0).toEqualTypeOf<Pick<SdkConfig, "dauthUrl" | "accountsUrl" | "fetchImpl">>();
   });
 });

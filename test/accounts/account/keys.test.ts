@@ -503,3 +503,53 @@ describe("setAliases", () => {
     expect(posts()).toBe(1);
   });
 });
+
+describe("key changes check the person-DID policy before deciding a change is already done (R6-F1)", () => {
+  /** A head that already "has" each change but whose rotation keys break the policy. */
+  async function nonConforming() {
+    const { dir, wallet, did, cfg } = await setup();
+    const owner = k1Signer();
+    const attacker = await WebCryptoP256Signer.generate();
+    const newKey = await WebCryptoP256Signer.generate();
+    const gone = await WebCryptoP256Signer.generate();
+    await dir.append(did, owner, (h, cid) => ({
+      ...h,
+      rotationKeys: [wallet.didKey, attacker.didKey],
+      verificationMethods: { ...h.verificationMethods, signing: newKey.didKey, "device-5": gone.didKey },
+      alsoKnownAs: [alias("ab")],
+      prev: cid,
+    }));
+    // device-5 was in an earlier entry and is not in the head: removeDeviceKey's "already removed".
+    await dir.append(did, owner, (h, cid) => {
+      const { "device-5": _removed, ...rest } = h.verificationMethods;
+      return { ...h, verificationMethods: rest, prev: cid };
+    });
+    return { dir, wallet, did, cfg, newKey, gone };
+  }
+
+  it.each([
+    [
+      "addDeviceKey (key already on the head)",
+      (s: Awaited<ReturnType<typeof nonConforming>>) =>
+        addDeviceKey(s.cfg, { did: s.did, wallet: s.wallet, newKey: s.newKey }),
+    ],
+    [
+      "setAliases (same aliases)",
+      (s: Awaited<ReturnType<typeof nonConforming>>) =>
+        setAliases(s.cfg, { did: s.did, wallet: s.wallet, aliases: [alias("ab")] }),
+    ],
+    [
+      "removeDeviceKey (fragment already removed)",
+      (s: Awaited<ReturnType<typeof nonConforming>>) =>
+        removeDeviceKey(s.cfg, { did: s.did, wallet: s.wallet, fragment: "device-5", key: s.gone.didKey }),
+    ],
+  ])("%s: PolicyError rotation_locked, never 'already done', nothing signed", async (_n, run) => {
+    const s = await nonConforming();
+    s.wallet.sign.mockClear();
+    const e = await run(s).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(PolicyError);
+    expect(e).toMatchObject({ code: "rotation_locked" });
+    expect(s.wallet.sign).not.toHaveBeenCalled();
+    expect(s.dir.submitted).toHaveLength(0);
+  });
+});

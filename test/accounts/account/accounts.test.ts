@@ -11,6 +11,7 @@ import {
 import { generateDpopKey } from "../../../src/accounts/auth/dpop.js";
 import type { Session } from "../../../src/accounts/auth/signin.js";
 import { SIGNUP_POP_MESSAGE, verifyOpSignature } from "../../../src/accounts/core/index.js";
+import { AccountsError, LinkRequiredError } from "../../../src/accounts/errors.js";
 import { WebCryptoP256Signer } from "../../../src/accounts/signers/webcrypto.js";
 import { cfgFor, json, router } from "./../helpers.js";
 
@@ -160,6 +161,27 @@ describe("createAccount", () => {
       status: 409,
     });
     expect((e as Error).message).toContain("signup in progress");
+  });
+
+  it("maps 409 link_required to LinkRequiredError (an AccountsError): claim with the SDK instead", async () => {
+    const { cfg } = setup(async () => json(errBody("link_required", "claim with the SDK and PUT /api/v2/me/did"), 409));
+    const e = await createAccount(cfg, { email: "a@b.c" }).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(LinkRequiredError);
+    expect(e).toBeInstanceOf(AccountsError);
+    expect(e).toMatchObject({ name: "LinkRequiredError", code: "link_required", status: 409 });
+    expect((e as Error).message).toBe("link_required: claim with the SDK and PUT /api/v2/me/did");
+  });
+
+  it("a conflict 409 is not LinkRequiredError, and link_required on another status is not either", async () => {
+    for (const [code, status] of [
+      ["conflict", 409],
+      ["link_required", 400],
+    ] as const) {
+      const { cfg } = setup(async () => json(errBody(code), status));
+      const e = await createAccount(cfg, { email: "a@b.c" }).catch((x: unknown) => x);
+      expect(e).toBeInstanceOf(AccountsError);
+      expect(e).not.toBeInstanceOf(LinkRequiredError);
+    }
   });
 
   it("maps other failures to AccountsError with the envelope code", async () => {

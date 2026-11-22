@@ -12,12 +12,14 @@ npm install @dimo-network/transactions
 
 ## Accounts v2
 
-The non-custodial DIMO accounts SDK (sign-in, device keys, account helpers, smart accounts) ships in this package as two subpath modules:
+The non-custodial DIMO accounts SDK (sign-in, device keys, account helpers, smart accounts) ships in this package as subpath modules:
 
 - `@dimo-network/transactions/accounts`: signers and account flows.
+- `@dimo-network/transactions/accounts/auth`: sign-in, DPoP and authenticated fetch only. It loads no `viem`, ZeroDev or Turnkey code.
+- `@dimo-network/transactions/accounts/directory`: the verifying did-directory client only. It loads no `viem`, ZeroDev or Turnkey code.
 - `@dimo-network/transactions/accounts/core`: encoding and verification only. It loads no `viem`, ZeroDev or Turnkey code.
 
-Both are ESM and CommonJS. The main entry does not re-export them. See [docs/accounts.md](docs/accounts.md).
+All are ESM and CommonJS. The main entry does not re-export them. See [docs/accounts.md](docs/accounts.md).
 
 ## How to Use the SDK
 

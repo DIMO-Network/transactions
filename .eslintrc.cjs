@@ -66,6 +66,15 @@ module.exports = {
   },
   overrides: [
     {
+      // npm run lint:accounts. The accounts code follows .prettierrc (npm run format), not
+      // the inline prettier options above: rule options replace rather than merge, so {}
+      // here makes eslint-plugin-prettier read .prettierrc alone for these files.
+      files: ["src/accounts/**/*.ts", "test/accounts/**/*.ts", "e2e/accounts/**/*.ts"],
+      rules: {
+        "prettier/prettier": ["error", {}],
+      },
+    },
+    {
       files: ["**/*.test.*"],
       rules: {
         "@typescript-eslint/no-explicit-any": "off",
@@ -89,6 +98,26 @@ module.exports = {
           },
         ],
         "no-restricted-globals": ["error", { name: "fetch", message: "src/accounts/core must not use fetch." }],
+      },
+    },
+    {
+      // @dimo-network/transactions/accounts/auth and /accounts/directory must load no
+      // smart-account, passkey or Turnkey code (scripts/check-dist.mjs and
+      // test/accounts/entries.test.ts check the module graph too).
+      files: ["src/accounts/auth/**/*.ts", "src/accounts/directory/**/*.ts"],
+      rules: {
+        "no-restricted-imports": [
+          "error",
+          {
+            patterns: [
+              {
+                group: ["@turnkey/*", "viem", "viem/*", "@zerodev/*", "../account/*", "../signers/turnkey*"],
+                message:
+                  "src/accounts/auth and src/accounts/directory must stay free of smart-account, passkey and Turnkey code.",
+              },
+            ],
+          },
+        ],
       },
     },
   ],

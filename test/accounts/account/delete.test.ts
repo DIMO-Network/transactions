@@ -14,6 +14,7 @@ import {
   buildSetAliases,
   computeCid,
   encodeSigningPayload,
+  ethAddressFromDidKey,
   toChecksumAddress,
   verifyOpSignature,
 } from "../../../src/accounts/core/index.js";
@@ -23,12 +24,15 @@ import {
   DirectoryRejectedError,
   HeadMovedError,
   NetworkError,
+  TurnkeyError,
   UsageError,
 } from "../../../src/accounts/errors.js";
 import { cfgFor, FakeDirectory, type Handler, json, k1Signer, router } from "../helpers.js";
 
 const ACCOUNTS = "https://accounts.test";
 const SUB = "sub-org-1";
+const OTHER_SUB = "org-root-sub-org";
+const OTHER_WALLET = toChecksumAddress("0x" + "cd".repeat(20));
 const completed = async () => ({
   activity: { id: "a", status: "ACTIVITY_STATUS_COMPLETED", result: {} },
 });
@@ -70,7 +74,22 @@ async function setup(
     if (opts.tkFails) throw new Error("turnkey down");
     return completed();
   });
-  const turnkey = { deleteSubOrganization } as unknown as TurnkeyClient;
+  // SUB holds the wallet; OTHER_SUB (say, an org root the same stamper can reach) does not.
+  const walletAccounts: Record<string, { addressFormat: string; address: string; path: string }[]> = {
+    [SUB]: [
+      {
+        addressFormat: "ADDRESS_FORMAT_ETHEREUM",
+        address: ethAddressFromDidKey(wallet.didKey),
+        path: "m/44'/60'/0'/0/0",
+      },
+    ],
+    [OTHER_SUB]: [{ addressFormat: "ADDRESS_FORMAT_ETHEREUM", address: OTHER_WALLET, path: "m/44'/60'/0'/0/0" }],
+  };
+  const getWalletAccounts = vi.fn(async ({ organizationId }: { organizationId: string }) => {
+    order.push("wallets");
+    return { accounts: walletAccounts[organizationId] ?? [] };
+  });
+  const turnkey = { deleteSubOrganization, getWalletAccounts } as unknown as TurnkeyClient;
   const session: Session = {
     did,
     token: "tok",
@@ -101,6 +120,7 @@ async function setup(
     cfg,
     turnkey,
     deleteSubOrganization,
+    getWalletAccounts,
     session,
     args,
     tombstoned,
@@ -126,11 +146,13 @@ const moveHead = (s: S) =>
   );
 
 describe("deleteAccount", () => {
-  it("order: head, sign tombstone, DELETE /me, re-check head, Turnkey delete, submit tombstone", async () => {
+  it("order: head, sub-org holds the wallet, sign tombstone, DELETE /me, re-check head, Turnkey delete, submit tombstone", async () => {
     const s = await setup();
     const prev = s.dir.head(s.did).cid;
     const res = await deleteAccount(...s.args());
-    expect(s.order).toEqual(["audit", "sign", "accounts", "audit", "turnkey", "submit"]);
+    expect(s.order).toEqual(["audit", "wallets", "sign", "accounts", "audit", "turnkey", "submit"]);
+    expect(s.getWalletAccounts).toHaveBeenCalledWith({ organizationId: SUB });
+    expect(res.walletAddress).toBe(ethAddressFromDidKey(s.wallet.didKey));
     expect(s.wallet.sign).toHaveBeenCalledTimes(1);
     const [url, init] = s.accounts.mock.calls[0]!;
     expect(url).toBe(`${ACCOUNTS}/api/v2/me`);
@@ -511,5 +533,136 @@ describe("DeleteIncompleteError.code", () => {
     expectTypeOf(e.code).toEqualTypeOf<"delete_incomplete" | "delete_head_moved" | "tombstone_signature_invalid">();
     expect(e.code).toBe("delete_incomplete");
     expect(new DeleteHeadMovedError(pending, "x").code).toBe("delete_head_moved");
+  });
+});
+
+describe("deleteAccount only deletes the sub-org that holds the wallet (R6-F3)", () => {
+  it("refuses a sub-org without the wallet before signing: nothing forgotten, nothing deleted", async () => {
+    const s = await setup();
+    const [cfg, opts] = s.args();
+    const e = await deleteAccount(cfg, { ...opts, subOrganizationId: OTHER_SUB }).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(TurnkeyError);
+    expect(e).toMatchObject({ code: "sub_org_mismatch" });
+    expect((e as Error).message).toContain(OTHER_SUB);
+    expect(s.wallet.sign).not.toHaveBeenCalled();
+    expect(s.accounts).not.toHaveBeenCalled();
+    expect(s.deleteSubOrganization).not.toHaveBeenCalled();
+    expect(s.dir.submitted).toHaveLength(0);
+  });
+
+  it("resumeDelete re-checks a stored sub-org before deleting it", async () => {
+    const s = await setup({ tkFails: true });
+    const pending = await pendingAfterTkFailure(s);
+    expect(pending.walletAddress).toBe(ethAddressFromDidKey(s.wallet.didKey));
+    s.deleteSubOrganization.mockClear();
+    s.getWalletAccounts.mockClear();
+    const err = await resumeDelete(
+      s.cfg,
+      { ...pending, subOrganizationId: OTHER_SUB },
+      { turnkeyWithUserStamper: s.turnkey }
+    ).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(DeleteIncompleteError);
+    expect((err as DeleteIncompleteError).cause).toBeInstanceOf(TurnkeyError);
+    expect((err as DeleteIncompleteError).cause).toMatchObject({ code: "sub_org_mismatch" });
+    expect(s.getWalletAccounts).toHaveBeenCalledWith({ organizationId: OTHER_SUB });
+    expect(s.deleteSubOrganization).not.toHaveBeenCalled();
+    expect(s.dir.submitted).toHaveLength(0);
+  });
+
+  it("resumeDelete refuses a stored walletAddress that is not the tombstone signer's", async () => {
+    const s = await setup({ tkFails: true });
+    const pending = await pendingAfterTkFailure(s);
+    s.deleteSubOrganization.mockClear();
+    const err = await resumeDelete(
+      s.cfg,
+      { ...pending, subOrganizationId: OTHER_SUB, walletAddress: OTHER_WALLET },
+      { turnkeyWithUserStamper: s.turnkey }
+    ).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(DeleteIncompleteError);
+    expect((err as DeleteIncompleteError).cause).toMatchObject({ code: "sub_org_mismatch" });
+    expect(s.deleteSubOrganization).not.toHaveBeenCalled();
+  });
+
+  it("resumeDelete checks the stored sub-org right before the Turnkey delete", async () => {
+    const s = await setup({ tkFails: true });
+    const pending = await pendingAfterTkFailure(s);
+    s.order.length = 0;
+    await resumeDelete(s.cfg, pending, { turnkeyWithUserStamper: s.turnkey });
+    expect(s.order).toEqual(["audit", "wallets", "turnkey", "submit"]);
+  });
+});
+
+describe("resumeDelete from stepsDone [] checks the sub-org before DELETE /me (fix round 1)", () => {
+  /** A pending stopped at DELETE /me (network error), so stepsDone is []. */
+  async function pendingBeforeAccounts() {
+    const s = await setup({
+      accounts: async () => {
+        throw new TypeError("offline");
+      },
+    });
+    const pending = ((await deleteAccount(...s.args()).catch((e: unknown) => e)) as DeleteIncompleteError).pending;
+    expect(pending.stepsDone).toEqual([]);
+    s.accounts.mockReset();
+    s.accounts.mockImplementation(async () => new Response(null, { status: 204 }));
+    s.order.length = 0;
+    return { s, pending };
+  }
+
+  it("a wrong stored sub-org forgets nothing and deletes nothing", async () => {
+    const { s, pending } = await pendingBeforeAccounts();
+    const err = await resumeDelete(
+      s.cfg,
+      { ...pending, subOrganizationId: OTHER_SUB },
+      { turnkeyWithUserStamper: s.turnkey, session: s.session }
+    ).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(DeleteIncompleteError);
+    expect((err as DeleteIncompleteError).cause).toMatchObject({ code: "sub_org_mismatch" });
+    expect((err as DeleteIncompleteError).pending.stepsDone).toEqual([]);
+    expect(s.accounts).not.toHaveBeenCalled();
+    expect(s.deleteSubOrganization).not.toHaveBeenCalled();
+    expect(s.dir.submitted).toHaveLength(0);
+  });
+
+  it("a stored walletAddress that is not the tombstone signer's forgets nothing", async () => {
+    const { s, pending } = await pendingBeforeAccounts();
+    const err = await resumeDelete(
+      s.cfg,
+      { ...pending, subOrganizationId: OTHER_SUB, walletAddress: OTHER_WALLET },
+      { turnkeyWithUserStamper: s.turnkey, session: s.session }
+    ).catch((e: unknown) => e);
+    expect((err as DeleteIncompleteError).cause).toMatchObject({ code: "sub_org_mismatch" });
+    expect(s.accounts).not.toHaveBeenCalled();
+  });
+
+  it("the right sub-org: checked once, before DELETE /me, then finishes", async () => {
+    const { s, pending } = await pendingBeforeAccounts();
+    const done = await resumeDelete(s.cfg, pending, { turnkeyWithUserStamper: s.turnkey, session: s.session });
+    expect(done.stepsDone).toEqual(["accounts", "turnkey", "tombstone"]);
+    expect(s.order).toEqual(["audit", "wallets", "accounts", "audit", "turnkey", "submit"]);
+  });
+});
+
+describe("a PendingDeletion is a bearer credential (R6-F4)", () => {
+  it("DeleteIncompleteError keeps pending out of its enumerable fields and its JSON", async () => {
+    const s = await setup({ tkFails: true });
+    const err = (await deleteAccount(...s.args()).catch((e: unknown) => e)) as DeleteIncompleteError;
+    expect(err).toBeInstanceOf(DeleteIncompleteError);
+    const sig = err.pending.signedTombstone.sig;
+    expect(err.pending.stepsDone).toEqual(["accounts"]);
+    expect(Object.keys(err)).not.toContain("pending");
+    expect(JSON.stringify(err)).not.toContain(sig);
+    expect(JSON.stringify({ ...err })).not.toContain(sig);
+    // What error reporters that copy extra error fields (Sentry's ExtraErrorData) collect.
+    const extra = Object.fromEntries(Object.entries(err));
+    expect(JSON.stringify(extra)).not.toContain(sig);
+    expect(err.message).not.toContain(sig);
+  });
+
+  it("DeleteHeadMovedError too", () => {
+    const pending = { stepsDone: [], signedTombstone: { sig: "SECRET" } } as unknown as PendingDeletion;
+    const e = new DeleteHeadMovedError(pending, "x");
+    expect(e.pending).toBe(pending);
+    expect(Object.keys(e)).not.toContain("pending");
+    expect(JSON.stringify(e)).not.toContain("SECRET");
   });
 });

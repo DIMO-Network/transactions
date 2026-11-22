@@ -22,8 +22,15 @@ export {
   type ResumeDeleteOptions,
 } from "./account/delete.js";
 export { addDeviceKey, type KeyChangeArgs, removeDeviceKey, setAliases } from "./account/keys.js";
-export { type LoginResult, loginWithEmail, loginWithPasskey, requestEmailCode } from "./account/login.js";
+export {
+  type EmailLoginResult,
+  type LoginResult,
+  loginWithEmail,
+  loginWithPasskey,
+  requestEmailCode,
+} from "./account/login.js";
 export { addPasskey, type PasskeyAttestation, type PasskeyTransport, removePasskey } from "./account/passkeys.js";
+export { removePhone } from "./account/phone.js";
 export {
   deploySmartAccount,
   type GasProvider,
@@ -38,6 +45,7 @@ export {
   dpopKeyFromKeyPair,
   generateDpopKey,
   jwkThumbprint,
+  normalizeHtu,
   type WebCryptoDpopKey,
 } from "./auth/dpop.js";
 export { authedFetch } from "./auth/fetch.js";
@@ -48,6 +56,7 @@ export { verifyAuditLog } from "./directory/verify.js";
 export {
   AccountSdkError,
   AccountsError,
+  ClockSkewError,
   DeactivatedError,
   DidExistsError,
   DidNotFoundError,
@@ -60,16 +69,20 @@ export {
   type GasProxyErrorCode,
   HeadMovedError,
   InvalidDidError,
+  KeyNotAllowedError,
+  LinkRequiredError,
   NetworkError,
   PolicyError,
   type PolicyErrorCode,
   ProvidersExhaustedError,
+  RemovePhoneFirstError,
   type SdkService,
   SignerError,
   SigninError,
   SponsorshipError,
   TurnkeyError,
   type TurnkeyErrorCode,
+  UnexpectedDidStateError,
   UsageError,
   type UsageErrorCode,
   UserOperationPendingError,

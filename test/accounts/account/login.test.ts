@@ -1,5 +1,5 @@
 import type { TurnkeyClient } from "@turnkey/http";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import { loginWithEmail, loginWithPasskey, requestEmailCode } from "../../../src/accounts/account/login.js";
 import type { SdkConfig } from "../../../src/accounts/config.js";
@@ -112,6 +112,8 @@ describe("email login", () => {
           walletAddress: wallet,
           did: null,
           credentialBundle: "cb",
+          emailVerified: true,
+          otherCredentials: false,
         })
       );
     const cfg = withFetch(f);
@@ -181,5 +183,44 @@ describe("email login", () => {
     expect(err).toBeInstanceOf(NetworkError);
     expect(err.service).toBe("accounts");
     expect(err.cause).toBe(boom);
+  });
+});
+
+describe("email login answer carries emailVerified and otherCredentials (contract 2)", () => {
+  const body = (over: Record<string, unknown> = {}) => ({
+    subOrganizationId: "sub",
+    walletAddress: wallet,
+    did: "did:dimo:aaaaaaaaaaaaaaaaaaaaaaaa",
+    credentialBundle: "cb",
+    emailVerified: false,
+    otherCredentials: true,
+    ...over,
+  });
+  const login = (res: Record<string, unknown>) =>
+    loginWithEmail(
+      withFetch(async () => json(res)),
+      { email: "a@b.c", codeId: "c", code: "1", sessionPublicKey: "pk" }
+    );
+
+  it("returns both booleans as accounts sent them", async () => {
+    const r = await login(body());
+    expect(r).toEqual(body());
+    expectTypeOf(r.emailVerified).toEqualTypeOf<boolean>();
+    expectTypeOf(r.otherCredentials).toEqualTypeOf<boolean>();
+    expect(await login(body({ emailVerified: true, otherCredentials: false }))).toMatchObject({
+      emailVerified: true,
+      otherCredentials: false,
+    });
+  });
+
+  it.each([
+    ["emailVerified missing", { emailVerified: undefined }],
+    ["otherCredentials missing", { otherCredentials: undefined }],
+    ["emailVerified not a boolean", { emailVerified: "true" }],
+    ["otherCredentials not a boolean", { otherCredentials: 0 }],
+  ])("%s is AccountsError invalid_response (never a reassuring default)", async (_n, over) => {
+    const err = await login(body(over)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AccountsError);
+    expect(err).toMatchObject({ code: "invalid_response" });
   });
 });

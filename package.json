@@ -34,6 +34,26 @@
         "default": "./dist/accounts/core/index.cjs"
       }
     },
+    "./accounts/auth": {
+      "import": {
+        "types": "./dist/accounts/auth/index.d.ts",
+        "default": "./dist/accounts/auth/index.js"
+      },
+      "require": {
+        "types": "./dist/accounts/auth/index.d.cts",
+        "default": "./dist/accounts/auth/index.cjs"
+      }
+    },
+    "./accounts/directory": {
+      "import": {
+        "types": "./dist/accounts/directory/index.d.ts",
+        "default": "./dist/accounts/directory/index.js"
+      },
+      "require": {
+        "types": "./dist/accounts/directory/index.d.cts",
+        "default": "./dist/accounts/directory/index.cjs"
+      }
+    },
     "./dist/*.js": "./dist/*.js",
     "./dist/*.cjs": "./dist/*.cjs",
     "./dist/*": {
@@ -49,6 +69,12 @@
       ],
       "accounts/core": [
         "./dist/accounts/core/index.d.ts"
+      ],
+      "accounts/auth": [
+        "./dist/accounts/auth/index.d.ts"
+      ],
+      "accounts/directory": [
+        "./dist/accounts/directory/index.d.ts"
       ]
     }
   },
@@ -61,6 +87,7 @@
     "dev": "tsc --watch & nodemon --watch dist --delay 1 --exec tsc-alias",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.accounts.json",
     "lint": "eslint . --ext .ts,.tsx --fix",
+    "lint:accounts": "ESLINT_USE_FLAT_CONFIG=false eslint --ext .ts src/accounts test/accounts e2e/accounts",
     "test": "vitest",
     "check:dist": "node scripts/check-dist.mjs",
     "vectors:sync": "git -C ../did-directory show origin/main:testdata/vectors/did-ops.json > test/accounts/fixtures/did-ops.json.tmp && mv test/accounts/fixtures/did-ops.json.tmp test/accounts/fixtures/did-ops.json || (rm -f test/accounts/fixtures/did-ops.json.tmp; exit 1)",

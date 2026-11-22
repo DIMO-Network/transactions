@@ -1,5 +1,6 @@
 import type { SdkConfig } from "../config.js";
 import {
+  assertPersonDid,
   buildAddKey,
   buildRemoveKey,
   buildSetAliases,
@@ -24,6 +25,8 @@ export type KeyChangeArgs = {
 };
 
 type Step<T> = {
+  /** Runs first on every attempt's verified log; throws to refuse the change. */
+  guard?: (log: readonly AuditEntry[]) => void;
   /**
    * Already applied on this head? Then return without signing. `log` is the verified
    * audit log the head came from (read once per attempt).
@@ -34,7 +37,8 @@ type Step<T> = {
 };
 
 /**
- * Read the verified head, build, sign with the wallet, submit. Retries on HeadMovedError
+ * Read the verified head, check it against the person-DID policy (assertPersonDid with the
+ * wallet), then build, sign with the wallet, submit. Retries on HeadMovedError
  * only, re-reading the head each time, for at most MAX_ATTEMPTS attempts in total.
  * Idempotent: if the head already has the change, returns its cid without signing, so a
  * call whose outcome was unknown (NetworkError, DirectoryUnavailableError) can be repeated.
@@ -48,6 +52,7 @@ async function change<T>(cfg: SdkConfig, args: KeyChangeArgs, step: Step<T>): Pr
     const log = await directory.auditLog(did);
     const last = log.at(-1)!;
     if (last.operation.type === "plc_tombstone") throw new DeactivatedError(did);
+    step.guard?.(log);
     const { cid: prevCid, operation: headOp } = last;
     // Only a rotation key of the head can sign an update: a wrong wallet never signs.
     if (!headOp.rotationKeys.includes(wallet.didKey)) {
@@ -55,6 +60,9 @@ async function change<T>(cfg: SdkConfig, args: KeyChangeArgs, step: Step<T>): Pr
     }
     // Builders copy only the unsigned fields, so the head's sig is not carried over.
     const head: UnsignedOperation = headOp;
+    // A head that breaks the person-DID policy is refused before anything else, so a
+    // non-conforming head can never count as "already done".
+    assertPersonDid(head, wallet.didKey);
     const already = step.done?.(head, prevCid, log);
     if (already !== undefined) return { cid: prevCid, ...already };
     const { op, extra } = step.build(head, prevCid);
@@ -88,18 +96,30 @@ export async function proveKey(key: Signer, payload: Uint8Array): Promise<void> 
  * was removed: a stale retry of this call must not bring it back. That is refused with
  * PolicyError `key_removed` before anything is signed, unless `allowReAdd` is true.
  */
-export async function addDeviceKey(
+export async function addDeviceKey(cfg: SdkConfig, args: AddDeviceKeyArgs): Promise<{ cid: string; fragment: string }> {
+  return addDeviceKeyGuarded(cfg, args);
+}
+
+type AddDeviceKeyArgs = KeyChangeArgs & {
+  newKey: Signer;
+  fragment?: string;
+  /** Add newKey even though an earlier entry of the audit log had it (it was removed). */
+  allowReAdd?: boolean;
+};
+
+/**
+ * addDeviceKey, with `guard` run on every attempt's verified log before anything else
+ * (claimDid uses it so #signing is only ever built on a log it accepts). Internal.
+ */
+export async function addDeviceKeyGuarded(
   cfg: SdkConfig,
-  args: KeyChangeArgs & {
-    newKey: Signer;
-    fragment?: string;
-    /** Add newKey even though an earlier entry of the audit log had it (it was removed). */
-    allowReAdd?: boolean;
-  }
+  args: AddDeviceKeyArgs,
+  guard?: (log: readonly AuditEntry[]) => void
 ): Promise<{ cid: string; fragment: string }> {
   const { newKey, fragment } = args;
   const has = (vms: Readonly<Record<string, string>>) => Object.entries(vms).find(([, key]) => key === newKey.didKey);
   return change(cfg, args, {
+    ...(guard ? { guard } : {}),
     done: (head, prevCid, log) => {
       const existing = has(head.verificationMethods);
       if (existing) return { fragment: existing[0] };

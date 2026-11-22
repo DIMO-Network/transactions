@@ -72,10 +72,31 @@ export async function dpopKeyFromKeyPair(pair: CryptoKeyPair): Promise<WebCrypto
   };
 }
 
-/** htu: RFC 9449 / RFC 3986 normalization: scheme and host lowercased, default port dropped, no query or fragment. */
+/** Matches a URL whose path is empty: scheme "://" authority, then only a query or fragment. */
+const EMPTY_PATH = /^[A-Za-z][A-Za-z0-9+.-]*:\/\/[^/?#\\]*(?:[?#]|$)/;
+
+/**
+ * htu, normalised for cross-repo contract 4 the way did-directory's Go pkg/dpop does it
+ * for the five shared vectors (test/accounts/fixtures/htu-vectors.json): scheme and host
+ * lowercased, `:443` dropped for https and `:80` for http, query and fragment dropped. The
+ * path is the percent-encoded one the request carries (WHATWG `URL.pathname`; Go uses
+ * `url.EscapedPath()`, so `/a b` is `/a%20b` on both sides), with no trailing slash added
+ * or removed.
+ *
+ * Bare-origin URLs (no path, such as `HTTPS://EXAMPLE.COM`, which gives
+ * `https://example.com`) are unsupported for DPoP: the request itself goes to `/`, so a
+ * verifier would expect `https://example.com/`. Every SDK and server URL has a path.
+ *
+ * Known divergences from Go that no vector covers, not reconciled: this drops userinfo and
+ * Go keeps it; Go escapes `|` in the path and WHATWG does not; WHATWG resolves dot
+ * segments (`/a/../b` is `/b`), reads `\` as `/` and compresses IPv6 hosts, and Go does
+ * none of these. Pass plain URLs without those forms. Throws the URL parser's TypeError for
+ * a string that is not a URL.
+ */
 export function normalizeHtu(raw: string): string {
   const u = new URL(raw);
-  return `${u.protocol.toLowerCase()}//${u.host.toLowerCase()}${u.pathname}`;
+  // WHATWG lowercases the scheme and host and drops the scheme's default port for http(s).
+  return `${u.protocol}//${u.host}${EMPTY_PATH.test(raw) ? "" : u.pathname}`;
 }
 
 /** The key's public JWK reduced to exactly {kty, crv, x, y}; rejects non EC/P-256 keys. */
@@ -87,7 +108,11 @@ export async function publicJwk(key: DpopKey): Promise<DpopJwk> {
   return { kty: "EC", crv: "P-256", x: j.x, y: j.y };
 }
 
-/** Build a DPoP proof JWT (RFC 9449) for a request; `ath` is set when a token is sent. */
+/**
+ * Build a DPoP proof JWT (RFC 9449) for a request; `ath` is set when a token is sent.
+ * `method` goes into htm exactly as given (verifiers compare it exactly), and `url`
+ * through normalizeHtu into htu.
+ */
 export async function createDpopProof(
   key: DpopKey,
   method: string,

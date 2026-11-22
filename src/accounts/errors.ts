@@ -75,6 +75,61 @@ export class DidExistsError extends AccountSdkError {
   }
 }
 
+/**
+ * claimDid found the DID's verified audit log in a state it did not make itself.
+ * Whoever could sign with the wallet before the claim (for a v1 account, DIMO's Turnkey
+ * API key) could have added a key or changed the rotation keys, and a planted key would
+ * keep working after the claim, so claimDid refuses. Three cases:
+ * - `did_unexpected_state`, `linked: false`: found before signing in (the DID exists with
+ *   operations claimDid did not make); nothing was linked.
+ * - `did_unexpected_state`, `linked: true`: found right after PUT /me/did linked the DID
+ *   (an operation appended before the handover that accounts' check did not see). The DID
+ *   is linked and only the wallet can sign it now: remove the listed keys with
+ *   removeDeviceKey, then add the signing key with addDeviceKey.
+ * - `did_unlinkable`: the DID already holds the caller's `signingKey` as `#signing`, but
+ *   the account is not linked to it, and accounts links only a bare genesis, so it can
+ *   never be claimed.
+ * `unexpectedKeys` maps each verification-method fragment the genesis has beyond `wallet`,
+ * or the head has beyond `wallet` and the caller's `#signing`, to its did:key;
+ * `rotationKeys` are the head's; `operations` is the verified log's length.
+ */
+export class UnexpectedDidStateError extends AccountSdkError {
+  declare readonly code: "did_unexpected_state" | "did_unlinkable";
+  readonly did: string;
+  readonly unexpectedKeys: Readonly<Record<string, string>>;
+  readonly rotationKeys: readonly string[];
+  readonly operations: number;
+  /** True when PUT /me/did had already linked the DID to the account. */
+  readonly linked: boolean;
+  constructor(
+    did: string,
+    state: {
+      unexpectedKeys: Record<string, string>;
+      rotationKeys: readonly string[];
+      operations: number;
+      linked?: boolean;
+      unlinkable?: boolean;
+    }
+  ) {
+    const keys = Object.entries(state.unexpectedKeys).map(([fragment, key]) => `${fragment}=${key}`);
+    const found = `${state.operations} operations; unexpected keys: ${keys.join(", ") || "none"}; rotation keys: ${
+      state.rotationKeys.join(", ") || "none"
+    }`;
+    const message = state.unlinkable
+      ? `DID ${did} already holds this signingKey as #signing, but this account is not linked to it, and accounts links only a bare genesis: this DID cannot be claimed`
+      : state.linked
+        ? `DID ${did} is linked, but its log changed before the handover (${found}); only the wallet can sign it now: remove those keys with removeDeviceKey, then add the signing key with addDeviceKey`
+        : `DID ${did} already exists, but not as the bare genesis claimDid makes (${found})`;
+    super(state.unlinkable ? "did_unlinkable" : "did_unexpected_state", message);
+    this.name = "UnexpectedDidStateError";
+    this.did = did;
+    this.unexpectedKeys = { ...state.unexpectedKeys };
+    this.rotationKeys = [...state.rotationKeys];
+    this.operations = state.operations;
+    this.linked = state.linked ?? false;
+  }
+}
+
 /** The DID is unknown to the directory. */
 export class DidNotFoundError extends AccountSdkError {
   readonly did: string;
@@ -128,6 +183,42 @@ export class SigninError extends AccountSdkError {
   }
 }
 
+/**
+ * dauth refused the token because the key that signed in may not get a scope it asked for
+ * (403 `key_not_allowed`, "approve needs a rotation key"): dauth grants `approve` only when
+ * that key is also one of the DID's rotation keys. A person gets `approve` by signing in
+ * with `#wallet`, an org with `#signing` (its root). `fragment` is the key that signed in.
+ * The SDK never switches keys for you: sign in again with the right one.
+ */
+export class KeyNotAllowedError extends SigninError {
+  declare readonly code: "key_not_allowed";
+  readonly fragment: string;
+  constructor(description: string, status: number, fragment: string) {
+    super("key_not_allowed", `${description} (signed in with #${fragment})`, status);
+    this.name = "KeyNotAllowedError";
+    this.fragment = fragment;
+  }
+}
+
+/**
+ * The device clock and dauth's (the challenge's `Issued At`) differ by more than 24 hours.
+ * signIn refuses before signing rather than stamp every DPoP proof with a clock that far
+ * off: fix the device clock and sign in again. `offsetMs` is dauth's clock minus the
+ * device's, as measured.
+ */
+export class ClockSkewError extends AccountSdkError {
+  declare readonly code: "clock_skew";
+  readonly offsetMs: number;
+  constructor(offsetMs: number) {
+    super(
+      "clock_skew",
+      `the device clock and dauth's differ by ${Math.round(Math.abs(offsetMs) / 1000)} s (more than 24 h); fix the device clock and sign in again`
+    );
+    this.name = "ClockSkewError";
+    this.offsetMs = offsetMs;
+  }
+}
+
 /** Retry-After as whole seconds. An HTTP-date, a negative or any other value is ignored (undefined). */
 export function parseRetryAfter(header: string | null | undefined): number | undefined {
   const h = header?.trim();
@@ -170,6 +261,35 @@ export class AccountsError extends AccountSdkError {
   }
 }
 
+/**
+ * Signup (POST /api/v2/accounts) answered 409 `link_required`: the email belongs to an
+ * existing v1 account that signup can't take over, because its email was never proven or
+ * its user is already a root of the sub-org. Don't retry signup. Log in with the account's
+ * v1 passkey (loginWithPasskey, then a Turnkey signer for its wallet) and call claimDid,
+ * which creates the DID and links it with PUT /api/v2/me/did.
+ */
+export class LinkRequiredError extends AccountsError {
+  declare readonly code: "link_required";
+  constructor(status: number, message: string, retryAfterSeconds?: number) {
+    super("link_required", status, message, retryAfterSeconds);
+    this.name = "LinkRequiredError";
+  }
+}
+
+/**
+ * PUT /api/v2/me/did answered 409 `remove_phone_first`: DIMO is already off this v1
+ * sub-org's root, and the end user still has a phone number on Turnkey, which accounts can
+ * no longer clear. Call removePhone with the user's own Turnkey session (the same passkey
+ * or session stamper used for the sub-org), then claimDid again.
+ */
+export class RemovePhoneFirstError extends AccountsError {
+  declare readonly code: "remove_phone_first";
+  constructor(status: number, message: string, retryAfterSeconds?: number) {
+    super("remove_phone_first", status, message, retryAfterSeconds);
+    this.name = "RemovePhoneFirstError";
+  }
+}
+
 export type UsageErrorCode =
   | "scope_missing"
   | "audience_empty"
@@ -197,9 +317,13 @@ export type TurnkeyErrorCode =
   | "public_key_mismatch"
   | "wallet_missing"
   | "wallet_ambiguous"
-  | "no_authenticator_id";
+  | "no_authenticator_id"
+  | "sub_org_mismatch";
 
-/** Turnkey answered, but not with what the SDK needs (no signature, a key that does not match, an ambiguous wallet). */
+/**
+ * Turnkey answered, but not with what the SDK needs (no signature, a key that does not
+ * match, an ambiguous wallet, or a sub-org that does not hold the wallet: `sub_org_mismatch`).
+ */
 export class TurnkeyError extends AccountSdkError {
   declare readonly code: TurnkeyErrorCode;
   constructor(code: TurnkeyErrorCode, message: string) {
@@ -334,7 +458,10 @@ function brief(cause: unknown): string {
  * No gas provider took the UserOp: each attempt failed before its send, or its provider
  * refused the send (a JSON-RPC error other than -32603, or an HTTP 4xx). `errors` holds
  * one error per provider, in order, untouched. The message lists `provider: <error name
- * and short message>` with URLs redacted, so it is safe to log.
+ * and short message>` with URLs redacted, so it is safe to log. Every attempt of the call
+ * signed the same nonce, so at most one of them can have been included; if a refusal was
+ * wrong (its bundler took the op after all), the later attempts were refused for that
+ * used nonce. Before sending the same calls again, check the account's EntryPoint nonce.
  */
 export class ProvidersExhaustedError extends AccountSdkError {
   readonly errors: unknown[];

@@ -25,8 +25,9 @@ async function create(ctx: Ctx, email: string): Promise<{ status: number; code?:
 
 /**
  * E18. Partner bulk creation: 300 POST /accounts in 60 s from one client.
- * Passes when: all return 201 (accounts doesn't throttle; its directory client absorbs
- * any ingress 429 with backoff).
+ * Passes when: all return 201. accounts does rate-limit public routes per client
+ * (V2_PUBLIC_RATE_LIMIT_PER_MINUTE, see the precondition), and its directory client absorbs
+ * any directory-ingress 429 with backoff.
  *
  * Precondition: V2_PUBLIC_RATE_LIMIT_PER_MINUTE is unset or >= 300 on dev. A 429 on the
  * first request is a SKIP naming that; any later 429 is a FAIL.
