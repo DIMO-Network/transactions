@@ -29,7 +29,9 @@ import { accountsJson } from "./response.js";
 /**
  * Create the person DID (wallet = rotation key, plus an optional device signing key that
  * must prove possession by co-signing the genesis), sign in with the wallet key, and link
- * the DID to the account via PUT /api/v2/me/did. Returns the DID, the session (scopes
+ * the DID to the account via PUT /api/v2/me/did. With a signing key the PUT body is
+ * `{ signingKey: <its did:key> }`: accounts links a genesis that has `#signing` only when
+ * the body names that same key. Returns the DID, the session (scopes
  * `read` and `write`, so the caller can use it straight away) and the AccountView that
  * PUT answered with. `opts.scope` may widen the session but must include `read` and
  * `write` (UsageError `scope_missing`, thrown before anything is sent).
@@ -96,14 +98,22 @@ export async function claimDid(
   const accounts = normalizeUrl(cfg.accountsUrl);
   const call = authedFetch(cfg, session);
   const url = `${accounts}/api/v2/me/did`;
-  let res = await call(url, { method: "PUT" });
+  // accounts links a genesis with #signing only when the body names that same key.
+  const put: RequestInit = signingKey
+    ? {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ signingKey: signingKey.didKey }),
+      }
+    : { method: "PUT" };
+  let res = await call(url, put);
   // Directory propagation can lag right after submit: accounts answers 503 `unavailable`
   // ("DID not visible yet; retry") with Retry-After. Retry a few times.
   for (let retry = 0; retry < LINK_RETRIES && res.status === 503; retry++) {
     const err = await AccountsError.fromResponse(res.clone());
     if (err.code !== "unavailable") break;
     await sleep(retryDelayMs(err.retryAfterSeconds));
-    res = await call(url, { method: "PUT" });
+    res = await call(url, put);
   }
   if (res.ok) {
     return {

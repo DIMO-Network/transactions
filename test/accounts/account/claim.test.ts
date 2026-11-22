@@ -453,3 +453,48 @@ describe("claimDid: an existing DID must be exactly the genesis it builds (R6-F1
     expect(r.did).toBe(did);
   });
 });
+
+describe("PUT /me/did names the genesis's #signing key (accounts contract, fix round 1)", () => {
+  const puts = (fetchImpl: ReturnType<typeof setup>["fetchImpl"]) =>
+    fetchImpl.mock.calls
+      .map(([u, i]) => [String(u), (i ?? {}) as RequestInit] as const)
+      .filter(([u, i]) => i.method === "PUT" && u.endsWith("/api/v2/me/did"))
+      .map(([, i]) => i);
+
+  it("sends { signingKey } as JSON when the genesis has #signing", async () => {
+    const wallet = await WebCryptoP256Signer.generate();
+    const signingKey = await WebCryptoP256Signer.generate();
+    const { cfg, fetchImpl } = setup();
+    await claimDid(cfg, { wallet, signingKey, dpopKey: await generateDpopKey() });
+    const [put] = puts(fetchImpl);
+    expect(JSON.parse(put!.body as string)).toEqual({ signingKey: signingKey.didKey });
+    expect(new Headers(put!.headers).get("content-type")).toBe("application/json");
+  });
+
+  it("sends it on the exists path too, and on every 503 retry", async () => {
+    const real = globalThis.setTimeout;
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void) =>
+      real(fn, 0)) as unknown as typeof setTimeout);
+    const wallet = await WebCryptoP256Signer.generate();
+    const signingKey = await WebCryptoP256Signer.generate();
+    let n = 0;
+    const { dir, cfg, fetchImpl } = setup(async (_u, init) =>
+      init.method === "PUT" && ++n === 1
+        ? json({ error: { code: "unavailable", message: "DID not visible yet; retry" } }, 503)
+        : json(viewFor("did:dimo:x"))
+    );
+    await dir.seedGenesis(wallet, { signingKey: signingKey.didKey });
+    await claimDid(cfg, { wallet, signingKey, dpopKey: await generateDpopKey() });
+    const sent = puts(fetchImpl);
+    expect(sent).toHaveLength(2);
+    for (const put of sent) expect(JSON.parse(put.body as string)).toEqual({ signingKey: signingKey.didKey });
+  });
+
+  it("sends no body for a wallet-only genesis", async () => {
+    const wallet = await WebCryptoP256Signer.generate();
+    const { cfg, fetchImpl } = setup();
+    await claimDid(cfg, { wallet, dpopKey: await generateDpopKey() });
+    const [put] = puts(fetchImpl);
+    expect(put!.body).toBeUndefined();
+  });
+});
