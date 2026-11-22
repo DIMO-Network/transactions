@@ -592,6 +592,56 @@ describe("deleteAccount only deletes the sub-org that holds the wallet (R6-F3)",
   });
 });
 
+describe("resumeDelete from stepsDone [] checks the sub-org before DELETE /me (fix round 1)", () => {
+  /** A pending stopped at DELETE /me (network error), so stepsDone is []. */
+  async function pendingBeforeAccounts() {
+    const s = await setup({
+      accounts: async () => {
+        throw new TypeError("offline");
+      },
+    });
+    const pending = ((await deleteAccount(...s.args()).catch((e: unknown) => e)) as DeleteIncompleteError).pending;
+    expect(pending.stepsDone).toEqual([]);
+    s.accounts.mockReset();
+    s.accounts.mockImplementation(async () => new Response(null, { status: 204 }));
+    s.order.length = 0;
+    return { s, pending };
+  }
+
+  it("a wrong stored sub-org forgets nothing and deletes nothing", async () => {
+    const { s, pending } = await pendingBeforeAccounts();
+    const err = await resumeDelete(
+      s.cfg,
+      { ...pending, subOrganizationId: OTHER_SUB },
+      { turnkeyWithUserStamper: s.turnkey, session: s.session }
+    ).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(DeleteIncompleteError);
+    expect((err as DeleteIncompleteError).cause).toMatchObject({ code: "sub_org_mismatch" });
+    expect((err as DeleteIncompleteError).pending.stepsDone).toEqual([]);
+    expect(s.accounts).not.toHaveBeenCalled();
+    expect(s.deleteSubOrganization).not.toHaveBeenCalled();
+    expect(s.dir.submitted).toHaveLength(0);
+  });
+
+  it("a stored walletAddress that is not the tombstone signer's forgets nothing", async () => {
+    const { s, pending } = await pendingBeforeAccounts();
+    const err = await resumeDelete(
+      s.cfg,
+      { ...pending, subOrganizationId: OTHER_SUB, walletAddress: OTHER_WALLET },
+      { turnkeyWithUserStamper: s.turnkey, session: s.session }
+    ).catch((e: unknown) => e);
+    expect((err as DeleteIncompleteError).cause).toMatchObject({ code: "sub_org_mismatch" });
+    expect(s.accounts).not.toHaveBeenCalled();
+  });
+
+  it("the right sub-org: checked once, before DELETE /me, then finishes", async () => {
+    const { s, pending } = await pendingBeforeAccounts();
+    const done = await resumeDelete(s.cfg, pending, { turnkeyWithUserStamper: s.turnkey, session: s.session });
+    expect(done.stepsDone).toEqual(["accounts", "turnkey", "tombstone"]);
+    expect(s.order).toEqual(["audit", "wallets", "accounts", "audit", "turnkey", "submit"]);
+  });
+});
+
 describe("a PendingDeletion is a bearer credential (R6-F4)", () => {
   it("DeleteIncompleteError keeps pending out of its enumerable fields and its JSON", async () => {
     const s = await setup({ tkFails: true });

@@ -231,9 +231,36 @@ const badTombstone = (pending: PendingDeletion): DeleteIncompleteError =>
   );
 
 /**
+ * The checks that guard the Turnkey delete, against the verified `log`: the tombstone's
+ * signature verifies under a rotation key of the state it was signed against (else
+ * `tombstone_signature_invalid`), `pending.walletAddress` is that key's address, and, when
+ * `checkTurnkey`, the stored sub-org holds an Ethereum account with it (else cause
+ * TurnkeyError `sub_org_mismatch`). Throws DeleteIncompleteError carrying `pending`.
+ */
+async function assertPendingSubOrg(
+  pending: PendingDeletion,
+  log: readonly AuditEntry[],
+  turnkey: TurnkeyClient,
+  checkTurnkey: boolean
+): Promise<void> {
+  const signedAgainst = log.find((e) => e.cid === pending.prevCid);
+  const signer = signedAgainst && tombstoneSigner(pending.signedTombstone, signedAgainst.operation.rotationKeys);
+  if (!signer) throw badTombstone(pending);
+  try {
+    if (!sameAddress(ethAddressFromDidKey(signer), pending.walletAddress)) {
+      throw subOrgMismatch(pending.subOrganizationId, pending.walletAddress);
+    }
+    if (checkTurnkey) await assertHoldsWallet(turnkey, pending.subOrganizationId, pending.walletAddress);
+  } catch (err) {
+    throw new DeleteIncompleteError(pending, err);
+  }
+}
+
+/**
  * Steps 3 and 4. Skips what stepsDone records. Never calls accounts and never signs.
- * `subOrgChecked`: deleteAccount checked moments ago that the sub-org holds the wallet,
- * so step 3 skips the second getWalletAccounts (one passkey prompt fewer).
+ * `subOrgChecked`: the caller checked moments ago that the sub-org holds the wallet
+ * (deleteAccount, or resumeDelete before DELETE /me), so step 3 skips the second
+ * getWalletAccounts (one passkey prompt fewer).
  */
 async function finish(
   pending: PendingDeletion,
@@ -268,20 +295,9 @@ async function finish(
         new HeadMovedError(`head is ${headCid}; the tombstone was signed against ${state.prevCid}`)
       );
     }
-    // Never destroy the wallet for a tombstone that cannot apply: its signature must
-    // verify under a rotation key of the state it was signed against.
-    const signedAgainst = log.find((e) => e.cid === state.prevCid);
-    const signer = signedAgainst && tombstoneSigner(state.signedTombstone, signedAgainst.operation.rotationKeys);
-    if (!signer) throw badTombstone(snapshot());
-    // Never destroy a sub-org that does not hold the wallet that signed the tombstone.
-    try {
-      if (!sameAddress(ethAddressFromDidKey(signer), state.walletAddress)) {
-        throw subOrgMismatch(state.subOrganizationId, state.walletAddress);
-      }
-      if (!subOrgChecked) await assertHoldsWallet(turnkey, state.subOrganizationId, state.walletAddress);
-    } catch (err) {
-      throw new DeleteIncompleteError(snapshot(), err);
-    }
+    // Never destroy the wallet for a tombstone that cannot apply, nor a sub-org that does
+    // not hold the wallet that signed it.
+    await assertPendingSubOrg(snapshot(), log, turnkey, !subOrgChecked);
     try {
       await deleteSubOrg(turnkey, state.subOrganizationId, state.deleteWithoutExport);
     } catch (err) {
@@ -368,9 +384,11 @@ export async function deleteAccount(cfg: SdkConfig, opts: DeleteAccountOptions):
 
 /**
  * Finish a saved PendingDeletion (with its stored deleteWithoutExport). Never signs.
- * Before deleting the stored sub-org it checks again that the sub-org holds an Ethereum
- * account with `pending.walletAddress`, and that this is the address of the key that
- * signed the tombstone (else DeleteIncompleteError, cause TurnkeyError `sub_org_mismatch`).
+ * While stepsDone lacks "turnkey" it checks again that the stored sub-org holds an
+ * Ethereum account with `pending.walletAddress`, and that this is the address of the key
+ * that signed the tombstone (else DeleteIncompleteError, cause TurnkeyError
+ * `sub_org_mismatch`): before DELETE /me when that step is still to do, so a wrong sub-org
+ * makes accounts forget nothing, and otherwise before the Turnkey delete.
  * Calls accounts only when stepsDone lacks "accounts", and then needs `opts.session`
  * (for pending.did, scope `approve`); without one it throws UsageError
  * `session_required`, and calling deleteAccount again also works.
@@ -381,7 +399,9 @@ export async function resumeDelete(
   opts: ResumeDeleteOptions
 ): Promise<PendingDeletion> {
   const directory = directoryFor(cfg, opts.directory);
+  const turnkey = opts.turnkeyWithUserStamper;
   let state = pending;
+  let subOrgChecked = false;
   if (!state.stepsDone.includes("accounts")) {
     const { session } = opts;
     if (!session || session.did !== pending.did) {
@@ -391,7 +411,18 @@ export async function resumeDelete(
       );
     }
     requireScopes(session, ["approve"], "account deletion");
+    // A wrong sub-org must be refused before accounts forgets anything, not after.
+    if (!state.stepsDone.includes("turnkey")) {
+      let log: AuditEntry[];
+      try {
+        log = await directory.auditLog(state.did);
+      } catch (err) {
+        throw new DeleteIncompleteError(state, err);
+      }
+      await assertPendingSubOrg(state, log, turnkey, true);
+      subOrgChecked = true;
+    }
     state = await forgetAccount(cfg, session, state);
   }
-  return finish(state, opts.turnkeyWithUserStamper, directory);
+  return finish(state, turnkey, directory, subOrgChecked);
 }
