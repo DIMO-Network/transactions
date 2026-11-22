@@ -20,9 +20,12 @@ export type PolicyErrorCode =
   | "key_removed"
   | "proof_invalid"
   | "alias_invalid"
-  | "services_not_allowed";
+  | "services_not_allowed"
+  | "rotation_keys"
+  | "fragment_not_allowed"
+  | "root_key_type";
 
-/** An operation would break the person-DID policy (spec §5), or a key failed proof of possession. */
+/** An operation would break the person- or org-DID policy (spec §5), or a key failed proof of possession. */
 export class PolicyError extends AccountSdkError {
   declare readonly code: PolicyErrorCode;
   constructor(code: PolicyErrorCode, message: string) {
