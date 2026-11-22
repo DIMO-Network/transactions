@@ -16,6 +16,14 @@ export interface Session {
    * to a key that is also a rotation key of the DID (`#wallet` for a person).
    */
   scopes: string[];
+  /**
+   * dauth's clock minus the device's, in ms, measured at sign-in from the challenge's
+   * `Issued At` (whole seconds). Set only when the device was at least 5 s off. Every DPoP
+   * proof made for this session (authedFetch) adds it to the device clock, so a phone whose
+   * clock is minutes off still lands inside the verifiers' iat window (accounts accepts
+   * 300 s back and 60 s ahead). Persist it with the token.
+   */
+  clockOffsetMs?: number;
 }
 
 export interface SignInOptions {
@@ -86,6 +94,26 @@ async function post(
 
 const SCOPE_ORDER = ["read", "write", "approve"];
 
+/** Below this, a measured offset is the challenge time's whole-second rounding and latency. */
+const CLOCK_SKEW_TOLERANCE_MS = 5000;
+
+/**
+ * dauth's clock minus the device's, from the challenge's `Issued At` line (dauth writes
+ * RFC 3339, whole seconds), or undefined when it is unreadable or within tolerance. The
+ * challenge is read rather than the Date header: browsers hide Date from cross-origin
+ * callers unless dauth exposes it, and dauth exposes only Retry-After.
+ */
+function clockOffset(challenge: string, receivedAt: number): number | undefined {
+  const issued = /\nIssued At: ([^\n]+)/.exec(challenge)?.[1];
+  const at = issued === undefined ? NaN : Date.parse(issued);
+  if (!Number.isFinite(at)) return undefined;
+  const offset = at - receivedAt;
+  return Math.abs(offset) >= CLOCK_SKEW_TOLERANCE_MS ? offset : undefined;
+}
+
+/** The device clock corrected by a session's clockOffsetMs. */
+export const serverNow = (clockOffsetMs: number | undefined): Date => new Date(Date.now() + (clockOffsetMs ?? 0));
+
 /**
  * Check the challenge is dauth's sign-in text for exactly this request before the
  * DID key signs it. Signatures over directory operations have the same form, so a
@@ -118,7 +146,8 @@ function validateChallenge(
  * Scope `approve` is granted only when the signing key is also a rotation key of the DID
  * (a person signs in with `#wallet`, an org with `#signing`); otherwise dauth answers 403
  * `key_not_allowed` and signIn throws KeyNotAllowedError. Other dauth refusals are
- * SigninError.
+ * SigninError. A device clock that is off by 5 s or more is measured against the
+ * challenge's `Issued At` and corrected in every DPoP proof (Session.clockOffsetMs).
  */
 export async function signIn(cfg: SdkConfig, args: SignInOptions): Promise<Session> {
   if (args.scope.length === 0) {
@@ -146,11 +175,12 @@ export async function signIn(cfg: SdkConfig, args: SignInOptions): Promise<Sessi
   if (typeof challenge !== "string" || typeof nonce !== "string") {
     throw new SigninError("server_error", "malformed challenge response", 200);
   }
+  const clockOffsetMs = clockOffset(challenge, Date.now());
   validateChallenge(challenge, nonce, { did: args.did, scope: args.scope, audience }, jkt);
   const signature = await args.signer.sign(new TextEncoder().encode(challenge));
   const tokenUrl = `${base}/signin/token`;
   const tok = await post(f, tokenUrl, { nonce, signature, key: args.fragment }, async () => ({
-    DPoP: await createDpopProof(args.dpopKey, "POST", tokenUrl),
+    DPoP: await createDpopProof(args.dpopKey, "POST", tokenUrl, undefined, serverNow(clockOffsetMs)),
   })).catch((err: unknown) => {
     if (err instanceof SigninError && err.code === "key_not_allowed") {
       throw new KeyNotAllowedError(err.message.replace(/^key_not_allowed: /, ""), err.status, args.fragment);
@@ -171,5 +201,6 @@ export async function signIn(cfg: SdkConfig, args: SignInOptions): Promise<Sessi
     expiresAt: new Date(Date.now() + tok.expires_in * 1000),
     dpopKey: args.dpopKey,
     scopes: granted,
+    ...(clockOffsetMs === undefined ? {} : { clockOffsetMs }),
   };
 }

@@ -108,6 +108,7 @@ await set("session", {
   token: session.token,
   expiresAt: session.expiresAt.toISOString(),
   scopes: session.scopes,
+  clockOffsetMs: session.clockOffsetMs,
   dpopKeyPair: (session.dpopKey as WebCryptoDpopKey).keyPair,
 });
 
@@ -119,6 +120,7 @@ const session: Session = {
   token: s.token,
   expiresAt: new Date(s.expiresAt),
   scopes: s.scopes,
+  clockOffsetMs: s.clockOffsetMs,
   dpopKey: await dpopKeyFromKeyPair(s.dpopKeyPair),
 };
 if (session.expiresAt.getTime() <= Date.now()) {
@@ -126,7 +128,7 @@ if (session.expiresAt.getTime() <= Date.now()) {
 }
 ```
 
-The token is bound to the DPoP key's thumbprint (`cnf.jkt`), so a restored token only works with the same pair. localStorage cannot hold a `CryptoKey`; do not export the private key to make it fit. React Native apps implement `Signer` and `DpopKey` over the platform keystore instead.
+The token is bound to the DPoP key's thumbprint (`cnf.jkt`), so a restored token only works with the same pair. `clockOffsetMs` is set when the device clock was 5 s or more off dauth's at sign-in (measured from the challenge's `Issued At`): every DPoP proof for the session adds it to the device clock, so a phone whose clock runs minutes fast or slow still passes the servers' `iat` window. Keep it with the token. localStorage cannot hold a `CryptoKey`; do not export the private key to make it fit. React Native apps implement `Signer` and `DpopKey` over the platform keystore instead.
 
 ## Scripts
 

@@ -470,3 +470,65 @@ describe("approve needs a rotation key (contract 1)", () => {
     expect(err).not.toBeInstanceOf(KeyNotAllowedError);
   });
 });
+
+describe("DPoP iat follows dauth's clock, not the device's (R6-F6)", () => {
+  afterEach(() => vi.useRealTimers());
+
+  /** A dauth whose clock is `skewMs` ahead of the device, stated in the challenge's Issued At. */
+  const skewedDauth = (skewMs: number) => {
+    const proofs: string[] = [];
+    const handler: Handler = async (url, init) => {
+      if (url.endsWith("/signin/token")) proofs.push(new Headers(init.headers).get("DPoP")!);
+      const res = await fakeDauth()(url, init);
+      if (!url.endsWith("/signin/challenge")) return res;
+      const body = await res.json();
+      const issued = new Date(Date.now() + skewMs).toISOString().replace(/\.\d{3}Z$/, "Z");
+      body.challenge = body.challenge.replace("Issued At: a", `Issued At: ${issued}`);
+      return json(body);
+    };
+    return { f: router({ "https://dauth.test": handler }), proofs };
+  };
+  const run = async (f: unknown) =>
+    signIn(cfgFor({ fetchImpl: f as unknown as typeof fetch }), {
+      did: "did:dimo:x",
+      signer: await WebCryptoP256Signer.generate(),
+      fragment: "wallet",
+      scope: ["read"],
+      dpopKey: await generateDpopKey(),
+    });
+  const serverSeconds = (skewMs: number) => (Date.now() + skewMs) / 1000;
+
+  it.each([
+    ["2 minutes fast", -120_000],
+    ["10 minutes slow", 600_000],
+  ])("a device clock %s: the token proof and later authed proofs carry dauth's time", async (_n, skewMs) => {
+    const { f, proofs } = skewedDauth(skewMs);
+    const session = await run(f);
+    expect(Math.abs(claims(proofs[0]!).iat - serverSeconds(skewMs))).toBeLessThan(3);
+    expect(Math.abs(session.clockOffsetMs! - skewMs)).toBeLessThan(2000);
+    let proof = "";
+    await authedFetch(
+      {
+        fetchImpl: (async (_u: string, init: RequestInit) => {
+          proof = new Headers(init.headers).get("DPoP")!;
+          return json({});
+        }) as typeof fetch,
+      },
+      session
+    )("https://accounts.test/api/v2/me");
+    expect(Math.abs(claims(proof).iat - serverSeconds(skewMs))).toBeLessThan(3);
+  });
+
+  it("a clock within a few seconds of dauth's is left alone (no offset)", async () => {
+    const { f, proofs } = skewedDauth(0);
+    const session = await run(f);
+    expect(session.clockOffsetMs).toBeUndefined();
+    expect(Math.abs(claims(proofs[0]!).iat - Date.now() / 1000)).toBeLessThan(2);
+  });
+
+  it("an unreadable Issued At leaves the device clock alone", async () => {
+    const f = router({ "https://dauth.test": fakeDauth() });
+    const session = await run(f);
+    expect(session.clockOffsetMs).toBeUndefined();
+  });
+});
