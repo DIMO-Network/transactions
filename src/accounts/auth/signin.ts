@@ -158,7 +158,10 @@ function validateChallenge(
  * challenge's `Issued At` (strict RFC 3339 only) and corrected in every DPoP proof
  * (Session.clockOffsetMs); more than 24 h off is ClockSkewError, before anything is signed.
  */
-export async function signIn(cfg: SdkConfig, args: SignInOptions): Promise<Session> {
+export async function signIn(
+  cfg: Pick<SdkConfig, "dauthUrl" | "accountsUrl" | "fetchImpl">,
+  args: SignInOptions
+): Promise<Session> {
   if (args.scope.length === 0) {
     throw new UsageError("scope_missing", "signIn needs at least one scope ('read', 'write' or 'approve')");
   }

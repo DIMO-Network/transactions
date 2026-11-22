@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import { generateDpopKey } from "../../../src/accounts/auth/dpop.js";
 import { authedFetch } from "../../../src/accounts/auth/fetch.js";
 import { signIn } from "../../../src/accounts/auth/signin.js";
+import type { SdkConfig } from "../../../src/accounts/config.js";
 import { verifyOpSignature } from "../../../src/accounts/core/index.js";
 import {
   AccountSdkError,
@@ -600,5 +601,25 @@ describe("Issued At is parsed strictly, and a skew above 24 h is refused (R6-F6,
     const { f } = dauthWith(rfc3339(Date.now() - 23 * 3_600_000));
     const session = await signInWith(f);
     expect(Math.abs(session.clockOffsetMs! + 23 * 3_600_000)).toBeLessThan(2000);
+  });
+});
+
+describe("signIn's config (fix round 1)", () => {
+  it("needs only dauthUrl, accountsUrl and fetchImpl, as authedFetch needs only fetchImpl", async () => {
+    const f = router({ "https://dauth.test": fakeDauth() });
+    const cfg = {
+      dauthUrl: "https://dauth.test",
+      accountsUrl: "https://accounts.test",
+      fetchImpl: f as unknown as typeof fetch,
+    };
+    const session = await signIn(cfg, {
+      did: "did:dimo:x",
+      signer: await WebCryptoP256Signer.generate(),
+      fragment: "wallet",
+      scope: ["read"],
+      dpopKey: await generateDpopKey(),
+    });
+    expect(session.token).toBe("jwt");
+    expectTypeOf(signIn).parameter(0).toEqualTypeOf<Pick<SdkConfig, "dauthUrl" | "accountsUrl" | "fetchImpl">>();
   });
 });
