@@ -3,12 +3,17 @@ import { assertOrgDid, ORG_HOST_SERVICE, ORG_HOST_SERVICE_TYPE } from "./org-pol
 import type { Operation, UnsignedOperation } from "./types.js";
 
 /** Org genesis: the root is the sole rotation key; `signingKey`, when given, becomes #signing (must equal the root). */
-export function buildOrgGenesis(args: { rootKey: string; hostUrl: string; signingKey?: string }): UnsignedOperation {
+export function buildOrgGenesis(args: {
+  rootKey: string;
+  hostUrl: string;
+  signingKey?: string;
+  alsoKnownAs?: string[];
+}): UnsignedOperation {
   const op: UnsignedOperation = {
     type: "plc_operation",
     rotationKeys: [args.rootKey],
     verificationMethods: args.signingKey ? { signing: args.signingKey } : {},
-    alsoKnownAs: [],
+    alsoKnownAs: [...(args.alsoKnownAs ?? [])],
     services: { [ORG_HOST_SERVICE]: { type: ORG_HOST_SERVICE_TYPE, endpoint: args.hostUrl } },
     prev: null,
   };
@@ -28,7 +33,7 @@ export function buildOrgKeyUpdate(prev: Operation, prevCid: string, dimoOrgKey: 
     type: "plc_operation",
     rotationKeys: [...prev.rotationKeys],
     verificationMethods: { ...prev.verificationMethods, dimo_org: dimoOrgKey },
-    alsoKnownAs: [],
+    alsoKnownAs: [...prev.alsoKnownAs],
     services: structuredClone(prev.services),
     prev: prevCid,
   };

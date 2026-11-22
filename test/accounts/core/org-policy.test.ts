@@ -54,6 +54,19 @@ describe("org builders match the Go vectors", () => {
     expect(() => assertOrgDid(op, ROOT)).not.toThrow();
   });
 
+  it("buildOrgKeyUpdate keeps the head's alsoKnownAs", () => {
+    const head = buildOrgGenesis({ rootKey: ROOT, hostUrl: HOST, signingKey: ROOT, alsoKnownAs: ["at://avis"] });
+    expect(head.alsoKnownAs).toEqual(["at://avis"]);
+    const op = buildOrgKeyUpdate({ ...head, sig: "" }, genesis.cid, DIMO_ORG);
+    expect(op.alsoKnownAs).toEqual(["at://avis"]);
+  });
+
+  it("buildOrgGenesis refuses a signingKey that is not the root", () => {
+    expect(codeOf(() => buildOrgGenesis({ rootKey: ROOT, hostUrl: HOST, signingKey: DIMO_ORG }))).toBe(
+      "fragment_not_allowed"
+    );
+  });
+
   it("builders refuse a non-conforming input", () => {
     expect(codeOf(() => buildOrgGenesis({ rootKey: ROOT, hostUrl: "http://x.example" }))).toBe("services_not_allowed");
     expect(codeOf(() => buildOrgKeyUpdate({ ...genesis.unsigned, sig: "" }, genesis.cid, ROOT))).toBe(
@@ -127,10 +140,10 @@ describe("assertOrgDid", () => {
     expect(codeOf(() => assertOrgDid(a, "nope"))).toBe("key_invalid");
   });
 
-  it("refuses aliases", () => {
+  it("accepts an org with alsoKnownAs [at://avis]", () => {
     const a = clone(genesis.unsigned);
-    a.alsoKnownAs = ["did:ethr:1:0x0000000000000000000000000000000000000000"];
-    expect(codeOf(() => assertOrgDid(a, ROOT))).toBe("alias_invalid");
+    a.alsoKnownAs = ["at://avis"];
+    expect(() => assertOrgDid(a, ROOT)).not.toThrow();
   });
 });
 

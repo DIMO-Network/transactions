@@ -26,6 +26,7 @@ export function isHttpsUrl(value: string): boolean {
 /**
  * Org-DID policy: a single secp256k1 root (the rotation key), an optional #signing equal to the
  * root, an optional P-256 #dimo_org, and one `dimo_org_host` service with an https: endpoint.
+ * `alsoKnownAs` entries are accepted as given: the person alias rules (did:ethr) do not fit org aliases such as at://avis.
  * The person policy (`assertPersonDid`) is unchanged and still refuses all of this.
  */
 export function assertOrgDid(op: UnsignedOperation, rootKey: string): void {
@@ -45,9 +46,6 @@ export function assertOrgDid(op: UnsignedOperation, rootKey: string): void {
     } else {
       throw new PolicyError("fragment_not_allowed", `verification method not allowed on an org DID: ${fragment}`);
     }
-  }
-  if (op.alsoKnownAs.length > 0) {
-    throw new PolicyError("alias_invalid", "an org DID carries no aliases");
   }
   for (const [name, svc] of Object.entries(op.services)) {
     if (name !== ORG_HOST_SERVICE) {
