@@ -170,9 +170,11 @@ describe("htu normalisation (contract 4)", () => {
     expect(dec(proof.split(".")[1]!).htu).toBe(out);
   });
 
-  it("leaves the path byte for byte: no dot-segment removal, no re-encoding, no trailing-slash change", () => {
-    expect(normalizeHtu("https://A.test/a/../B%7e//?q=1")).toBe("https://a.test/a/../B%7e//");
+  it("keeps the path in the percent-encoded form the request carries (as Go's EscapedPath), with no trailing-slash change", () => {
+    expect(normalizeHtu("https://A.test/B%7e//?q=1")).toBe("https://a.test/B%7e//");
     expect(normalizeHtu("https://a.test/x/")).toBe("https://a.test/x/");
+    expect(normalizeHtu("https://a.test/é")).toBe("https://a.test/%C3%A9");
+    expect(normalizeHtu("https://a.test?q=1")).toBe("https://a.test");
   });
 
   it("drops only the scheme's own default port, and userinfo", () => {

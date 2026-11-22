@@ -72,30 +72,23 @@ export async function dpopKeyFromKeyPair(pair: CryptoKeyPair): Promise<WebCrypto
   };
 }
 
-/** scheme "://" authority, then the path up to the query or fragment (RFC 3986 §3). */
-const HIERARCHICAL_URL = /^([A-Za-z][A-Za-z0-9+.-]*):\/\/([^/?#]*)([^?#]*)/;
-
-const DEFAULT_PORT: Readonly<Record<string, string>> = { https: ":443", http: ":80" };
+/** Matches a URL whose path is empty: scheme "://" authority, then only a query or fragment. */
+const EMPTY_PATH = /^[A-Za-z][A-Za-z0-9+.-]*:\/\/[^/?#\\]*(?:[?#]|$)/;
 
 /**
- * htu, normalised exactly as did-directory's Go pkg/dpop does it (cross-repo contract 4):
- * scheme and host lowercased, `:443` dropped for https and `:80` for http, query and
- * fragment dropped, and the path left byte for byte (no dot-segment removal, no
- * re-encoding, no trailing slash added or removed: `HTTPS://EXAMPLE.COM` gives
- * `https://example.com`). Userinfo is dropped. Pass the URL the request will carry. Throws
- * the URL parser's TypeError for a string that is not a URL.
+ * htu, normalised as did-directory's Go pkg/dpop does it (cross-repo contract 4): scheme
+ * and host lowercased, `:443` dropped for https and `:80` for http, userinfo, query and
+ * fragment dropped. The path is the percent-encoded one the request carries (WHATWG
+ * `URL.pathname`, which matches Go's `url.EscapedPath()`: `/a b` is `/a%20b`), with no
+ * trailing slash added or removed: `HTTPS://EXAMPLE.COM` gives `https://example.com`.
+ * Known divergences no vector covers: WHATWG resolves dot segments (`/a/../b` is `/b`),
+ * reads `\` as `/` and compresses IPv6 hosts, and Go does none of these. Throws the URL
+ * parser's TypeError for a string that is not a URL.
  */
 export function normalizeHtu(raw: string): string {
-  const parsed = new URL(raw);
-  const m = HIERARCHICAL_URL.exec(raw);
-  // A URL without "//" (e.g. "https:host/x", which WHATWG still parses): its parsed form.
-  if (!m) return `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
-  const scheme = m[1]!.toLowerCase();
-  const authority = m[2]!;
-  let host = authority.slice(authority.lastIndexOf("@") + 1).toLowerCase();
-  const port = DEFAULT_PORT[scheme];
-  if (port !== undefined && host.endsWith(port)) host = host.slice(0, -port.length);
-  return `${scheme}://${host}${m[3]}`;
+  const u = new URL(raw);
+  // WHATWG lowercases the scheme and host and drops the scheme's default port for http(s).
+  return `${u.protocol}//${u.host}${EMPTY_PATH.test(raw) ? "" : u.pathname}`;
 }
 
 /** The key's public JWK reduced to exactly {kty, crv, x, y}; rejects non EC/P-256 keys. */
