@@ -14,25 +14,41 @@ function curveOf(key: string, what: string): KeyCurve {
   }
 }
 
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1"]);
 
-/** True for an absolute https: URL, or an http: URL whose host is exactly localhost, 127.0.0.1 or [::1] (any port). */
+/** Scheme, a host of [A-Za-z0-9.-], an optional port and path: no userinfo, query, fragment, escapes or IPv6 literal. */
+const ORG_HOST_URL_RE = /^https?:\/\/[A-Za-z0-9.-]+(:\d+)?(\/[A-Za-z0-9._~/-]*)?$/;
+
+/**
+ * True for an https: URL, or an http: one whose host is exactly localhost or 127.0.0.1 (any
+ * port), written in canonical form. The endpoint is published exactly as given, and Go
+ * consumers compare it byte for byte (the org host's register check) or parse it with
+ * url.Parse, so `value` must match ORG_HOST_URL_RE and equal WHATWG's `new URL(value).href`,
+ * or that href less its trailing `/` (`https://org.dimo.zone` and `https://org.dimo.zone/`
+ * pass; `https://Org.dimo.zone`, `:443`, `http://127.1` and `/a/../b` do not).
+ */
 export function isAllowedOrgHostUrl(value: string): boolean {
+  if (!ORG_HOST_URL_RE.test(value)) return false;
+  let url: URL;
   try {
-    const url = new URL(value);
-    if (url.protocol === "https:") return true;
-    return url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname);
+    url = new URL(value);
   } catch {
     return false;
   }
+  const { href } = url;
+  if (value !== href && !(href.endsWith("/") && value === href.slice(0, -1))) return false;
+  if (url.protocol === "https:") return true;
+  return url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname);
 }
 
-/** @deprecated Kept for compatibility; use isAllowedOrgHostUrl (this now also allows http: on loopback hosts). */
+/** @deprecated Kept for compatibility; use isAllowedOrgHostUrl (this now also allows http: on localhost and 127.0.0.1). */
 export const isHttpsUrl = isAllowedOrgHostUrl;
 
 /**
  * Org-DID policy: a single secp256k1 root (the rotation key), an optional #signing equal to the
- * root, an optional P-256 #dimo_org, and one `dimo_org_host` service with an https: endpoint (http: only on localhost, 127.0.0.1 or [::1]).
+ * root, an optional P-256 #dimo_org, and exactly one service, `dimo_org_host`, of type
+ * DimoOrgHost, whose endpoint isAllowedOrgHostUrl accepts (https:, or http: only on localhost
+ * or 127.0.0.1, in canonical form).
  * `alsoKnownAs` entries are accepted as given: the person alias rules (did:ethr) do not fit org aliases such as at://avis.
  * The person policy (`assertPersonDid`) is unchanged and still refuses all of this.
  */
@@ -54,6 +70,9 @@ export function assertOrgDid(op: UnsignedOperation, rootKey: string): void {
       throw new PolicyError("fragment_not_allowed", `verification method not allowed on an org DID: ${fragment}`);
     }
   }
+  if (!Object.hasOwn(op.services, ORG_HOST_SERVICE)) {
+    throw new PolicyError("services_not_allowed", `an org DID must carry exactly one ${ORG_HOST_SERVICE} service`);
+  }
   for (const [name, svc] of Object.entries(op.services)) {
     if (name !== ORG_HOST_SERVICE) {
       throw new PolicyError("services_not_allowed", `service not allowed on an org DID: ${name}`);
@@ -61,7 +80,7 @@ export function assertOrgDid(op: UnsignedOperation, rootKey: string): void {
     if (svc.type !== ORG_HOST_SERVICE_TYPE || !isAllowedOrgHostUrl(svc.endpoint)) {
       throw new PolicyError(
         "services_not_allowed",
-        `${ORG_HOST_SERVICE} must be type ${ORG_HOST_SERVICE_TYPE} with an https: endpoint (http: only on localhost)`
+        `${ORG_HOST_SERVICE} must be type ${ORG_HOST_SERVICE_TYPE} with a canonical https: endpoint (http: only on localhost or 127.0.0.1)`
       );
     }
   }
