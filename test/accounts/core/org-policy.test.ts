@@ -213,6 +213,12 @@ describe("isAllowedOrgHostUrl accepts only canonical URLs in a strict character 
     "http://localhost/",
     "http://localhost:27281",
     "http://127.0.0.1:27281",
+    "https://a.com:1",
+    "https://org.dimo.zone:65535",
+    "https://a-b.c-d.example",
+    "https://1.2.3.4",
+    "https://x",
+    "http://localhost:65535/",
   ])("accepts %j", (url) => {
     expect(isAllowedOrgHostUrl(url)).toBe(true);
     expect(() => assertOrgDid(withEndpoint(url), ROOT)).not.toThrow();
@@ -258,6 +264,20 @@ describe("isAllowedOrgHostUrl accepts only canonical URLs in a strict character 
     "https://",
     "https:///x",
     "https://org.example.com:99999",
+    // Fix round 1: the host is DNS labels joined by single dots, and the port is 1-65535.
+    "https://..",
+    "https://.",
+    "https://-",
+    "https://a..b",
+    "https://.a",
+    "https://org.dimo.zone.",
+    "https://a.com:0",
+    "https://a-.com",
+    "https://-a.com",
+    "https://a.-b.com",
+    "https://org.dimo.zone:65536",
+    "http://localhost.",
+    "http://127.0.0.1.",
   ])("refuses %j", (url) => {
     expect(isAllowedOrgHostUrl(url)).toBe(false);
     expect(codeOf(() => assertOrgDid(withEndpoint(url), ROOT))).toBe("services_not_allowed");
