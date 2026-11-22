@@ -34,6 +34,26 @@
         "default": "./dist/accounts/core/index.cjs"
       }
     },
+    "./accounts/auth": {
+      "import": {
+        "types": "./dist/accounts/auth/index.d.ts",
+        "default": "./dist/accounts/auth/index.js"
+      },
+      "require": {
+        "types": "./dist/accounts/auth/index.d.cts",
+        "default": "./dist/accounts/auth/index.cjs"
+      }
+    },
+    "./accounts/directory": {
+      "import": {
+        "types": "./dist/accounts/directory/index.d.ts",
+        "default": "./dist/accounts/directory/index.js"
+      },
+      "require": {
+        "types": "./dist/accounts/directory/index.d.cts",
+        "default": "./dist/accounts/directory/index.cjs"
+      }
+    },
     "./dist/*.js": "./dist/*.js",
     "./dist/*.cjs": "./dist/*.cjs",
     "./dist/*": {
@@ -49,6 +69,12 @@
       ],
       "accounts/core": [
         "./dist/accounts/core/index.d.ts"
+      ],
+      "accounts/auth": [
+        "./dist/accounts/auth/index.d.ts"
+      ],
+      "accounts/directory": [
+        "./dist/accounts/directory/index.d.ts"
       ]
     }
   },

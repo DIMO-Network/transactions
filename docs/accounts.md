@@ -1,11 +1,13 @@
 # Accounts v2
 
-TypeScript SDK for running DIMO accounts non-custodially, shipped as two subpath modules of `@dimo-network/transactions`. Node 20+, browsers and React Native. Both are ESM and CommonJS, with types for each.
+TypeScript SDK for running DIMO accounts non-custodially, shipped as subpath modules of `@dimo-network/transactions`. Node 20+, browsers and React Native. All are ESM and CommonJS, with types for each.
 
 - `@dimo-network/transactions/accounts/core`: pure encoding and verification code. No `@turnkey/*`, `viem`, `@zerodev/*` or `fetch` imports (checked in the build output by `check:dist`, which `npm run build` runs, and restricted in `src/accounts/core` by `.eslintrc.js`).
-- `@dimo-network/transactions/accounts`: signers and account flows. It imports `viem`, `@zerodev/sdk`, `@zerodev/ecdsa-validator` and `@turnkey/http` when it loads (all four are dependencies of this package, so they install with it); `@dimo-network/transactions/accounts/core` imports none of them, so code that only needs encoding and verification should import `/accounts/core` and keep them out of its bundle.
+- `@dimo-network/transactions/accounts/auth`: `signIn`, the DPoP helpers (`generateDpopKey`, `dpopKeyFromKeyPair`, `createDpopProof`, `jwkThumbprint`, `normalizeHtu`), `authedFetch`, `WebCryptoP256Signer`, the `Session`/`Scope`/`SdkConfig`/`Signer` types and the errors they throw. It loads no smart-account, passkey or Turnkey code, so no `viem`, `@zerodev/*` or `@turnkey/*`: an app that only signs in with a device key ships about 90 KB minified instead of about 330 KB.
+- `@dimo-network/transactions/accounts/directory`: `DirectoryClient`, `verifyAuditLog` and the directory errors, with the same guarantee.
+- `@dimo-network/transactions/accounts`: the `auth` and `directory` exports plus the signers and account flows. It imports `viem`, `@zerodev/sdk`, `@zerodev/ecdsa-validator` and `@turnkey/http` when it loads (all four are dependencies of this package, so they install with it); the three entries above import none of them, so code that only needs them should import those and keep the rest out of its bundle. Every class and function is one shared copy across the entries, so `instanceof` works whichever entry threw.
 
-The package's main entry, `@dimo-network/transactions`, does not re-export either module, and the accounts modules do not load it.
+The package's main entry, `@dimo-network/transactions`, does not re-export any of them, and the accounts modules do not load it.
 
 ## Usage
 
@@ -133,6 +135,6 @@ The token is bound to the DPoP key's thumbprint (`cnf.jkt`), so a restored token
 ## Scripts
 
 `npm run build` (tsc for the main entry, then tsup for `dist/accounts`, then `check:dist`), `npm test` (vitest; the accounts tests are in `test/accounts`), `npm run typecheck` (`tsconfig.json`, then `tsconfig.accounts.json` for `src/accounts`, `test/accounts` and `e2e/accounts`).
-`npm run check:dist` checks the built output: `dist/accounts/core` (ESM and CJS, with every chunk it loads) imports no external module, and `./accounts` and `./accounts/core` export the very same error classes under both `require` and `import`.
+`npm run check:dist` checks the built output: `dist/accounts/core`, `dist/accounts/auth` and `dist/accounts/directory` (ESM and CJS, with every chunk they load) import no external module; browser bundles of `auth` and `directory` contain no ZeroDev, Turnkey or viem code; and `./accounts` exports the very same values as each of them under both `require` and `import`.
 `npm run vectors:sync` copies `testdata/vectors/did-ops.json` from `origin/main` of a `../did-directory` checkout (run `git fetch` there first) to `test/accounts/fixtures/did-ops.json`. It fails, leaving the fixture as it is, until did-directory #30 is on main.
 `npm run e2e:accounts` runs the end-to-end suite against dev. It is opt-in and never part of `npm test`; `e2e/accounts/env.example` lists its variables, opt-ins and preconditions.

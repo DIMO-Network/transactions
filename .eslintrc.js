@@ -91,5 +91,25 @@ module.exports = {
         "no-restricted-globals": ["error", { name: "fetch", message: "src/accounts/core must not use fetch." }],
       },
     },
+    {
+      // @dimo-network/transactions/accounts/auth and /accounts/directory must load no
+      // smart-account, passkey or Turnkey code (scripts/check-dist.mjs and
+      // test/accounts/entries.test.ts check the module graph too).
+      files: ["src/accounts/auth/**/*.ts", "src/accounts/directory/**/*.ts"],
+      rules: {
+        "no-restricted-imports": [
+          "error",
+          {
+            patterns: [
+              {
+                group: ["@turnkey/*", "viem", "viem/*", "@zerodev/*", "../account/*", "../signers/turnkey*"],
+                message:
+                  "src/accounts/auth and src/accounts/directory must stay free of smart-account, passkey and Turnkey code.",
+              },
+            ],
+          },
+        ],
+      },
+    },
   ],
 };
