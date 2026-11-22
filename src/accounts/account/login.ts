@@ -80,8 +80,18 @@ export async function loginWithEmail(
 }
 
 /**
+ * The name prefix of every org's Turnkey sub-org: accounts names them "DIMO org <uuid>"
+ * (orgs spec §3). A person's sub-org is "DIMO <email>", and an email has no space.
+ */
+const ORG_SUB_ORG_PREFIX = "DIMO org ";
+
+/**
  * Passkey login. `turnkey` must be stamped by the passkey. whoami (against the parent org)
  * returns the sub-org; its Ethereum account on m/44'/60'/0'/0/0 is the wallet.
+ * A passkey of an org's sub-org (whoami's organizationName starts with "DIMO org ") is
+ * TurnkeyError `org_sub_org`, before anything else is read: its org-root wallet sits at the
+ * same path, and logging in there would look like an account without a DID (and claimDid
+ * would make a person DID rooted in the org's key). Ask the user for their own passkey.
  */
 export async function loginWithPasskey(cfg: SdkConfig, args: { turnkey: TurnkeyClient }): Promise<LoginResult> {
   const { turnkey } = args;
@@ -89,6 +99,12 @@ export async function loginWithPasskey(cfg: SdkConfig, args: { turnkey: TurnkeyC
     organizationId: cfg.turnkeyParentOrgId,
   });
   const subOrganizationId = who.organizationId;
+  if (typeof who.organizationName === "string" && who.organizationName.startsWith(ORG_SUB_ORG_PREFIX)) {
+    throw new TurnkeyError(
+      "org_sub_org",
+      `the passkey belongs to an org's sub-organization (${subOrganizationId}), not to a person's account`
+    );
+  }
   const { accounts } = await turnkey.getWalletAccounts({
     organizationId: subOrganizationId,
   });

@@ -318,11 +318,13 @@ export type TurnkeyErrorCode =
   | "wallet_missing"
   | "wallet_ambiguous"
   | "no_authenticator_id"
-  | "sub_org_mismatch";
+  | "sub_org_mismatch"
+  | "org_sub_org";
 
 /**
  * Turnkey answered, but not with what the SDK needs (no signature, a key that does not
- * match, an ambiguous wallet, or a sub-org that does not hold the wallet: `sub_org_mismatch`).
+ * match, an ambiguous wallet, a sub-org that does not hold the wallet: `sub_org_mismatch`,
+ * or a passkey that loginWithPasskey found is an org's, not a person's: `org_sub_org`).
  */
 export class TurnkeyError extends AccountSdkError {
   declare readonly code: TurnkeyErrorCode;

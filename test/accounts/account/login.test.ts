@@ -101,6 +101,42 @@ describe("loginWithPasskey ambiguity", () => {
   });
 });
 
+// R7-F7: accounts names every org's Turnkey sub-org "DIMO org <uuid>" (orgs spec §3), with an
+// org-root wallet at the same path as a person's. A browser can offer the org passkey at login
+// (same RP), and logging in there would look like an account without a DID.
+describe("loginWithPasskey refuses an org's sub-organization (R7-F7)", () => {
+  const ORG_NAME = "DIMO org 0f8b7c1e-3a2d-4c5b-9e6f-7a8b9c0d1e2f";
+
+  it("throws TurnkeyError org_sub_org right after whoami: no wallet read, no accounts call", async () => {
+    const { c, getWhoami, getWalletAccounts } = tk();
+    getWhoami.mockResolvedValue({ organizationId: "org-sub", organizationName: ORG_NAME, userId: "u" } as never);
+    const f = vi.fn(async () => json({ did: "did:dimo:x" }));
+    const e = await loginWithPasskey(withFetch(f), { turnkey: c }).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(TurnkeyError);
+    expect(e).toMatchObject({ code: "org_sub_org" });
+    expect((e as Error).message).toContain("org-sub");
+    expect(getWalletAccounts).not.toHaveBeenCalled();
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("refuses any name with the prefix, not only the exact form accounts makes", async () => {
+    const { c, getWhoami } = tk();
+    getWhoami.mockResolvedValue({ organizationId: "org-sub", organizationName: "DIMO org x", userId: "u" } as never);
+    await expect(loginWithPasskey(base, { turnkey: c })).rejects.toMatchObject({ code: "org_sub_org" });
+  });
+
+  it.each(["DIMO a@b.c", "DIMO org@example.com", "DIMO organisation@example.com", "dimo org x", ""])(
+    "a person's sub-org named %j logs in as before",
+    async (organizationName) => {
+      const { c, getWhoami } = tk();
+      getWhoami.mockResolvedValue({ organizationId: "sub", organizationName, userId: "u" } as never);
+      const f = vi.fn(async () => json({ did: "did:dimo:x" }));
+      const r = await loginWithPasskey(withFetch(f), { turnkey: c });
+      expect(r).toEqual({ subOrganizationId: "sub", walletAddress: wallet, did: "did:dimo:x" });
+    }
+  );
+});
+
 describe("email login", () => {
   it("requests a code and logs in", async () => {
     const f = vi
