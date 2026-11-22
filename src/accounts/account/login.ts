@@ -92,6 +92,8 @@ const ORG_SUB_ORG_PREFIX = "DIMO org ";
  * TurnkeyError `org_sub_org`, before anything else is read: its org-root wallet sits at the
  * same path, and logging in there would look like an account without a DID (and claimDid
  * would make a person DID rooted in the org's key). Ask the user for their own passkey.
+ * This guards against picking the wrong passkey; it is not a security boundary (it trusts the
+ * naming convention, and a whoami without organizationName logs in as before).
  */
 export async function loginWithPasskey(cfg: SdkConfig, args: { turnkey: TurnkeyClient }): Promise<LoginResult> {
   const { turnkey } = args;

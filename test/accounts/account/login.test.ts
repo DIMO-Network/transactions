@@ -125,6 +125,16 @@ describe("loginWithPasskey refuses an org's sub-organization (R7-F7)", () => {
     await expect(loginWithPasskey(base, { turnkey: c })).rejects.toMatchObject({ code: "org_sub_org" });
   });
 
+  // The check guards against picking the wrong passkey; it is not a security boundary, and
+  // a whoami without the name (a test double, an older API) logs in as before.
+  it("a whoami with no organizationName logs in", async () => {
+    const { c, getWhoami } = tk();
+    getWhoami.mockResolvedValue({ organizationId: "sub", userId: "u", username: "a@b.c" } as never);
+    const f = vi.fn(async () => json({ did: "did:dimo:x" }));
+    const r = await loginWithPasskey(withFetch(f), { turnkey: c });
+    expect(r).toEqual({ subOrganizationId: "sub", walletAddress: wallet, did: "did:dimo:x" });
+  });
+
   it.each(["DIMO a@b.c", "DIMO org@example.com", "DIMO organisation@example.com", "dimo org x", ""])(
     "a person's sub-org named %j logs in as before",
     async (organizationName) => {
