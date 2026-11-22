@@ -11,6 +11,7 @@ import { generateDpopKey } from "../../src/accounts/auth/dpop.js";
 import { authedFetch } from "../../src/accounts/auth/fetch.js";
 import { signIn } from "../../src/accounts/auth/signin.js";
 import type { SdkConfig } from "../../src/accounts/config.js";
+import { ethAddressFromDidKey } from "../../src/accounts/core/index.js";
 import { DirectoryClient } from "../../src/accounts/directory/client.js";
 import { WebCryptoP256Signer } from "../../src/accounts/signers/webcrypto.js";
 import { cfgFor, fakeDauth, FakeDirectory, json, k1Signer, router, strictReceiver } from "./helpers.js";
@@ -114,6 +115,9 @@ describe.each(modes)("fetch is called unbound via %s", (_mode, mk) => {
     const { dir, strict } = await world();
     const did = await dir.seedGenesis(k1Signer());
     const turnkey = {
+      getWalletAccounts: async () => ({
+        accounts: [{ addressFormat: "ADDRESS_FORMAT_ETHEREUM", address: ethAddressFromDidKey(k1Signer().didKey) }],
+      }),
       deleteSubOrganization: async () => ({
         activity: { id: "a", status: "ACTIVITY_STATUS_COMPLETED", result: {} },
       }),

@@ -4,17 +4,44 @@ import { authedFetch } from "../auth/fetch.js";
 import { requireScopes } from "../auth/scopes.js";
 import type { Session } from "../auth/signin.js";
 import { normalizeUrl, type SdkConfig } from "../config.js";
-import { buildTombstone, computeCid, encodeSigningPayload, type Operation, verifyOpSignature } from "../core/index.js";
+import {
+  buildTombstone,
+  computeCid,
+  encodeSigningPayload,
+  ethAddressFromDidKey,
+  type Operation,
+  verifyOpSignature,
+} from "../core/index.js";
 import { type AuditEntry, type DirectoryClient, directoryFor } from "../directory/client.js";
-import { AccountSdkError, AccountsError, HeadMovedError, NetworkError, PolicyError, UsageError } from "../errors.js";
+import {
+  AccountSdkError,
+  AccountsError,
+  HeadMovedError,
+  NetworkError,
+  PolicyError,
+  TurnkeyError,
+  UsageError,
+} from "../errors.js";
 import type { Signer } from "../signers/types.js";
 
 export type DeleteStep = "accounts" | "turnkey" | "tombstone";
 
-/** Everything needed to finish a deletion without signing again. Safe to persist (JSON). */
+/**
+ * Everything needed to finish a deletion without signing again. It is plain JSON, but it is
+ * a bearer credential: `signedTombstone` deactivates the DID for good, for whoever submits
+ * it, for as long as the head stays at `prevCid`, even if the user changes their mind.
+ * Persist it only on the device (IndexedDB, the platform keystore), never log it, and never
+ * send it to a server or an error reporter. DeleteIncompleteError keeps it in a
+ * non-enumerable `pending`, so reporters that copy an error's own fields skip it.
+ */
 export interface PendingDeletion {
   did: string;
   subOrganizationId: string;
+  /**
+   * The Ethereum address of the DID's wallet (the key that signed the tombstone). The
+   * sub-org is deleted only while it holds an Ethereum account with this address.
+   */
+  walletAddress: `0x${string}`;
   signedTombstone: Operation;
   /** The head cid the tombstone was signed against. */
   prevCid: string;
@@ -28,19 +55,21 @@ const describe = (cause: unknown): string => (cause instanceof Error ? cause.mes
 export type DeleteIncompleteCode = "delete_incomplete" | "delete_head_moved" | "tombstone_signature_invalid";
 
 /**
- * A deletion stopped part-way. `pending` can be persisted and passed to resumeDelete;
- * `cause` is the underlying failure. With stepsDone [] (DELETE /me's outcome unknown),
- * resumeDelete needs a session again.
+ * A deletion stopped part-way. `pending` can be persisted (on the device only: it is a
+ * bearer credential, see PendingDeletion) and passed to resumeDelete; `cause` is the
+ * underlying failure. With stepsDone [] (DELETE /me's outcome unknown), resumeDelete needs
+ * a session again. `pending` is non-enumerable, so JSON.stringify and error reporters that
+ * copy an error's own enumerable fields leave the signed tombstone out.
  */
 export class DeleteIncompleteError extends AccountSdkError {
   declare readonly code: DeleteIncompleteCode;
-  readonly pending: PendingDeletion;
+  declare readonly pending: PendingDeletion;
   constructor(pending: PendingDeletion, cause: unknown, code: DeleteIncompleteCode = "delete_incomplete") {
     super(code, `account deletion incomplete (done: ${pending.stepsDone.join(", ") || "none"}): ${describe(cause)}`, {
       cause,
     });
     this.name = "DeleteIncompleteError";
-    this.pending = pending;
+    Object.defineProperty(this, "pending", { value: pending, enumerable: false, writable: false, configurable: false });
   }
 }
 
@@ -59,13 +88,19 @@ export class DeleteHeadMovedError extends DeleteIncompleteError {
 }
 
 export interface DeleteAccountOptions {
-  /** Identity token carrying scope `approve`. */
+  /**
+   * Identity token carrying scope `approve`. dauth grants `approve` only to a key that is
+   * also a rotation key of the DID, so for a person this session must come from signIn
+   * with the wallet (`fragment: "wallet"`); asking for `approve` with a device key fails
+   * with KeyNotAllowedError.
+   */
   session: Session;
   wallet: Signer;
   /** Defaults to cfg.directoryUrl with cfg.fetchImpl. */
   directory?: DirectoryClient;
   /** Turnkey client stamping with the user's credential (passkey / session key). */
   turnkeyWithUserStamper: TurnkeyClient;
+  /** The sub-org that holds the wallet. Checked (getWalletAccounts) before anything is signed. */
   subOrganizationId: string;
   /** Required, no default. See deleteAccount for what each value risks. */
   deleteWithoutExport: boolean;
@@ -75,7 +110,10 @@ export interface ResumeDeleteOptions {
   turnkeyWithUserStamper: TurnkeyClient;
   /** Defaults to cfg.directoryUrl with cfg.fetchImpl. */
   directory?: DirectoryClient;
-  /** Needed only when stepsDone lacks "accounts": a session for pending.did with scope `approve`. */
+  /**
+   * Needed only when stepsDone lacks "accounts": a session for pending.did with scope
+   * `approve`, signed in with the wallet (`fragment: "wallet"`), as for deleteAccount.
+   */
   session?: Session;
 }
 
@@ -146,11 +184,40 @@ async function tombstoneApplied(directory: DirectoryClient, did: string, tombsto
   }
 }
 
-/** True when the tombstone's signature verifies under one of `rotationKeys`. */
-function tombstoneVerifies(tombstone: Operation, rotationKeys: readonly string[]): boolean {
+/** The rotation key the tombstone's signature verifies under, if any. */
+function tombstoneSigner(tombstone: Operation, rotationKeys: readonly string[]): string | undefined {
   const { sig, ...unsigned } = tombstone;
   const payload = encodeSigningPayload(unsigned);
-  return rotationKeys.some((k) => verifyOpSignature(payload, sig, k));
+  return rotationKeys.find((k) => verifyOpSignature(payload, sig, k));
+}
+
+/** True when the tombstone's signature verifies under one of `rotationKeys`. */
+const tombstoneVerifies = (tombstone: Operation, rotationKeys: readonly string[]): boolean =>
+  tombstoneSigner(tombstone, rotationKeys) !== undefined;
+
+const sameAddress = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
+
+const subOrgMismatch = (subOrganizationId: string, walletAddress: string): TurnkeyError =>
+  new TurnkeyError(
+    "sub_org_mismatch",
+    `sub-organization ${subOrganizationId} holds no Ethereum account ${walletAddress} (this DID's wallet); refusing to delete it`
+  );
+
+/**
+ * Throw TurnkeyError `sub_org_mismatch` unless the sub-org holds an Ethereum account with
+ * the wallet's address. Deleting any other sub-org the stamper can reach (an org's root
+ * sub-org, another account) would destroy keys this deletion has nothing to do with.
+ */
+async function assertHoldsWallet(
+  turnkey: TurnkeyClient,
+  subOrganizationId: string,
+  walletAddress: string
+): Promise<void> {
+  const { accounts } = await turnkey.getWalletAccounts({ organizationId: subOrganizationId });
+  const holds = accounts.some(
+    (a) => a.addressFormat === "ADDRESS_FORMAT_ETHEREUM" && sameAddress(a.address, walletAddress)
+  );
+  if (!holds) throw subOrgMismatch(subOrganizationId, walletAddress);
 }
 
 const badTombstone = (pending: PendingDeletion): DeleteIncompleteError =>
@@ -163,11 +230,16 @@ const badTombstone = (pending: PendingDeletion): DeleteIncompleteError =>
     "tombstone_signature_invalid"
   );
 
-/** Steps 3 and 4. Skips what stepsDone records. Never calls accounts and never signs. */
+/**
+ * Steps 3 and 4. Skips what stepsDone records. Never calls accounts and never signs.
+ * `subOrgChecked`: deleteAccount checked moments ago that the sub-org holds the wallet,
+ * so step 3 skips the second getWalletAccounts (one passkey prompt fewer).
+ */
 async function finish(
   pending: PendingDeletion,
   turnkey: TurnkeyClient,
-  directory: DirectoryClient
+  directory: DirectoryClient,
+  subOrgChecked = false
 ): Promise<PendingDeletion> {
   const state: PendingDeletion = {
     ...pending,
@@ -199,8 +271,16 @@ async function finish(
     // Never destroy the wallet for a tombstone that cannot apply: its signature must
     // verify under a rotation key of the state it was signed against.
     const signedAgainst = log.find((e) => e.cid === state.prevCid);
-    if (!signedAgainst || !tombstoneVerifies(state.signedTombstone, signedAgainst.operation.rotationKeys)) {
-      throw badTombstone(snapshot());
+    const signer = signedAgainst && tombstoneSigner(state.signedTombstone, signedAgainst.operation.rotationKeys);
+    if (!signer) throw badTombstone(snapshot());
+    // Never destroy a sub-org that does not hold the wallet that signed the tombstone.
+    try {
+      if (!sameAddress(ethAddressFromDidKey(signer), state.walletAddress)) {
+        throw subOrgMismatch(state.subOrganizationId, state.walletAddress);
+      }
+      if (!subOrgChecked) await assertHoldsWallet(turnkey, state.subOrganizationId, state.walletAddress);
+    } catch (err) {
+      throw new DeleteIncompleteError(snapshot(), err);
     }
     try {
       await deleteSubOrg(turnkey, state.subOrganizationId, state.deleteWithoutExport);
@@ -230,7 +310,12 @@ async function finish(
 }
 
 /**
+ * `opts.session` must carry scope `approve`, which dauth grants only to a rotation key:
+ * sign in with the wallet (`fragment: "wallet"`), not a device key.
+ *
  * Delete the account, in the spec §6.6 order:
+ * 0. check that `subOrganizationId` holds an Ethereum account with the wallet's address
+ *    (TurnkeyError `sub_org_mismatch` otherwise, before anything is signed or forgotten);
  * 1. sign the tombstone (once) against the verified head;
  * 2. DELETE /api/v2/me (204, or a 404 with accounts' not_found envelope, counts as done);
  * 3. delete the Turnkey sub-org, only after re-reading the head and finding it unchanged;
@@ -255,6 +340,9 @@ export async function deleteAccount(cfg: SdkConfig, opts: DeleteAccountOptions):
   if (!headOp.rotationKeys.includes(wallet.didKey)) {
     throw new PolicyError("rotation_locked", "wallet is not a rotation key of this DID");
   }
+  // 0. The sub-org must hold this wallet, before anything is signed or forgotten.
+  const walletAddress = ethAddressFromDidKey(wallet.didKey);
+  await assertHoldsWallet(opts.turnkeyWithUserStamper, opts.subOrganizationId, walletAddress);
   // 1. Sign, don't submit.
   const unsigned = buildTombstone(prevCid);
   const signedTombstone: Operation = {
@@ -264,6 +352,7 @@ export async function deleteAccount(cfg: SdkConfig, opts: DeleteAccountOptions):
   const initial: PendingDeletion = {
     did,
     subOrganizationId: opts.subOrganizationId,
+    walletAddress,
     signedTombstone,
     prevCid,
     stepsDone: [],
@@ -274,11 +363,14 @@ export async function deleteAccount(cfg: SdkConfig, opts: DeleteAccountOptions):
   // 2. Accounts forgets the email, while the identity token still works.
   const pending = await forgetAccount(cfg, session, initial);
   // 3 and 4.
-  return finish(pending, opts.turnkeyWithUserStamper, directory);
+  return finish(pending, opts.turnkeyWithUserStamper, directory, true);
 }
 
 /**
  * Finish a saved PendingDeletion (with its stored deleteWithoutExport). Never signs.
+ * Before deleting the stored sub-org it checks again that the sub-org holds an Ethereum
+ * account with `pending.walletAddress`, and that this is the address of the key that
+ * signed the tombstone (else DeleteIncompleteError, cause TurnkeyError `sub_org_mismatch`).
  * Calls accounts only when stepsDone lacks "accounts", and then needs `opts.session`
  * (for pending.did, scope `approve`); without one it throws UsageError
  * `session_required`, and calling deleteAccount again also works.

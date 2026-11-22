@@ -232,9 +232,13 @@ export type TurnkeyErrorCode =
   | "public_key_mismatch"
   | "wallet_missing"
   | "wallet_ambiguous"
-  | "no_authenticator_id";
+  | "no_authenticator_id"
+  | "sub_org_mismatch";
 
-/** Turnkey answered, but not with what the SDK needs (no signature, a key that does not match, an ambiguous wallet). */
+/**
+ * Turnkey answered, but not with what the SDK needs (no signature, a key that does not
+ * match, an ambiguous wallet, or a sub-org that does not hold the wallet: `sub_org_mismatch`).
+ */
 export class TurnkeyError extends AccountSdkError {
   declare readonly code: TurnkeyErrorCode;
   constructor(code: TurnkeyErrorCode, message: string) {
