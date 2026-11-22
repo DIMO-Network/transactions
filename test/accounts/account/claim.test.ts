@@ -2,8 +2,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { claimDid } from "../../../src/accounts/account/claim.js";
 import { generateDpopKey } from "../../../src/accounts/auth/dpop.js";
-import { buildGenesis, deriveDid } from "../../../src/accounts/core/index.js";
-import { AccountsError, DeactivatedError, DirectoryRejectedError, PolicyError } from "../../../src/accounts/errors.js";
+import { buildGenesis, deriveDid, toChecksumAddress } from "../../../src/accounts/core/index.js";
+import {
+  AccountSdkError,
+  AccountsError,
+  DeactivatedError,
+  DirectoryRejectedError,
+  PolicyError,
+  UnexpectedDidStateError,
+} from "../../../src/accounts/errors.js";
 import { WebCryptoP256Signer } from "../../../src/accounts/signers/webcrypto.js";
 import { cfgFor, fakeDauth, FakeDirectory, type Handler, json, router } from "../helpers.js";
 
@@ -376,5 +383,73 @@ describe("claimDid: PUT /me/did retries on 503", () => {
       return json(viewFor(did));
     });
     expect((await claimDid(cfg, { wallet, dpopKey: await generateDpopKey() })).did).toBe(did);
+  });
+});
+
+describe("claimDid: an existing DID must be exactly the genesis it builds (R6-F1)", () => {
+  const signedIn = (calls: () => string[]) => calls().some((c) => c.includes("dauth") || c.includes("accounts.test"));
+
+  it("refuses a pre-planted verification method before signing in, listing it", async () => {
+    const wallet = await WebCryptoP256Signer.generate();
+    const attacker = await WebCryptoP256Signer.generate();
+    const { dir, cfg, calls } = setup();
+    const did = await dir.seedGenesis(wallet);
+    // Someone who could sign with the wallet before the claim added a key.
+    await dir.append(did, wallet, (h, cid) => ({
+      ...h,
+      verificationMethods: { ...h.verificationMethods, "device-9": attacker.didKey },
+      prev: cid,
+    }));
+    const sign = vi.spyOn(wallet, "sign");
+    const e = await claimDid(cfg, { wallet, dpopKey: await generateDpopKey() }).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(UnexpectedDidStateError);
+    expect(e).toBeInstanceOf(AccountSdkError);
+    expect(e).toMatchObject({
+      code: "did_unexpected_state",
+      did,
+      unexpectedKeys: { "device-9": attacker.didKey },
+      rotationKeys: [wallet.didKey],
+      operations: 2,
+    });
+    expect((e as Error).message).toContain(`device-9=${attacker.didKey}`);
+    expect(signedIn(calls)).toBe(false);
+    // Only the genesis was signed (before the submit); no challenge was.
+    expect(sign).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a DID whose rotation keys changed after the genesis", async () => {
+    const wallet = await WebCryptoP256Signer.generate();
+    const attacker = await WebCryptoP256Signer.generate();
+    const { dir, cfg, calls } = setup();
+    const did = await dir.seedGenesis(wallet);
+    await dir.append(did, wallet, (h, cid) => ({ ...h, rotationKeys: [attacker.didKey], prev: cid }));
+    const e = await claimDid(cfg, { wallet, dpopKey: await generateDpopKey() }).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(UnexpectedDidStateError);
+    expect(e).toMatchObject({ unexpectedKeys: {}, rotationKeys: [attacker.didKey], operations: 2 });
+    expect(signedIn(calls)).toBe(false);
+  });
+
+  it("refuses any later operation, even one that adds no key (the log must be exactly [genesis])", async () => {
+    const wallet = await WebCryptoP256Signer.generate();
+    const { dir, cfg, calls } = setup();
+    const did = await dir.seedGenesis(wallet);
+    await dir.append(did, wallet, (h, cid) => ({
+      ...h,
+      alsoKnownAs: ["did:ethr:137:" + toChecksumAddress("0x" + "ab".repeat(20))],
+      prev: cid,
+    }));
+    const e = await claimDid(cfg, { wallet, dpopKey: await generateDpopKey() }).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(UnexpectedDidStateError);
+    expect(e).toMatchObject({ unexpectedKeys: {}, operations: 2 });
+    expect(signedIn(calls)).toBe(false);
+  });
+
+  it("accepts an existing genesis that holds the signingKey the caller passed", async () => {
+    const wallet = await WebCryptoP256Signer.generate();
+    const signingKey = await WebCryptoP256Signer.generate();
+    const { dir, cfg } = setup();
+    const did = await dir.seedGenesis(wallet, { signingKey: signingKey.didKey });
+    const r = await claimDid(cfg, { wallet, signingKey, dpopKey: await generateDpopKey() });
+    expect(r.did).toBe(did);
   });
 });

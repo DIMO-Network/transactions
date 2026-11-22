@@ -75,6 +75,41 @@ export class DidExistsError extends AccountSdkError {
   }
 }
 
+/**
+ * claimDid found its DID already in the directory, but not as the bare genesis it builds:
+ * the verified audit log has operations after the genesis. Whoever could sign with the
+ * wallet before the claim (for a v1 account, DIMO's Turnkey API key) could have added a
+ * key or changed the rotation keys, and a planted key would keep working after the claim,
+ * so claimDid refuses before signing in and links nothing. `unexpectedKeys` maps each
+ * verification-method fragment of the head that the caller did not pass (or that holds
+ * another key) to its did:key; `rotationKeys` are the head's; `operations` is the verified
+ * log's length (1 would be the genesis alone).
+ */
+export class UnexpectedDidStateError extends AccountSdkError {
+  declare readonly code: "did_unexpected_state";
+  readonly did: string;
+  readonly unexpectedKeys: Readonly<Record<string, string>>;
+  readonly rotationKeys: readonly string[];
+  readonly operations: number;
+  constructor(
+    did: string,
+    state: { unexpectedKeys: Record<string, string>; rotationKeys: readonly string[]; operations: number }
+  ) {
+    const keys = Object.entries(state.unexpectedKeys).map(([fragment, key]) => `${fragment}=${key}`);
+    super(
+      "did_unexpected_state",
+      `DID ${did} already exists with ${state.operations} operations, not just its genesis; unexpected keys: ${
+        keys.join(", ") || "none"
+      }; rotation keys: ${state.rotationKeys.join(", ") || "none"}`
+    );
+    this.name = "UnexpectedDidStateError";
+    this.did = did;
+    this.unexpectedKeys = { ...state.unexpectedKeys };
+    this.rotationKeys = [...state.rotationKeys];
+    this.operations = state.operations;
+  }
+}
+
 /** The DID is unknown to the directory. */
 export class DidNotFoundError extends AccountSdkError {
   readonly did: string;

@@ -1,5 +1,6 @@
 import type { SdkConfig } from "../config.js";
 import {
+  assertPersonDid,
   buildAddKey,
   buildRemoveKey,
   buildSetAliases,
@@ -34,7 +35,8 @@ type Step<T> = {
 };
 
 /**
- * Read the verified head, build, sign with the wallet, submit. Retries on HeadMovedError
+ * Read the verified head, check it against the person-DID policy (assertPersonDid with the
+ * wallet), then build, sign with the wallet, submit. Retries on HeadMovedError
  * only, re-reading the head each time, for at most MAX_ATTEMPTS attempts in total.
  * Idempotent: if the head already has the change, returns its cid without signing, so a
  * call whose outcome was unknown (NetworkError, DirectoryUnavailableError) can be repeated.
@@ -55,6 +57,9 @@ async function change<T>(cfg: SdkConfig, args: KeyChangeArgs, step: Step<T>): Pr
     }
     // Builders copy only the unsigned fields, so the head's sig is not carried over.
     const head: UnsignedOperation = headOp;
+    // A head that breaks the person-DID policy is refused before anything else, so a
+    // non-conforming head can never count as "already done".
+    assertPersonDid(head, wallet.didKey);
     const already = step.done?.(head, prevCid, log);
     if (already !== undefined) return { cid: prevCid, ...already };
     const { op, extra } = step.build(head, prevCid);

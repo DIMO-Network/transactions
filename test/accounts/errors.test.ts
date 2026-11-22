@@ -43,6 +43,7 @@ describe("error hierarchy", () => {
         "SigninError",
         "SponsorshipError",
         "TurnkeyError",
+        "UnexpectedDidStateError",
         "UsageError",
         "UserOperationPendingError",
         "UserOperationRevertedError",
@@ -71,6 +72,11 @@ describe("error hierarchy", () => {
       [new sdk.UsageError("scope_missing", "x"), "UsageError", "scope_missing"],
       [new sdk.TurnkeyError("no_signature", "x"), "TurnkeyError", "no_signature"],
       [new sdk.SignerError("x"), "SignerError", "signer_failed"],
+      [
+        new sdk.UnexpectedDidStateError("d", { unexpectedKeys: {}, rotationKeys: [], operations: 2 }),
+        "UnexpectedDidStateError",
+        "did_unexpected_state",
+      ],
       [new sdk.GasProxyError(403, "alchemy"), "GasProxyError", "proxy_forbidden"],
       [new sdk.ProvidersExhaustedError([new Error("a")]), "ProvidersExhaustedError", "providers_exhausted"],
       [

@@ -2,9 +2,25 @@ import type { DpopKey } from "../auth/dpop.js";
 import { authedFetch } from "../auth/fetch.js";
 import { type Scope, type Session, signIn } from "../auth/signin.js";
 import { normalizeUrl, type SdkConfig } from "../config.js";
-import { buildGenesis, deriveDid, encodeSigningPayload, type Operation } from "../core/index.js";
-import { type DirectoryClient, directoryFor } from "../directory/client.js";
-import { AccountsError, DidExistsError, DidNotFoundError, DirectoryRejectedError, UsageError } from "../errors.js";
+import {
+  assertPersonDid,
+  buildGenesis,
+  computeCid,
+  deriveDid,
+  encodeSigningPayload,
+  type Operation,
+  type UnsignedOperation,
+} from "../core/index.js";
+import { type AuditEntry, type DirectoryClient, directoryFor } from "../directory/client.js";
+import {
+  AccountsError,
+  DeactivatedError,
+  DidExistsError,
+  DidNotFoundError,
+  DirectoryRejectedError,
+  UnexpectedDidStateError,
+  UsageError,
+} from "../errors.js";
 import type { Signer } from "../signers/types.js";
 import { type AccountView, getMe, isAccountView } from "./accounts.js";
 import { proveKey } from "./keys.js";
@@ -19,9 +35,12 @@ import { accountsJson } from "./response.js";
  * `write` (UsageError `scope_missing`, thrown before anything is sent).
  *
  * PUT answering 503 `unavailable` is retried up to 3 times, honouring Retry-After.
- * Safe to repeat: if the genesis already exists, the DID is reused once its verified audit
- * log confirms it; if PUT answers 409 but GET /api/v2/me already shows this DID, that is
- * success. Every request uses cfg.fetchImpl.
+ * Safe to repeat: if the genesis already exists, the DID is reused only when its verified
+ * audit log is exactly that genesis (the keys the caller passed, nothing after it). Any
+ * later operation (an added key, new rotation keys, aliases) throws
+ * UnexpectedDidStateError listing what is there, before signing in: someone who could sign
+ * with the wallet before the claim may have planted a key. If PUT answers 409 but GET
+ * /api/v2/me already shows this DID, that is success. Every request uses cfg.fetchImpl.
  */
 export async function claimDid(
   cfg: SdkConfig,
@@ -57,12 +76,14 @@ export async function claimDid(
     // for an update. Either way, only a verified audit log for this DID proves it exists.
     const maybeExists = err instanceof DidExistsError || (err instanceof DirectoryRejectedError && err.status === 400);
     if (!maybeExists) throw err;
+    let log: AuditEntry[];
     try {
-      await directory.head(did);
+      log = await directory.auditLog(did);
     } catch (headErr) {
       if (headErr instanceof DidNotFoundError) throw err;
       throw headErr;
     }
+    assertBareGenesis(did, log, genesis, wallet.didKey);
   }
 
   const session = await signIn(cfg, {
@@ -98,6 +119,29 @@ export async function claimDid(
     if (account?.did === did) return { did, session, account };
   }
   throw err;
+}
+
+/**
+ * The existing DID must be exactly the genesis claimDid built: a verified log of that one
+ * operation. Anything after it may have been signed by someone else who could use the
+ * wallet before the claim, and is refused (UnexpectedDidStateError) before signing in.
+ */
+function assertBareGenesis(
+  did: string,
+  log: readonly AuditEntry[],
+  genesis: UnsignedOperation,
+  walletKey: string
+): void {
+  const head = log.at(-1)!.operation;
+  if (head.type === "plc_tombstone") throw new DeactivatedError(did);
+  if (log.length !== 1 || log[0]!.cid !== computeCid(genesis)) {
+    const expected = genesis.verificationMethods;
+    const unexpectedKeys = Object.fromEntries(
+      Object.entries(head.verificationMethods).filter(([f, key]) => !Object.hasOwn(expected, f) || expected[f] !== key)
+    );
+    throw new UnexpectedDidStateError(did, { unexpectedKeys, rotationKeys: head.rotationKeys, operations: log.length });
+  }
+  assertPersonDid(head, walletKey);
 }
 
 const LINK_RETRIES = 3;

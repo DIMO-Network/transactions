@@ -70,6 +70,7 @@ export {
   SponsorshipError,
   TurnkeyError,
   type TurnkeyErrorCode,
+  UnexpectedDidStateError,
   UsageError,
   type UsageErrorCode,
   UserOperationPendingError,
