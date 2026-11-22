@@ -276,6 +276,20 @@ export class LinkRequiredError extends AccountsError {
   }
 }
 
+/**
+ * PUT /api/v2/me/did answered 409 `remove_phone_first`: DIMO is already off this v1
+ * sub-org's root, and the end user still has a phone number on Turnkey, which accounts can
+ * no longer clear. Call removePhone with the user's own Turnkey session (the same passkey
+ * or session stamper used for the sub-org), then claimDid again.
+ */
+export class RemovePhoneFirstError extends AccountsError {
+  declare readonly code: "remove_phone_first";
+  constructor(status: number, message: string, retryAfterSeconds?: number) {
+    super("remove_phone_first", status, message, retryAfterSeconds);
+    this.name = "RemovePhoneFirstError";
+  }
+}
+
 export type UsageErrorCode =
   | "scope_missing"
   | "audience_empty"

@@ -21,6 +21,7 @@ import {
   DirectoryRejectedError,
   DirectoryUnavailableError,
   PolicyError,
+  RemovePhoneFirstError,
   UnexpectedDidStateError,
 } from "../../../src/accounts/errors.js";
 import { WebCryptoP256Signer } from "../../../src/accounts/signers/webcrypto.js";
@@ -664,5 +665,32 @@ describe("claimDid re-checks the log after the link (fix round 2)", () => {
     expect(e).toBeInstanceOf(UnexpectedDidStateError);
     expect(e).toMatchObject({ code: "did_unexpected_state", unexpectedKeys: {}, operations: 3 });
     expect(calls().some((c) => c.includes("dauth"))).toBe(false);
+  });
+});
+
+describe("PUT /me/did 409 remove_phone_first (fix round 2)", () => {
+  it("is RemovePhoneFirstError (an AccountsError); after removePhone, claimDid again links", async () => {
+    const wallet = await WebCryptoP256Signer.generate();
+    const did = deriveDid(buildGenesis({ walletKey: wallet.didKey }));
+    let phone = true;
+    const { cfg, calls } = setup(async (_u, init) => {
+      if (init.method === "PUT" && phone) {
+        return json(
+          { error: { code: "remove_phone_first", message: "remove the phone number from Turnkey first" } },
+          409
+        );
+      }
+      return json(viewFor(did));
+    });
+    const e = await claimDid(cfg, { wallet, dpopKey: await generateDpopKey() }).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(RemovePhoneFirstError);
+    expect(e).toBeInstanceOf(AccountsError);
+    expect(e).toMatchObject({ name: "RemovePhoneFirstError", code: "remove_phone_first", status: 409 });
+    // No "409 means already linked" fallback for this code.
+    expect(calls()).not.toContain("GET https://accounts.test/api/v2/me");
+
+    phone = false; // the app called removePhone
+    const r = await claimDid(cfg, { wallet, dpopKey: await generateDpopKey() });
+    expect(r.did).toBe(did);
   });
 });

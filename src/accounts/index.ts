@@ -30,6 +30,7 @@ export {
   requestEmailCode,
 } from "./account/login.js";
 export { addPasskey, type PasskeyAttestation, type PasskeyTransport, removePasskey } from "./account/passkeys.js";
+export { removePhone } from "./account/phone.js";
 export {
   deploySmartAccount,
   type GasProvider,
@@ -74,6 +75,7 @@ export {
   PolicyError,
   type PolicyErrorCode,
   ProvidersExhaustedError,
+  RemovePhoneFirstError,
   type SdkService,
   SignerError,
   SigninError,

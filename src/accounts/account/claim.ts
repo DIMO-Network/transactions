@@ -19,6 +19,7 @@ import {
   DidExistsError,
   DidNotFoundError,
   DirectoryRejectedError,
+  RemovePhoneFirstError,
   UnexpectedDidStateError,
   UsageError,
 } from "../errors.js";
@@ -48,6 +49,10 @@ import { accountsJson } from "./response.js";
  * verified log is checked again, and an operation the previous wallet signer appended
  * before the handover is UnexpectedDidStateError with `linked: true`; #signing is never
  * built on such a log.
+ *
+ * PUT answering 409 `remove_phone_first` (a v1 sub-org DIMO already left still holds the
+ * user's phone number) is RemovePhoneFirstError: call removePhone with the user's own
+ * Turnkey session, then claimDid again.
  *
  * PUT answering 503 `unavailable` is retried up to 3 times, honouring Retry-After.
  * Safe to repeat: if the genesis already exists, the DID is reused only when its verified
@@ -160,6 +165,13 @@ async function link(cfg: SdkConfig, session: Session, did: string): Promise<Acco
   }
   if (res.ok) return accountsJson<AccountView>(res, isAccountView);
   const err = await AccountsError.fromResponse(res);
+  if (res.status === 409 && err.code === "remove_phone_first") {
+    throw new RemovePhoneFirstError(
+      err.status,
+      err.message.replace(/^remove_phone_first: /, ""),
+      err.retryAfterSeconds
+    );
+  }
   // 409: the account may already carry this DID (a retried claim whose response was lost).
   if (res.status === 409) {
     const account = await linkedAccount(cfg, session);
