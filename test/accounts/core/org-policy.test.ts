@@ -54,10 +54,14 @@ describe("org builders match the Go vectors", () => {
     expect(hex(encodeOperationCbor(op))).toBe(update.cborHex);
   });
 
-  it("buildOrgGenesis without signingKey omits #signing", () => {
+  // R7-F3: the directory refuses an op with no verification method, so a genesis without
+  // #signing could never be published. signingKey defaults to the root.
+  it("buildOrgGenesis without signingKey makes the root #signing, as org-genesis does", () => {
     const op = buildOrgGenesis({ rootKey: ROOT, hostUrl: HOST });
-    expect(op.verificationMethods).toEqual({});
-    expect(() => assertOrgDid(op, ROOT)).not.toThrow();
+    expect(op.verificationMethods).toEqual({ signing: ROOT });
+    expect(op).toEqual(genesis.unsigned);
+    expect(hex(encodeOperationCbor(op))).toBe(genesis.cborHex);
+    expect(buildOrgGenesis({ rootKey: ROOT, hostUrl: HOST, signingKey: undefined })).toEqual(genesis.unsigned);
   });
 
   it("buildOrgKeyUpdate keeps the head's alsoKnownAs", () => {

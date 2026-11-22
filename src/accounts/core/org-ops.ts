@@ -2,17 +2,22 @@ import { PolicyError } from "./errors.js";
 import { assertOrgDid, ORG_HOST_SERVICE, ORG_HOST_SERVICE_TYPE } from "./org-policy.js";
 import type { Operation, UnsignedOperation } from "./types.js";
 
-/** Org genesis: the root is the sole rotation key; `signingKey`, when given, becomes #signing (must equal the root). */
+/**
+ * Org genesis (orgs spec §4): the root is the sole rotation key and #signing, and
+ * `dimo_org_host` points at `hostUrl`. `signingKey` defaults to `rootKey` and must equal it:
+ * the directory refuses an operation with no verification method, so #signing is always set.
+ */
 export function buildOrgGenesis(args: {
   rootKey: string;
   hostUrl: string;
+  /** Defaults to `rootKey`; anything else is PolicyError `fragment_not_allowed`. */
   signingKey?: string;
   alsoKnownAs?: string[];
 }): UnsignedOperation {
   const op: UnsignedOperation = {
     type: "plc_operation",
     rotationKeys: [args.rootKey],
-    verificationMethods: args.signingKey ? { signing: args.signingKey } : {},
+    verificationMethods: { signing: args.signingKey ?? args.rootKey },
     alsoKnownAs: [...(args.alsoKnownAs ?? [])],
     services: { [ORG_HOST_SERVICE]: { type: ORG_HOST_SERVICE_TYPE, endpoint: args.hostUrl } },
     prev: null,
