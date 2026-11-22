@@ -137,6 +137,10 @@ if (session.expiresAt.getTime() <= Date.now()) {
 
 The token is bound to the DPoP key's thumbprint (`cnf.jkt`), so a restored token only works with the same pair. `clockOffsetMs` is set when the device clock was 5 s or more off dauth's at sign-in (measured from the challenge's `Issued At`, read only when it is strict RFC 3339; more than 24 h off is `ClockSkewError`, thrown before anything is signed): every DPoP proof for the session adds it to the device clock, so a phone whose clock runs minutes fast or slow still passes the servers' `iat` window. Keep it with the token. localStorage cannot hold a `CryptoKey`; do not export the private key to make it fit. React Native apps implement `Signer` and `DpopKey` over the platform keystore instead.
 
+## Before publishing
+
+Publish this SDK only after the accounts service whose `POST /api/v2/login/email` answers `emailVerified` and `otherCredentials` is deployed to every environment the release targets, dev included. `loginWithEmail` refuses an answer without both booleans (`AccountsError` `invalid_response`), so against an older accounts every email login fails. The same release also relies on that accounts for the `signingKey` body of `PUT /api/v2/me/did` (sent by `claimDid` with a signing key) and for signup's 409 `link_required`.
+
 ## Scripts
 
 `npm run build` (tsc for the main entry, then tsup for `dist/accounts`, then `check:dist`), `npm test` (vitest; the accounts tests are in `test/accounts`), `npm run typecheck` (`tsconfig.json`, then `tsconfig.accounts.json` for `src/accounts`, `test/accounts` and `e2e/accounts`).
