@@ -27,12 +27,12 @@ async function expectAccountsError(what: string, status: number, code: string, p
 /**
  * E9. v1 claim where the user is root. Setup: v1 create with deployAccount: true, then a
  * user session from /login/email.
- * Passes when: SDK claimDid, then PUT /me/did, links the DID; a second PUT returns 409; a
- * DID whose rotation key isn't this user's wallet returns 403.
+ * Passes when: SDK claimDid, then PUT /me/did, links the DID; claimDid again with a
+ * signing key links the same DID again (an idempotent 200) and then adds #signing with a
+ * wallet-signed update; a DID whose rotation key isn't this user's wallet returns 403.
  *
- * "A second PUT" is a PUT for another DID of the same wallet: accounts answers a repeat of
- * the very same DID with an idempotent 200, and 409 only when the account already holds a
- * different DID.
+ * A person's genesis is wallet-only, so a wallet has exactly one claimable DID: the old
+ * "second DID for the same wallet gets 409" step can no longer happen through claimDid.
  */
 export const e09: Scenario = {
   id: "E9",
@@ -64,17 +64,17 @@ export const e09: Scenario = {
     eq(me.did, first.did, "GET /me did after claimDid");
     eq(await lookupByWallet(ctx.cfg, { address: user.walletAddress }), first.did, "by-wallet lookup after claimDid");
 
-    // 409: another DID for the same wallet (a different signing key gives a different genesis).
-    await expectAccountsError(
-      "second PUT /me/did with a different DID",
-      409,
-      "conflict",
-      claimDid(ctx.cfg, {
-        wallet: user.wallet,
-        signingKey: await WebCryptoP256Signer.generate(),
-        dpopKey: await generateDpopKey(),
-      })
-    );
-    return `linked ${first.did}; a second DID got 409; a DID of an unowned wallet got 403 forbidden`;
+    // Again with a signing key: the same wallet-only DID (an idempotent link), then #signing
+    // added by a wallet-signed update after the link.
+    const signingKey = await WebCryptoP256Signer.generate();
+    const second = await claimDid(ctx.cfg, {
+      wallet: user.wallet,
+      signingKey,
+      dpopKey: await generateDpopKey(),
+    });
+    eq(second.did, first.did, "claimDid with a signing key: same DID");
+    const head = await ctx.directory.head(first.did);
+    eq(head.op.verificationMethods.signing, signingKey.didKey, "#signing after the second claimDid");
+    return `linked ${first.did}; claimDid again added #signing after the link; a DID of an unowned wallet got 403 forbidden`;
   },
 };
