@@ -123,8 +123,11 @@ function harness(
     lookup?: Record<string, (found: unknown) => unknown>;
     /** The chain id the RPC claims. Defaults to CHAIN_ID. */
     rpcChainId?: number;
-    /** What EntryPoint.getNonce returns. Defaults to key << 64. */
-    chainNonce?: bigint;
+    /**
+     * What EntryPoint.getNonce returns. Defaults to key << 64. A function gets the number
+     * of eth_sendUserOperation requests so far (to model an op landing between attempts).
+     */
+    chainNonce?: bigint | ((sends: number) => bigint);
   } = {}
 ) {
   const calls: Call[] = [];
@@ -191,7 +194,8 @@ function harness(
             data,
           });
           nonceKeys.push(nonceArgs[1]);
-          return ok(encodeAbiParameters([{ type: "uint256" }], [opts.chainNonce ?? nonceArgs[1] << 64n]));
+          const chainNonce = typeof opts.chainNonce === "function" ? opts.chainNonce(sent.length) : opts.chainNonce;
+          return ok(encodeAbiParameters([{ type: "uint256" }], [chainNonce ?? nonceArgs[1] << 64n]));
         }
         default:
           return rpcErr(-32601, `unexpected chain method ${body.method}`);
@@ -1259,6 +1263,39 @@ describe("a send without an answer is never sent again elsewhere", () => {
     expect(h.sent.map((x) => x.provider)).toEqual(["alchemy", "gelato"]);
     expect(new Set(h.nonceKeys).size).toBe(1);
     expect(h.sent[1]!.userOp.nonce).toBe(h.sent[0]!.userOp.nonce);
+  });
+
+  it("reads the nonce once per call: a refused send that landed anyway cannot run twice (R6-F2)", async () => {
+    // alchemy's bundler took the op but answered a JSON-RPC error (classified as a refusal),
+    // and the op was mined before gelato prepared: the chain nonce has moved on.
+    const h = harness({
+      sendFails: { alchemy: { rpcCode: -32000, kept: true } },
+      chainNonce: (sends) => BigInt(sends),
+    });
+    const { out } = await send(h);
+    expect(out).toMatchObject({ provider: "gelato" });
+    expect(h.sent.map((x) => x.provider)).toEqual(["alchemy", "gelato"]);
+    // Both attempts signed the nonce read before the first one, so at most one can land.
+    expect(h.sent[1]!.userOp.nonce).toBe(h.sent[0]!.userOp.nonce);
+    expect(BigInt(h.sent[0]!.userOp.nonce!)).toBe(0n);
+    expect(h.nonceKeys).toHaveLength(1);
+  });
+
+  it("deploy reads the nonce once across provider attempts too (R6-F2)", async () => {
+    const h = harness({
+      sendFails: { alchemy: { rpcCode: -32000, kept: true } },
+      chainNonce: (sends) => BigInt(sends),
+    });
+    const { account } = spySigner();
+    const r = await deploySmartAccount(h.cfg, {
+      session: await session(),
+      walletViemAccount: account,
+      chainId: CHAIN_ID,
+      providers: ["alchemy", "gelato"],
+    });
+    expect(r.provider).toBe("gelato");
+    expect(h.sent[1]!.userOp.nonce).toBe(h.sent[0]!.userOp.nonce);
+    expect(h.nonceKeys).toHaveLength(1);
   });
 
   it.each(["send", "deploy"] as const)(

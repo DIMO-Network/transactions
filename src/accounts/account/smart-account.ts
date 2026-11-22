@@ -114,6 +114,12 @@ interface Kernel {
   publicClient: ReturnType<typeof publicClientFor>["publicClient"];
   /** Signs through guardSigner, so a wallet failure is a SignerError. */
   account: KernelAccount;
+  /**
+   * The account's EntryPoint nonce, read from the RPC on first use and then reused by every
+   * provider attempt of this call. Two attempts therefore sign the same nonce, so at most
+   * one of their ops can ever be included, whatever a provider's error claimed.
+   */
+  nonce: () => Promise<bigint>;
 }
 
 /** Build the shared kernel. Refuses an RPC that serves another chain, before any signing. */
@@ -124,7 +130,9 @@ async function kernelFor(cfg: SdkConfig, opts: SmartAccountOptions): Promise<Ker
     throw new UsageError("chain_mismatch", `cfg.rpcUrls[${opts.chainId}] serves chain ${served}`);
   }
   const account = await plainKernelAccount(publicClient, guardSigner(opts.walletViemAccount));
-  return { chain, publicClient, account };
+  // Kept only once read: a failed read signed nothing, so the next attempt may read again.
+  let nonce: bigint | undefined;
+  return { chain, publicClient, account, nonce: async () => (nonce ??= await account.getNonce()) };
 }
 
 /**
@@ -367,8 +375,8 @@ async function knowsUserOperation(client: ProxyClient, hash: Hex): Promise<boole
 }
 
 /**
- * One provider attempt: prepare (nonce, gas, sponsorship), sign, then send the signed op
- * with eth_sendUserOperation. Returns the op's hash, computed locally before the send.
+ * One provider attempt: prepare (gas, sponsorship; the nonce is the call's, read once by
+ * Kernel.nonce), sign, then send the signed op with eth_sendUserOperation. Returns the op's hash, computed locally before the send.
  * A failure before the send, or a refusal of the send (isRefusedSend), throws for
  * withProviders to classify (usually: try the next provider). Any other send failure,
  * and a 2xx whose result is not the op's hash, is looked up once on the same provider by
@@ -379,12 +387,14 @@ async function submitUserOperation(
   { client, sender }: ProxyClients,
   chainId: number,
   provider: GasProvider,
-  calls: SendUserOperationOptions["calls"]
+  calls: SendUserOperationOptions["calls"],
+  nonce: Kernel["nonce"]
 ): Promise<Hex> {
   const { account } = client;
   const entryPointAddress = account.entryPoint.address;
   const prepared = (await client.prepareUserOperation({
     calls,
+    nonce: await nonce(),
   })) as UserOperation<"0.7">;
   const signature = await account.signUserOperation({ ...prepared, chainId });
   const userOperation: UserOperation<"0.7"> = { ...prepared, signature };
@@ -446,9 +456,13 @@ export async function deploySmartAccount(
     async (clients, provider) => {
       const { client } = clients;
       // Fallback is only allowed until the op may have reached the bundler.
-      const hash = await submitUserOperation(clients, opts.chainId, provider, [
-        { to: zeroAddress, value: 0n, data: "0x" },
-      ]);
+      const hash = await submitUserOperation(
+        clients,
+        opts.chainId,
+        provider,
+        [{ to: zeroAddress, value: 0n, data: "0x" }],
+        kernel.nonce
+      );
       let receipt: Awaited<ReturnType<typeof client.waitForUserOperationReceipt>>;
       try {
         receipt = await client.waitForUserOperationReceipt({
@@ -472,7 +486,9 @@ export async function deploySmartAccount(
 /**
  * Send a UserOp from the plain kernel. Each provider attempt prepares, signs and sends it.
  * A failure before the send, or a refusal of the send (a JSON-RPC error other than
- * -32603, or an HTTP 4xx), moves on to the next provider, which prepares and signs again.
+ * -32603, or an HTTP 4xx), moves on to the next provider, which prepares and signs again
+ * with the same nonce: the nonce is read once per call, so even a "refusal" whose op the
+ * bundler took after all cannot run twice (the next op is then invalid on chain).
  * Returns the op's hash (computed locally) once the bundler accepts it; no receipt wait.
  * Any other send failure (a timeout, a network error, an unreadable body, HTTP 5xx,
  * -32603), and a 2xx whose result is not the op's hash, never moves on: the same provider
@@ -488,8 +504,9 @@ export async function sendUserOperation(
   opts: SendUserOperationOptions
 ): Promise<{ userOpHash: `0x${string}`; provider: string }> {
   requireScopes(opts.session, ["write"], "sending a UserOperation");
-  const { result, provider } = await withProviders(cfg, opts, await kernelFor(cfg, opts), (clients, provider) =>
-    submitUserOperation(clients, opts.chainId, provider, opts.calls)
+  const kernel = await kernelFor(cfg, opts);
+  const { result, provider } = await withProviders(cfg, opts, kernel, (clients, provider) =>
+    submitUserOperation(clients, opts.chainId, provider, opts.calls, kernel.nonce)
   );
   return { userOpHash: result, provider };
 }
