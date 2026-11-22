@@ -22,7 +22,13 @@ export {
   type ResumeDeleteOptions,
 } from "./account/delete.js";
 export { addDeviceKey, type KeyChangeArgs, removeDeviceKey, setAliases } from "./account/keys.js";
-export { type LoginResult, loginWithEmail, loginWithPasskey, requestEmailCode } from "./account/login.js";
+export {
+  type EmailLoginResult,
+  type LoginResult,
+  loginWithEmail,
+  loginWithPasskey,
+  requestEmailCode,
+} from "./account/login.js";
 export { addPasskey, type PasskeyAttestation, type PasskeyTransport, removePasskey } from "./account/passkeys.js";
 export {
   deploySmartAccount,

@@ -12,6 +12,23 @@ export type LoginResult = {
   credentialBundle?: string;
 };
 
+/**
+ * loginWithEmail's answer (POST /api/v2/login/email, cross-repo contract 2): LoginResult plus
+ * two facts about the account, for the app to check before the user relies on it.
+ * - `emailVerified`: the account's email was proven. false means the account was created
+ *   without proof of the inbox, so whoever logs in now may not be whoever made it.
+ * - `otherCredentials`: the account's sub-org holds a passkey or API key that this login
+ *   did not create.
+ * Open signup lets anyone create an account for an email address with their own passkey and
+ * signing key. `emailVerified: false` together with `otherCredentials: true` is that case:
+ * someone else may already control the wallet and the DID, so warn the user (or stop) before
+ * they link vehicles or receive funds.
+ */
+export type EmailLoginResult = LoginResult & {
+  emailVerified: boolean;
+  otherCredentials: boolean;
+};
+
 const isAddress = (v: unknown): v is `0x${string}` => typeof v === "string" && /^0x[0-9a-fA-F]{40}$/.test(v);
 
 const isLoginResult = (b: Record<string, unknown>): boolean =>
@@ -19,6 +36,10 @@ const isLoginResult = (b: Record<string, unknown>): boolean =>
   isAddress(b.walletAddress) &&
   (b.did === null || typeof b.did === "string") &&
   (b.credentialBundle === undefined || typeof b.credentialBundle === "string");
+
+// Both flags are required: a missing one is invalid_response, never a reassuring default.
+const isEmailLoginResult = (b: Record<string, unknown>): boolean =>
+  isLoginResult(b) && typeof b.emailVerified === "boolean" && typeof b.otherCredentials === "boolean";
 
 /** Ask accounts to email a one-time code. */
 export async function requestEmailCode(cfg: SdkConfig, args: { email: string }): Promise<{ codeId: string }> {
@@ -31,7 +52,11 @@ export async function requestEmailCode(cfg: SdkConfig, args: { email: string }):
   return { codeId };
 }
 
-/** Log in (or recover) with the emailed code; returns a Turnkey credential bundle for the session key. */
+/**
+ * Log in (or recover) with the emailed code; returns a Turnkey credential bundle for the
+ * session key, and `emailVerified` / `otherCredentials` (see EmailLoginResult). An answer
+ * without both booleans is AccountsError `invalid_response`.
+ */
 export async function loginWithEmail(
   cfg: SdkConfig,
   args: {
@@ -40,7 +65,7 @@ export async function loginWithEmail(
     code: string;
     sessionPublicKey: string;
   }
-): Promise<LoginResult> {
+): Promise<EmailLoginResult> {
   const res = await send(unboundFetch(cfg), "accounts", `${normalizeUrl(cfg.accountsUrl)}/api/v2/login/email`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -51,7 +76,7 @@ export async function loginWithEmail(
       sessionPublicKey: args.sessionPublicKey,
     }),
   });
-  return accountsJson<LoginResult>(res, isLoginResult);
+  return accountsJson<EmailLoginResult>(res, isEmailLoginResult);
 }
 
 /**
