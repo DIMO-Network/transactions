@@ -6,8 +6,8 @@ import {
   buildOrgGenesis,
   buildOrgKeyUpdate,
   encodeOperationCbor,
-  PolicyError,
   type Operation,
+  PolicyError,
   type UnsignedOperation,
 } from "../../../src/accounts/core/index.js";
 import vectors from "../fixtures/did-ops.json";
