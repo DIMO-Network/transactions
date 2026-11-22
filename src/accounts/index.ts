@@ -38,6 +38,7 @@ export {
   dpopKeyFromKeyPair,
   generateDpopKey,
   jwkThumbprint,
+  normalizeHtu,
   type WebCryptoDpopKey,
 } from "./auth/dpop.js";
 export { authedFetch } from "./auth/fetch.js";

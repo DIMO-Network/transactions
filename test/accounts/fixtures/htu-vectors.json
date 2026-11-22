@@ -1,0 +1,6 @@
+[
+  { "in": "https://Org.Example.com:443/orgs/x?a=1#f", "out": "https://org.example.com/orgs/x" },
+  { "in": "http://localhost:80/a/", "out": "http://localhost/a/" },
+  { "in": "http://localhost:8080/a", "out": "http://localhost:8080/a" },
+  { "in": "HTTPS://EXAMPLE.COM", "out": "https://example.com" }
+]

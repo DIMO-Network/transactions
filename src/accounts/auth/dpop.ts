@@ -72,10 +72,30 @@ export async function dpopKeyFromKeyPair(pair: CryptoKeyPair): Promise<WebCrypto
   };
 }
 
-/** htu: RFC 9449 / RFC 3986 normalization: scheme and host lowercased, default port dropped, no query or fragment. */
+/** scheme "://" authority, then the path up to the query or fragment (RFC 3986 §3). */
+const HIERARCHICAL_URL = /^([A-Za-z][A-Za-z0-9+.-]*):\/\/([^/?#]*)([^?#]*)/;
+
+const DEFAULT_PORT: Readonly<Record<string, string>> = { https: ":443", http: ":80" };
+
+/**
+ * htu, normalised exactly as did-directory's Go pkg/dpop does it (cross-repo contract 4):
+ * scheme and host lowercased, `:443` dropped for https and `:80` for http, query and
+ * fragment dropped, and the path left byte for byte (no dot-segment removal, no
+ * re-encoding, no trailing slash added or removed: `HTTPS://EXAMPLE.COM` gives
+ * `https://example.com`). Userinfo is dropped. Pass the URL the request will carry. Throws
+ * the URL parser's TypeError for a string that is not a URL.
+ */
 export function normalizeHtu(raw: string): string {
-  const u = new URL(raw);
-  return `${u.protocol.toLowerCase()}//${u.host.toLowerCase()}${u.pathname}`;
+  const parsed = new URL(raw);
+  const m = HIERARCHICAL_URL.exec(raw);
+  // A URL without "//" (e.g. "https:host/x", which WHATWG still parses): its parsed form.
+  if (!m) return `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
+  const scheme = m[1]!.toLowerCase();
+  const authority = m[2]!;
+  let host = authority.slice(authority.lastIndexOf("@") + 1).toLowerCase();
+  const port = DEFAULT_PORT[scheme];
+  if (port !== undefined && host.endsWith(port)) host = host.slice(0, -port.length);
+  return `${scheme}://${host}${m[3]}`;
 }
 
 /** The key's public JWK reduced to exactly {kty, crv, x, y}; rejects non EC/P-256 keys. */
@@ -87,7 +107,11 @@ export async function publicJwk(key: DpopKey): Promise<DpopJwk> {
   return { kty: "EC", crv: "P-256", x: j.x, y: j.y };
 }
 
-/** Build a DPoP proof JWT (RFC 9449) for a request; `ath` is set when a token is sent. */
+/**
+ * Build a DPoP proof JWT (RFC 9449) for a request; `ath` is set when a token is sent.
+ * `method` goes into htm exactly as given (verifiers compare it exactly), and `url`
+ * through normalizeHtu into htu.
+ */
 export async function createDpopProof(
   key: DpopKey,
   method: string,

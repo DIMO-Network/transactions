@@ -4,7 +4,9 @@ import type { Session } from "./signin.js";
 
 /**
  * A fetch for accounts that authenticates with the session's DPoP-bound token and a
- * fresh proof per request. Uses cfg.fetchImpl; a rejected fetch becomes a NetworkError.
+ * fresh proof per request. The method is upper-cased once and both sent and signed (htm),
+ * since verifiers compare htm exactly and fetch upper-cases only its six standard methods.
+ * Uses cfg.fetchImpl; a rejected fetch becomes a NetworkError.
  */
 export function authedFetch(
   cfg: Pick<SdkConfig, "fetchImpl">,
@@ -12,12 +14,10 @@ export function authedFetch(
 ): (url: string, init?: RequestInit) => Promise<Response> {
   const f = unboundFetch(cfg);
   return async (url, init = {}) => {
+    const method = (init.method ?? "GET").toUpperCase();
     const headers = new Headers(init.headers);
     headers.set("Authorization", `DPoP ${session.token}`);
-    headers.set(
-      "DPoP",
-      await createDpopProof(session.dpopKey, (init.method ?? "GET").toUpperCase(), url, session.token)
-    );
-    return send(f, "accounts", url, { ...init, headers });
+    headers.set("DPoP", await createDpopProof(session.dpopKey, method, url, session.token));
+    return send(f, "accounts", url, { ...init, method, headers });
   };
 }
