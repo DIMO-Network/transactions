@@ -45,7 +45,7 @@ export function isAllowedOrgHostUrl(value: string): boolean {
 export const isHttpsUrl = isAllowedOrgHostUrl;
 
 /**
- * Org-DID policy: a single secp256k1 root (the rotation key), an optional #signing equal to the
+ * Org-DID policy: a single secp256k1 root (the rotation key), a required #signing equal to the
  * root, an optional P-256 #dimo_org, and exactly one service, `dimo_org_host`, of type
  * DimoOrgHost, whose endpoint isAllowedOrgHostUrl accepts (https:, or http: only on localhost
  * or 127.0.0.1, in canonical form).
@@ -59,9 +59,12 @@ export function assertOrgDid(op: UnsignedOperation, rootKey: string): void {
   if (curveOf(rootKey, "the root key") !== "secp256k1") {
     throw new PolicyError("root_key_type", "the org root key must be secp256k1");
   }
+  if (op.verificationMethods.signing !== rootKey) {
+    throw new PolicyError("fragment_not_allowed", "#signing must equal the root key");
+  }
   for (const [fragment, key] of Object.entries(op.verificationMethods)) {
     if (fragment === "signing") {
-      if (key !== rootKey) throw new PolicyError("fragment_not_allowed", "#signing must equal the root key");
+      continue; // checked above
     } else if (fragment === "dimo_org") {
       if (curveOf(key, "#dimo_org") !== "p256") {
         throw new PolicyError("fragment_not_allowed", "#dimo_org must be a P-256 did:key");

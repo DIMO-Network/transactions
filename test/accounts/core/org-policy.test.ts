@@ -154,6 +154,25 @@ describe("assertOrgDid", () => {
     expect(codeOf(() => assertOrgDid(a, ROOT))).toBe("fragment_not_allowed");
   });
 
+  // Fix round 1: #signing is required, not optional. The directory refuses an op with no
+  // verification method, and an org signs in (and gets approve) with #signing, its root.
+  it("refuses an org DID with no verification methods", () => {
+    const a = clone(genesis.unsigned);
+    a.verificationMethods = {};
+    expect(codeOf(() => assertOrgDid(a, ROOT))).toBe("fragment_not_allowed");
+  });
+
+  it("refuses #dimo_org without #signing", () => {
+    const a = clone(update.unsigned);
+    a.verificationMethods = { dimo_org: DIMO_ORG };
+    expect(codeOf(() => assertOrgDid(a, ROOT))).toBe("fragment_not_allowed");
+    expect(
+      codeOf(() =>
+        buildOrgKeyUpdate({ ...clone(genesis.unsigned), verificationMethods: {}, sig: "" }, genesis.cid, DIMO_ORG)
+      )
+    ).toBe("fragment_not_allowed");
+  });
+
   it("refuses a secp256k1 #dimo_org", () => {
     const a = clone(update.unsigned);
     a.verificationMethods.dimo_org = ROOT;
