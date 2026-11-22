@@ -14,18 +14,25 @@ function curveOf(key: string, what: string): KeyCurve {
   }
 }
 
-/** True for an absolute https: URL. */
-export function isHttpsUrl(value: string): boolean {
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/** True for an absolute https: URL, or an http: URL whose host is exactly localhost, 127.0.0.1 or [::1] (any port). */
+export function isAllowedOrgHostUrl(value: string): boolean {
   try {
-    return new URL(value).protocol === "https:";
+    const url = new URL(value);
+    if (url.protocol === "https:") return true;
+    return url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname);
   } catch {
     return false;
   }
 }
 
+/** @deprecated Kept for compatibility; use isAllowedOrgHostUrl (this now also allows http: on loopback hosts). */
+export const isHttpsUrl = isAllowedOrgHostUrl;
+
 /**
  * Org-DID policy: a single secp256k1 root (the rotation key), an optional #signing equal to the
- * root, an optional P-256 #dimo_org, and one `dimo_org_host` service with an https: endpoint.
+ * root, an optional P-256 #dimo_org, and one `dimo_org_host` service with an https: endpoint (http: only on localhost, 127.0.0.1 or [::1]).
  * `alsoKnownAs` entries are accepted as given: the person alias rules (did:ethr) do not fit org aliases such as at://avis.
  * The person policy (`assertPersonDid`) is unchanged and still refuses all of this.
  */
@@ -51,10 +58,10 @@ export function assertOrgDid(op: UnsignedOperation, rootKey: string): void {
     if (name !== ORG_HOST_SERVICE) {
       throw new PolicyError("services_not_allowed", `service not allowed on an org DID: ${name}`);
     }
-    if (svc.type !== ORG_HOST_SERVICE_TYPE || !isHttpsUrl(svc.endpoint)) {
+    if (svc.type !== ORG_HOST_SERVICE_TYPE || !isAllowedOrgHostUrl(svc.endpoint)) {
       throw new PolicyError(
         "services_not_allowed",
-        `${ORG_HOST_SERVICE} must be type ${ORG_HOST_SERVICE_TYPE} with an https: endpoint`
+        `${ORG_HOST_SERVICE} must be type ${ORG_HOST_SERVICE_TYPE} with an https: endpoint (http: only on localhost)`
       );
     }
   }

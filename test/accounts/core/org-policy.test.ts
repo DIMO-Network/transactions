@@ -94,6 +94,31 @@ describe("assertOrgDid", () => {
     expect(codeOf(() => assertOrgDid(a, ROOT))).toBe("services_not_allowed");
   });
 
+  const withEndpoint = (endpoint: string) => {
+    const a = clone(genesis.unsigned);
+    a.services.dimo_org_host!.endpoint = endpoint;
+    return a;
+  };
+
+  it("accepts an http://localhost org host", () => {
+    expect(() => assertOrgDid(withEndpoint("http://localhost"), ROOT)).not.toThrow();
+    expect(() => assertOrgDid(withEndpoint("http://localhost:3000"), ROOT)).not.toThrow();
+  });
+
+  it("accepts http://127.0.0.1:27281", () => {
+    expect(() => assertOrgDid(withEndpoint("http://127.0.0.1:27281"), ROOT)).not.toThrow();
+    expect(() => assertOrgDid(withEndpoint("http://[::1]:8080"), ROOT)).not.toThrow();
+  });
+
+  it("still refuses http://org-host.example.com", () => {
+    expect(codeOf(() => assertOrgDid(withEndpoint("http://org-host.example.com"), ROOT))).toBe("services_not_allowed");
+  });
+
+  it("refuses http://localhost.evil.com", () => {
+    expect(codeOf(() => assertOrgDid(withEndpoint("http://localhost.evil.com"), ROOT))).toBe("services_not_allowed");
+    expect(codeOf(() => assertOrgDid(withEndpoint("http://127.0.0.1.evil.com"), ROOT))).toBe("services_not_allowed");
+  });
+
   it("refuses a malformed host URL and a wrong service type", () => {
     const a = clone(genesis.unsigned);
     a.services.dimo_org_host!.endpoint = "not a url";
