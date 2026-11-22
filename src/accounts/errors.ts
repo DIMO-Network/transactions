@@ -241,6 +241,21 @@ export class AccountsError extends AccountSdkError {
   }
 }
 
+/**
+ * Signup (POST /api/v2/accounts) answered 409 `link_required`: the email belongs to an
+ * existing v1 account that signup can't take over, because its email was never proven or
+ * its user is already a root of the sub-org. Don't retry signup. Log in with the account's
+ * v1 passkey (loginWithPasskey, then a Turnkey signer for its wallet) and call claimDid,
+ * which creates the DID and links it with PUT /api/v2/me/did.
+ */
+export class LinkRequiredError extends AccountsError {
+  declare readonly code: "link_required";
+  constructor(status: number, message: string, retryAfterSeconds?: number) {
+    super("link_required", status, message, retryAfterSeconds);
+    this.name = "LinkRequiredError";
+  }
+}
+
 export type UsageErrorCode =
   | "scope_missing"
   | "audience_empty"

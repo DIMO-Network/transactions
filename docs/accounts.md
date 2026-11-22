@@ -60,7 +60,8 @@ import { createAccount, getMe, recordSignIn, lookupByWallet, claimDid } from "@d
 
 // Sign up (public route). With `signingKey` the SDK signs the proof of possession over
 // "DIMO accounts v2 signup\nemail: <trimmed, lowercased>\nkey: <didKey>", verifies it
-// locally, and sends { didKey, proof }. 409 is AccountsError code "conflict".
+// locally, and sends { didKey, proof }. 409 is AccountsError code "conflict", or
+// LinkRequiredError ("link_required") for an existing v1 account: see below.
 const { account, credentialBundle } = await createAccount(cfg, {
   email,
   proof: { codeId, code }, // or { idToken }
@@ -78,6 +79,8 @@ await recordSignIn(cfg, { session, deviceKey: device.didKey });
 // GET /accounts/by-wallet/{address} (public): the account's DID, or null.
 const did = await lookupByWallet(cfg, { address: walletAddress });
 ```
+
+`createAccount` answering 409 `link_required` throws `LinkRequiredError` (an `AccountsError`): the email belongs to an existing v1 account that signup can't take over, because its email was never proven or its user is already a root of the sub-org. Don't retry signup. Log in with the account's v1 passkey (`loginWithPasskey`, then a Turnkey signer for its wallet) and call `claimDid`, which creates the DID and links it with `PUT /api/v2/me/did`.
 
 `loginWithEmail` answers an `EmailLoginResult`: the `LoginResult` fields plus `emailVerified` (the account's email was proven) and `otherCredentials` (its sub-org holds a passkey or API key this login did not create). Open signup lets anyone make an account for an email address with their own passkey and signing key, so `emailVerified: false` with `otherCredentials: true` means someone else may already control the wallet and the DID: warn the user, or stop, before they link vehicles or receive funds. An answer without both booleans is `AccountsError` `invalid_response`.
 

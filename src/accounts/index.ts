@@ -69,6 +69,7 @@ export {
   HeadMovedError,
   InvalidDidError,
   KeyNotAllowedError,
+  LinkRequiredError,
   NetworkError,
   PolicyError,
   type PolicyErrorCode,

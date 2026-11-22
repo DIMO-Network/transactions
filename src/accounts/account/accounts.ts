@@ -3,7 +3,7 @@ import { requireScopes } from "../auth/scopes.js";
 import type { Session } from "../auth/signin.js";
 import { normalizeUrl, type SdkConfig, send, unboundFetch } from "../config.js";
 import { decodeDidKey, SIGNUP_POP_MESSAGE, verifyOpSignature } from "../core/index.js";
-import { AccountsError, PolicyError, UsageError } from "../errors.js";
+import { AccountsError, LinkRequiredError, PolicyError, UsageError } from "../errors.js";
 import type { Signer } from "../signers/types.js";
 import type { PasskeyAttestation, PasskeyTransport } from "./passkeys.js";
 import { accountsJson, isObject } from "./response.js";
@@ -65,8 +65,10 @@ export const isAccountView = (v: unknown): boolean =>
  * `{ didKey, proof }`: the proof is the Signer's signature over
  * utf8(SIGNUP_POP_MESSAGE(email.trim().toLowerCase(), didKey)), checked locally with
  * verifyOpSignature before anything is sent (PolicyError `proof_invalid`, nothing sent).
- * 409 is AccountsError `conflict` (a signup in progress or with different parameters);
- * other failures are AccountsError with the server's code.
+ * 409 is AccountsError `conflict` (a signup in progress or with different parameters), or
+ * LinkRequiredError `link_required` (an existing v1 account for this email that signup
+ * can't take over: log in with its v1 passkey and claimDid instead); other failures are
+ * AccountsError with the server's code.
  */
 export async function createAccount(cfg: SdkConfig, input: CreateAccountInput): Promise<CreateAccountResult> {
   const { signingKey, ...rest } = input;
@@ -82,6 +84,13 @@ export async function createAccount(cfg: SdkConfig, input: CreateAccountInput): 
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
+  if (res.status === 409) {
+    const err = await AccountsError.fromResponse(res);
+    if (err.code === "link_required") {
+      throw new LinkRequiredError(err.status, err.message.replace(/^link_required: /, ""), err.retryAfterSeconds);
+    }
+    throw err;
+  }
   const out = await accountsJson<{
     account: AccountView;
     credentialBundle?: unknown;
