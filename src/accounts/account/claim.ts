@@ -24,7 +24,7 @@ import {
 } from "../errors.js";
 import type { Signer } from "../signers/types.js";
 import { type AccountView, getMe, isAccountView } from "./accounts.js";
-import { addDeviceKey, proveKey } from "./keys.js";
+import { addDeviceKeyGuarded, proveKey } from "./keys.js";
 import { accountsJson } from "./response.js";
 
 /**
@@ -44,13 +44,17 @@ import { accountsJson } from "./response.js";
  * 3. once the link succeeded (DIMO is off the root, so only the user can sign with the
  *    wallet), adds `#signing` with a wallet-signed key update (addDeviceKey).
  * If step 3 fails, the DID is already linked: call claimDid again with the same arguments
- * and it finishes adding the key.
+ * and it finishes adding the key. Right after the link (with or without a signingKey) the
+ * verified log is checked again, and an operation the previous wallet signer appended
+ * before the handover is UnexpectedDidStateError with `linked: true`; #signing is never
+ * built on such a log.
  *
  * PUT answering 503 `unavailable` is retried up to 3 times, honouring Retry-After.
  * Safe to repeat: if the genesis already exists, the DID is reused only when its verified
  * audit log is that genesis alone, or the genesis plus the very `#signing` update step 3
  * makes for this `signingKey` (a repeat after step 3's answer was lost; the link is then
- * confirmed with GET /api/v2/me, and an account without this DID is refused). Any other
+ * confirmed with GET /api/v2/me, and an account without this DID is UnexpectedDidStateError
+ * `did_unlinkable`). Any other
  * log (an added key, new rotation keys, aliases, a genesis that is not wallet-only) throws
  * UnexpectedDidStateError listing what is there, before signing in. If PUT answers 409 but
  * GET /api/v2/me already shows this DID, that is success. Every request uses cfg.fetchImpl.
@@ -109,22 +113,34 @@ export async function claimDid(
   let account: AccountView;
   if (signingAlreadyAdded) {
     // An earlier claimDid linked the DID and added #signing, and only its answer was lost.
-    // accounts would refuse a PUT for this log, so confirm the link instead.
+    // Confirm the link with GET /me: a PUT would also answer an idempotent 200 for an
+    // already-linked DID, but GET /me tells apart an account that is not linked to it,
+    // which accounts would never link (the log is no longer a bare genesis).
     const me = await getMe(cfg, { session });
     if (me?.did !== did) {
       throw new UnexpectedDidStateError(did, {
         unexpectedKeys: {},
         rotationKeys: [wallet.didKey],
         operations: 2,
+        unlinkable: true,
       });
     }
     account = me;
   } else {
     account = await link(cfg, session, did);
   }
+  // After the link only the user can sign with the wallet, but the previous signer may
+  // have appended an operation just before the handover that accounts' check did not see.
+  // Re-check the verified log against the same rule; #signing is built only on a log that
+  // passes it (the check runs on every attempt's log inside the key update).
+  const afterLink = (log: readonly AuditEntry[]): void => {
+    assertClaimable(did, log, genesis, wallet.didKey, signingKey?.didKey, true);
+  };
   if (signingKey) {
     // Step 3, only after the link. Idempotent: a key already on the head is not re-added.
-    await addDeviceKey(cfg, { did, wallet, newKey: signingKey, fragment: "signing", directory });
+    await addDeviceKeyGuarded(cfg, { did, wallet, newKey: signingKey, fragment: "signing", directory }, afterLink);
+  } else {
+    afterLink(await directory.auditLog(did));
   }
   return { did, session, account };
 }
@@ -170,7 +186,8 @@ function assertClaimable(
   log: readonly AuditEntry[],
   genesis: UnsignedOperation,
   walletKey: string,
-  signingKey: string | undefined
+  signingKey: string | undefined,
+  linked = false
 ): boolean {
   const head = log.at(-1)!.operation;
   if (head.type === "plc_tombstone") throw new DeactivatedError(did);
@@ -187,7 +204,12 @@ function assertClaimable(
       ...extraKeys(log[0]!.operation.verificationMethods, genesis.verificationMethods),
       ...extraKeys(head.verificationMethods, expectedHead),
     };
-    throw new UnexpectedDidStateError(did, { unexpectedKeys, rotationKeys: head.rotationKeys, operations: log.length });
+    throw new UnexpectedDidStateError(did, {
+      unexpectedKeys,
+      rotationKeys: head.rotationKeys,
+      operations: log.length,
+      linked,
+    });
   }
   assertPersonDid(head, walletKey);
   return ownSigningUpdate;

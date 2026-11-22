@@ -93,6 +93,8 @@ describe("claimDid", () => {
       "POST https://dauth.test/signin/challenge",
       "POST https://dauth.test/signin/token",
       "PUT https://accounts.test/api/v2/me/did",
+      // Re-read after the link (fix round 2).
+      `GET https://dir.test/${r.did}/log/audit`,
     ]);
     const body = (i: number) => JSON.parse((fetchImpl.mock.calls[i]![1] as RequestInit).body as string);
     expect(body(1)).toMatchObject({
@@ -168,7 +170,10 @@ describe("claimDid", () => {
     const r = await claimDid(cfg, { wallet, dpopKey: await generateDpopKey() });
     expect(r.did).toBe(did);
     expect(calls()).toContain(`GET https://dir.test/${did}/log/audit`);
-    expect(calls().at(-1)).toBe("PUT https://accounts.test/api/v2/me/did");
+    expect(calls().slice(-2)).toEqual([
+      "PUT https://accounts.test/api/v2/me/did",
+      `GET https://dir.test/${did}/log/audit`,
+    ]);
   });
 
   it("continues on a 409 DidExists as well", async () => {
@@ -224,9 +229,10 @@ describe("claimDid", () => {
     const r = await claimDid(cfg, { wallet, dpopKey: await generateDpopKey() });
     expect(r.did).toBe(did);
     expect(r.account).toEqual(viewFor(did));
-    expect(calls().slice(-2)).toEqual([
+    expect(calls().slice(-3)).toEqual([
       "PUT https://accounts.test/api/v2/me/did",
       "GET https://accounts.test/api/v2/me",
+      `GET https://dir.test/${did}/log/audit`,
     ]);
   });
 
@@ -299,7 +305,7 @@ describe("claimDid fetch injection", () => {
     const { cfg, calls } = setup();
     await claimDid(cfg, { wallet, dpopKey: await generateDpopKey() });
     expect(g).not.toHaveBeenCalled();
-    expect(calls()).toHaveLength(4);
+    expect(calls()).toHaveLength(5);
   });
 });
 
@@ -570,6 +576,93 @@ describe("claimDid with a signingKey adds #signing only after the link, and resu
     const e = await claimDid(cfg, { wallet, dpopKey: await generateDpopKey(), directory }).catch((x: unknown) => x);
     expect(e).toBeInstanceOf(UnexpectedDidStateError);
     expect(e).toMatchObject({ unexpectedKeys: { signing: signingKey.didKey }, operations: 1 });
+    expect(calls().some((c) => c.includes("dauth"))).toBe(false);
+  });
+});
+
+describe("claimDid re-checks the log after the link (fix round 2)", () => {
+  it.each([true, false])(
+    "an op the pre-link signer planted during PUT /me/did is refused after the link (signingKey=%s)",
+    async (withSigning) => {
+      const wallet = await WebCryptoP256Signer.generate();
+      const signingKey = await WebCryptoP256Signer.generate();
+      const planted = await WebCryptoP256Signer.generate();
+      const did = deriveDid(buildGenesis({ walletKey: wallet.didKey }));
+      let dir: FakeDirectory | undefined;
+      const s = setup(async (_u, init) => {
+        // The pre-link signer appends while accounts' link check reads a stale log.
+        if (init.method === "PUT")
+          await dir!.append(did, wallet, (h, cid) => buildAddKey(h, cid, planted.didKey, "device-2").op);
+        return json(viewFor(did));
+      });
+      dir = s.dir;
+      const e = await claimDid(s.cfg, {
+        wallet,
+        ...(withSigning ? { signingKey } : {}),
+        dpopKey: await generateDpopKey(),
+      }).catch((x: unknown) => x);
+      expect(e).toBeInstanceOf(UnexpectedDidStateError);
+      expect(e).toMatchObject({
+        code: "did_unexpected_state",
+        linked: true,
+        unexpectedKeys: { "device-2": planted.didKey },
+        operations: 2,
+      });
+      expect((e as Error).message).toContain("removeDeviceKey");
+      // #signing was never built on the planted head.
+      expect(dir.head(did).operation.verificationMethods.signing).toBeUndefined();
+      expect(dir.submitted).toHaveLength(1);
+    }
+  );
+
+  it("a clean link with no signingKey still reads the log once more and succeeds", async () => {
+    const wallet = await WebCryptoP256Signer.generate();
+    const { cfg, calls } = setup();
+    const r = await claimDid(cfg, { wallet, dpopKey: await generateDpopKey() });
+    expect(calls().at(-1)).toBe(`GET https://dir.test/${r.did}/log/audit`);
+  });
+
+  it("the stuck case (the caller's own #signing on a DID this account isn't linked to) has its own code", async () => {
+    const wallet = await WebCryptoP256Signer.generate();
+    const signingKey = await WebCryptoP256Signer.generate();
+    const { dir, cfg } = setup(async (_u, init) =>
+      init.method === "PUT" ? json({}) : json({ error: { code: "not_found", message: "no user" } }, 404)
+    );
+    const did = await dir.seedGenesis(wallet);
+    await dir.append(did, wallet, (h, cid) => buildAddKey(h, cid, signingKey.didKey, "signing").op);
+    const e = await claimDid(cfg, { wallet, signingKey, dpopKey: await generateDpopKey() }).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(UnexpectedDidStateError);
+    expect(e).toMatchObject({ code: "did_unlinkable", linked: false, did });
+    expect((e as Error).message).toContain("not linked");
+    expect((e as Error).message).not.toContain("unexpected keys: none");
+  });
+
+  it("genesis plus a #signing update, with no signingKey passed: refused before signing in", async () => {
+    const wallet = await WebCryptoP256Signer.generate();
+    const key = await WebCryptoP256Signer.generate();
+    const { dir, cfg, calls } = setup();
+    const did = await dir.seedGenesis(wallet);
+    await dir.append(did, wallet, (h, cid) => buildAddKey(h, cid, key.didKey, "signing").op);
+    const e = await claimDid(cfg, { wallet, dpopKey: await generateDpopKey() }).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(UnexpectedDidStateError);
+    expect(e).toMatchObject({ code: "did_unexpected_state", linked: false, unexpectedKeys: { signing: key.didKey } });
+    expect(calls().some((c) => c.includes("dauth"))).toBe(false);
+  });
+
+  it("a three-op log with a signingKey (its own #signing update, then more): refused before signing in", async () => {
+    const wallet = await WebCryptoP256Signer.generate();
+    const signingKey = await WebCryptoP256Signer.generate();
+    const { dir, cfg, calls } = setup();
+    const did = await dir.seedGenesis(wallet);
+    await dir.append(did, wallet, (h, cid) => buildAddKey(h, cid, signingKey.didKey, "signing").op);
+    await dir.append(did, wallet, (h, cid) => ({
+      ...h,
+      alsoKnownAs: ["did:ethr:137:" + toChecksumAddress("0x" + "ab".repeat(20))],
+      prev: cid,
+    }));
+    const e = await claimDid(cfg, { wallet, signingKey, dpopKey: await generateDpopKey() }).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(UnexpectedDidStateError);
+    expect(e).toMatchObject({ code: "did_unexpected_state", unexpectedKeys: {}, operations: 3 });
     expect(calls().some((c) => c.includes("dauth"))).toBe(false);
   });
 });

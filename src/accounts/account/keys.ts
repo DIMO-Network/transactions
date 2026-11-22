@@ -25,6 +25,8 @@ export type KeyChangeArgs = {
 };
 
 type Step<T> = {
+  /** Runs first on every attempt's verified log; throws to refuse the change. */
+  guard?: (log: readonly AuditEntry[]) => void;
   /**
    * Already applied on this head? Then return without signing. `log` is the verified
    * audit log the head came from (read once per attempt).
@@ -50,6 +52,7 @@ async function change<T>(cfg: SdkConfig, args: KeyChangeArgs, step: Step<T>): Pr
     const log = await directory.auditLog(did);
     const last = log.at(-1)!;
     if (last.operation.type === "plc_tombstone") throw new DeactivatedError(did);
+    step.guard?.(log);
     const { cid: prevCid, operation: headOp } = last;
     // Only a rotation key of the head can sign an update: a wrong wallet never signs.
     if (!headOp.rotationKeys.includes(wallet.didKey)) {
@@ -93,18 +96,30 @@ export async function proveKey(key: Signer, payload: Uint8Array): Promise<void> 
  * was removed: a stale retry of this call must not bring it back. That is refused with
  * PolicyError `key_removed` before anything is signed, unless `allowReAdd` is true.
  */
-export async function addDeviceKey(
+export async function addDeviceKey(cfg: SdkConfig, args: AddDeviceKeyArgs): Promise<{ cid: string; fragment: string }> {
+  return addDeviceKeyGuarded(cfg, args);
+}
+
+type AddDeviceKeyArgs = KeyChangeArgs & {
+  newKey: Signer;
+  fragment?: string;
+  /** Add newKey even though an earlier entry of the audit log had it (it was removed). */
+  allowReAdd?: boolean;
+};
+
+/**
+ * addDeviceKey, with `guard` run on every attempt's verified log before anything else
+ * (claimDid uses it so #signing is only ever built on a log it accepts). Internal.
+ */
+export async function addDeviceKeyGuarded(
   cfg: SdkConfig,
-  args: KeyChangeArgs & {
-    newKey: Signer;
-    fragment?: string;
-    /** Add newKey even though an earlier entry of the audit log had it (it was removed). */
-    allowReAdd?: boolean;
-  }
+  args: AddDeviceKeyArgs,
+  guard?: (log: readonly AuditEntry[]) => void
 ): Promise<{ cid: string; fragment: string }> {
   const { newKey, fragment } = args;
   const has = (vms: Readonly<Record<string, string>>) => Object.entries(vms).find(([, key]) => key === newKey.didKey);
   return change(cfg, args, {
+    ...(guard ? { guard } : {}),
     done: (head, prevCid, log) => {
       const existing = has(head.verificationMethods);
       if (existing) return { fragment: existing[0] };
