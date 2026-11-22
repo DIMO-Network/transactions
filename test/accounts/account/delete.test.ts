@@ -24,6 +24,7 @@ import {
   DirectoryRejectedError,
   HeadMovedError,
   NetworkError,
+  SoleOrgAdminError,
   TurnkeyError,
   UsageError,
 } from "../../../src/accounts/errors.js";
@@ -664,5 +665,88 @@ describe("a PendingDeletion is a bearer credential (R6-F4)", () => {
     expect(e.pending).toBe(pending);
     expect(Object.keys(e)).not.toContain("pending");
     expect(JSON.stringify(e)).not.toContain("SECRET");
+  });
+});
+
+// Contract 3 (R8-F8): accounts refuses DELETE /me with 409 sole_org_admin while the caller is
+// the only OrgAdmin of an org, with the org DIDs in a body field `orgs` or, failing that, in
+// the message. Nothing is deleted: the signed tombstone is dropped, Turnkey and the DID untouched.
+describe("DELETE /me 409 sole_org_admin is SoleOrgAdminError (contract 3)", () => {
+  const ORG1 = "did:dimo:" + "a".repeat(24);
+  const ORG2 = "did:dimo:" + "b2".repeat(12);
+  const refuse = (body: unknown) => async () => json(body, 409);
+
+  it.each([
+    ["orgs in the error object", { error: { code: "sole_org_admin", message: "only admin", orgs: [ORG1, ORG2] } }],
+    ["orgs beside the error object", { error: { code: "sole_org_admin", message: "only admin" }, orgs: [ORG1, ORG2] }],
+    [
+      "orgs only in the message",
+      {
+        error: {
+          code: "sole_org_admin",
+          message: `the account is the only admin of ${ORG1}, ${ORG2}; add another admin first`,
+        },
+      },
+    ],
+  ])("%s: typed error with the org DIDs, nothing destroyed", async (_n, body) => {
+    const s = await setup({ accounts: refuse(body) });
+    const e = await deleteAccount(...s.args()).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(SoleOrgAdminError);
+    expect(e).toBeInstanceOf(AccountsError);
+    expect(e).not.toBeInstanceOf(DeleteIncompleteError);
+    expect(e).toMatchObject({ name: "SoleOrgAdminError", code: "sole_org_admin", status: 409 });
+    expect((e as SoleOrgAdminError).orgs).toEqual([ORG1, ORG2]);
+    expect((e as Error).message).toMatch(/^sole_org_admin: /);
+    expect(s.deleteSubOrganization).not.toHaveBeenCalled();
+    expect(s.dir.submitted).toHaveLength(0);
+    expect(s.tombstoned()).toBe(false);
+  });
+
+  it("the body field wins over the message, and keeps only well-formed DIDs, once each", async () => {
+    const body = {
+      error: { code: "sole_org_admin", message: `only admin of ${ORG2}`, orgs: [ORG1, 7, "did:dimo:short", ORG1] },
+    };
+    const s = await setup({ accounts: refuse(body) });
+    const e = (await deleteAccount(...s.args()).catch((x: unknown) => x)) as SoleOrgAdminError;
+    expect(e.orgs).toEqual([ORG1]);
+  });
+
+  it("the message is read for exact DIDs only (no prefix of a longer string)", async () => {
+    const body = { error: { code: "sole_org_admin", message: `orgs: ${ORG1}a, ${ORG2}.` } };
+    const s = await setup({ accounts: refuse(body) });
+    const e = (await deleteAccount(...s.args()).catch((x: unknown) => x)) as SoleOrgAdminError;
+    expect(e.orgs).toEqual([ORG2]);
+  });
+
+  it("no DIDs anywhere: still SoleOrgAdminError, with orgs []", async () => {
+    const s = await setup({ accounts: refuse({ error: { code: "sole_org_admin", message: "only admin" } }) });
+    const e = (await deleteAccount(...s.args()).catch((x: unknown) => x)) as SoleOrgAdminError;
+    expect(e).toBeInstanceOf(SoleOrgAdminError);
+    expect(e.orgs).toEqual([]);
+  });
+
+  it("another 409 stays a plain AccountsError", async () => {
+    const s = await setup({ accounts: refuse({ error: { code: "conflict", message: "busy" }, orgs: [ORG1] }) });
+    const e = await deleteAccount(...s.args()).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(AccountsError);
+    expect(e).not.toBeInstanceOf(SoleOrgAdminError);
+    expect(e).toMatchObject({ code: "conflict", status: 409 });
+  });
+
+  it("resumeDelete from stepsDone [] surfaces it too, before anything is destroyed", async () => {
+    const s = await setup({
+      accounts: async () => {
+        throw new TypeError("offline");
+      },
+    });
+    const pending = ((await deleteAccount(...s.args()).catch((e: unknown) => e)) as DeleteIncompleteError).pending;
+    s.accounts.mockImplementation(refuse({ error: { code: "sole_org_admin", message: "x", orgs: [ORG1] } }));
+    const e = await resumeDelete(s.cfg, pending, { turnkeyWithUserStamper: s.turnkey, session: s.session }).catch(
+      (x: unknown) => x
+    );
+    expect(e).toBeInstanceOf(SoleOrgAdminError);
+    expect((e as SoleOrgAdminError).orgs).toEqual([ORG1]);
+    expect(s.deleteSubOrganization).not.toHaveBeenCalled();
+    expect(s.dir.submitted).toHaveLength(0);
   });
 });

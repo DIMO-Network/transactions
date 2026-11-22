@@ -19,10 +19,12 @@ import {
   HeadMovedError,
   NetworkError,
   PolicyError,
+  SoleOrgAdminError,
   TurnkeyError,
   UsageError,
 } from "../errors.js";
 import type { Signer } from "../signers/types.js";
+import { isObject } from "./response.js";
 
 export type DeleteStep = "accounts" | "turnkey" | "tombstone";
 
@@ -145,11 +147,41 @@ async function deleteSubOrg(
   });
 }
 
+const DID_RE = /^did:dimo:[a-z2-7]{24}$/;
+const DIDS_IN_TEXT = /did:dimo:[a-z2-7]{24}(?![A-Za-z0-9])/g;
+
+/**
+ * The org DIDs of a 409 `sole_org_admin` body: its `orgs` array (in the error object, else
+ * beside it), keeping only well-formed DIDs; without one, the DIDs the message names.
+ */
+function soleAdminOrgs(body: unknown, message: string): string[] {
+  const b = isObject(body) ? body : {};
+  const e = isObject(b.error) ? b.error : {};
+  const field = Array.isArray(e.orgs) ? e.orgs : Array.isArray(b.orgs) ? b.orgs : undefined;
+  const dids = field
+    ? field.filter((d): d is string => typeof d === "string" && DID_RE.test(d))
+    : (message.match(DIDS_IN_TEXT) ?? []);
+  return [...new Set(dids)];
+}
+
+/** SoleOrgAdminError from DELETE /me's 409 `sole_org_admin` (`err` was read from a clone of `res`). */
+async function soleOrgAdmin(res: Response, err: AccountsError): Promise<SoleOrgAdminError> {
+  let body: unknown;
+  try {
+    body = JSON.parse(await res.text());
+  } catch {
+    body = undefined;
+  }
+  const message = err.message.replace(/^sole_org_admin: /, "");
+  return new SoleOrgAdminError(err.status, message, soleAdminOrgs(body, message), err.retryAfterSeconds);
+}
+
 /**
  * Step 2: DELETE /api/v2/me. 2xx, and a 404 carrying accounts' `{error:{code:"not_found"}}`
  * envelope (nothing left for this DID), count as done. Any other 404, a network error
  * or a 5xx leaves the outcome unknown: DeleteIncompleteError with the step not done.
- * Any other status is an AccountsError and nothing is resumable.
+ * A 409 `sole_org_admin` is SoleOrgAdminError. Any other status is an AccountsError, and
+ * in both cases nothing is resumable.
  */
 async function forgetAccount(cfg: SdkConfig, session: Session, pending: PendingDeletion): Promise<PendingDeletion> {
   let res: Response;
@@ -160,7 +192,8 @@ async function forgetAccount(cfg: SdkConfig, session: Session, pending: PendingD
     throw err;
   }
   if (!res.ok) {
-    const err = await AccountsError.fromResponse(res);
+    const err = await AccountsError.fromResponse(res.clone());
+    if (res.status === 409 && err.code === "sole_org_admin") throw await soleOrgAdmin(res, err);
     // Only accounts' own envelope means "nothing left for this DID". A framework 404 or a
     // wrong accountsUrl proves nothing: the account may still hold the email.
     if (res.status === 404) {
@@ -345,7 +378,9 @@ async function finish(
  * Returns the completed PendingDeletion. A failure after signing throws
  * DeleteIncompleteError (or DeleteHeadMovedError) carrying a PendingDeletion for
  * resumeDelete. A DELETE /me that fails with a 4xx other than 404 throws AccountsError:
- * nothing happened, so start over.
+ * nothing happened, so start over. While the account is the only admin of an org, that is
+ * SoleOrgAdminError (409 `sole_org_admin`, `orgs` lists the org DIDs): give each org
+ * another admin first.
  */
 export async function deleteAccount(cfg: SdkConfig, opts: DeleteAccountOptions): Promise<PendingDeletion> {
   const { session, wallet } = opts;
@@ -391,7 +426,8 @@ export async function deleteAccount(cfg: SdkConfig, opts: DeleteAccountOptions):
  * makes accounts forget nothing, and otherwise before the Turnkey delete.
  * Calls accounts only when stepsDone lacks "accounts", and then needs `opts.session`
  * (for pending.did, scope `approve`); without one it throws UsageError
- * `session_required`, and calling deleteAccount again also works.
+ * `session_required`, and calling deleteAccount again also works. DELETE /me's 409
+ * `sole_org_admin` is SoleOrgAdminError, as in deleteAccount; `pending` is unchanged.
  */
 export async function resumeDelete(
   cfg: SdkConfig,

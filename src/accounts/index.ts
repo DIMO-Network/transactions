@@ -79,6 +79,7 @@ export {
   type SdkService,
   SignerError,
   SigninError,
+  SoleOrgAdminError,
   SponsorshipError,
   TurnkeyError,
   type TurnkeyErrorCode,
