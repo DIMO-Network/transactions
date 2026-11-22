@@ -122,6 +122,12 @@ export function computeCid(op: Operation | UnsignedOperation): string {
   return base58.encode(multihash);
 }
 
+/** The form deriveDid returns, unanchored: "did:dimo:" and 24 lowercase base32 characters. */
+export const DID_SOURCE = "did:dimo:[a-z2-7]{24}";
+
+/** A string that is exactly a DID of the form deriveDid returns. */
+export const DID_RE = new RegExp(`^${DID_SOURCE}$`);
+
 /** did:dimo: + first 24 chars of lowercase base32 of SHA-256(DAG-CBOR(genesis)). */
 export function deriveDid(genesis: UnsignedOperation): string {
   return (

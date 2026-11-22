@@ -4,6 +4,7 @@ import { authedFetch } from "../auth/fetch.js";
 import { requireScopes } from "../auth/scopes.js";
 import type { Session } from "../auth/signin.js";
 import { normalizeUrl, type SdkConfig } from "../config.js";
+import { DID_RE, DID_SOURCE } from "../core/encoding.js";
 import {
   buildTombstone,
   computeCid,
@@ -147,21 +148,28 @@ async function deleteSubOrg(
   });
 }
 
-const DID_RE = /^did:dimo:[a-z2-7]{24}$/;
-const DIDS_IN_TEXT = /did:dimo:[a-z2-7]{24}(?![A-Za-z0-9])/g;
+/** Every DID a text names, whole (not the start of a longer token). */
+const DIDS_IN_TEXT = new RegExp(`${DID_SOURCE}(?![A-Za-z0-9])`, "g");
+
+/** The well-formed DIDs of an `orgs` value: strings and `{ did }` objects; anything else is skipped. */
+function didsOf(orgs: unknown): string[] {
+  if (!Array.isArray(orgs)) return [];
+  return orgs
+    .map((o: unknown) => (isObject(o) ? o.did : o))
+    .filter((d): d is string => typeof d === "string" && DID_RE.test(d));
+}
 
 /**
- * The org DIDs of a 409 `sole_org_admin` body: its `orgs` array (in the error object, else
- * beside it), keeping only well-formed DIDs; without one, the DIDs the message names.
+ * The org DIDs of a 409 `sole_org_admin` body, from the first of these that yields any:
+ * the error object's `orgs`, the body's own `orgs`, the DIDs the message names. An `orgs`
+ * entry is a DID string or an object with a `did`.
  */
 function soleAdminOrgs(body: unknown, message: string): string[] {
   const b = isObject(body) ? body : {};
   const e = isObject(b.error) ? b.error : {};
-  const field = Array.isArray(e.orgs) ? e.orgs : Array.isArray(b.orgs) ? b.orgs : undefined;
-  const dids = field
-    ? field.filter((d): d is string => typeof d === "string" && DID_RE.test(d))
-    : (message.match(DIDS_IN_TEXT) ?? []);
-  return [...new Set(dids)];
+  const fromError = didsOf(e.orgs);
+  const dids = fromError.length ? fromError : didsOf(b.orgs);
+  return [...new Set(dids.length ? dids : (message.match(DIDS_IN_TEXT) ?? []))];
 }
 
 /** SoleOrgAdminError from DELETE /me's 409 `sole_org_admin` (`err` was read from a clone of `res`). */

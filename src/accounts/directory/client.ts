@@ -1,4 +1,5 @@
 import { normalizeUrl, send, unboundFetch } from "../config.js";
+import { DID_RE } from "../core/encoding.js";
 import { computeCid, type Operation } from "../core/index.js";
 import {
   DeactivatedError,
@@ -35,8 +36,6 @@ export type DidDocument = {
 
 /** A verified head: the last audit entry's cid and operation. */
 export type Head = { cid: string; op: Operation };
-
-const DID_RE = /^did:dimo:[a-z2-7]{24}$/;
 
 async function readBody(res: Response): Promise<{ message: string; body: unknown }> {
   const fallback = `directory returned HTTP ${res.status}`;

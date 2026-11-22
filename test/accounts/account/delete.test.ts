@@ -718,6 +718,49 @@ describe("DELETE /me 409 sole_org_admin is SoleOrgAdminError (contract 3)", () =
     expect(e.orgs).toEqual([ORG2]);
   });
 
+  // Fix round 1: every shape accounts might send for `orgs`.
+  it.each([
+    [
+      "{ did } objects in the error object",
+      { error: { code: "sole_org_admin", message: "m", orgs: [{ did: ORG1, name: "Acme" }, { did: ORG2 }] } },
+    ],
+    [
+      "{ did } objects beside the error object",
+      { error: { code: "sole_org_admin", message: "m" }, orgs: [{ did: ORG1 }, { did: ORG2 }] },
+    ],
+    [
+      "strings and { did } objects mixed",
+      { error: { code: "sole_org_admin", message: "m", orgs: [ORG1, { did: ORG2 }] } },
+    ],
+    [
+      "an empty error.orgs, DIDs beside it",
+      { error: { code: "sole_org_admin", message: "m", orgs: [] }, orgs: [ORG1, ORG2] },
+    ],
+    [
+      "an orgs field with no usable DID, DIDs in the message",
+      {
+        error: {
+          code: "sole_org_admin",
+          message: `only admin of ${ORG1} and ${ORG2}`,
+          orgs: ["x", 7, { did: "did:dimo:short" }, { name: "Acme" }, null],
+        },
+      },
+    ],
+    [
+      "an empty orgs field, DIDs in the message",
+      { error: { code: "sole_org_admin", message: `only admin of ${ORG1}, ${ORG2}`, orgs: [] } },
+    ],
+    [
+      "orgs not an array, DIDs in the message",
+      { error: { code: "sole_org_admin", message: `only admin of ${ORG1}, ${ORG2}`, orgs: "x" } },
+    ],
+  ])("%s: orgs are both org DIDs", async (_n, body) => {
+    const s = await setup({ accounts: refuse(body) });
+    const e = (await deleteAccount(...s.args()).catch((x: unknown) => x)) as SoleOrgAdminError;
+    expect(e).toBeInstanceOf(SoleOrgAdminError);
+    expect(e.orgs).toEqual([ORG1, ORG2]);
+  });
+
   it("no DIDs anywhere: still SoleOrgAdminError, with orgs []", async () => {
     const s = await setup({ accounts: refuse({ error: { code: "sole_org_admin", message: "only admin" } }) });
     const e = (await deleteAccount(...s.args()).catch((x: unknown) => x)) as SoleOrgAdminError;

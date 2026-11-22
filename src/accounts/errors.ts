@@ -295,9 +295,10 @@ export class RemovePhoneFirstError extends AccountsError {
  * the only admin of one or more orgs, and deleting it would leave them with no admin, so
  * accounts kept it. deleteAccount stops there and drops the tombstone it signed (resumeDelete
  * leaves the caller's `pending` as it was); neither touches the Turnkey sub-org or the DID.
- * `orgs` holds those orgs' DIDs, from the body's `orgs` field (in the error object or beside
- * it) or, without one, the `did:dimo:` DIDs the message names; it can be empty. Give each
- * listed org another admin, then call deleteAccount again.
+ * `orgs` holds those orgs' DIDs, from the body's `orgs` field (DID strings or `{ did }`
+ * objects, in the error object or beside it) or, when that yields none, the `did:dimo:` DIDs
+ * the message names; it can be empty. Give each listed org another admin, then call
+ * deleteAccount again.
  */
 export class SoleOrgAdminError extends AccountsError {
   declare readonly code: "sole_org_admin";
