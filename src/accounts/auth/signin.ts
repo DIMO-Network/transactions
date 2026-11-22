@@ -1,5 +1,5 @@
 import { normalizeUrl, type SdkConfig, send, unboundFetch } from "../config.js";
-import { KeyNotAllowedError, parseRetryAfter, SigninError, UsageError } from "../errors.js";
+import { ClockSkewError, KeyNotAllowedError, parseRetryAfter, SigninError, UsageError } from "../errors.js";
 import type { Signer } from "../signers/types.js";
 import { createDpopProof, type DpopKey, jwkThumbprint, publicJwk } from "./dpop.js";
 
@@ -18,10 +18,11 @@ export interface Session {
   scopes: string[];
   /**
    * dauth's clock minus the device's, in ms, measured at sign-in from the challenge's
-   * `Issued At` (whole seconds). Set only when the device was at least 5 s off. Every DPoP
-   * proof made for this session (authedFetch) adds it to the device clock, so a phone whose
-   * clock is minutes off still lands inside the verifiers' iat window (accounts accepts
-   * 300 s back and 60 s ahead). Persist it with the token.
+   * `Issued At` (whole seconds). Set only when the device was at least 5 s off; more than
+   * 24 h off is ClockSkewError instead. Every DPoP proof made for this session
+   * (authedFetch) adds it to the device clock, so a phone whose clock is minutes off still
+   * lands inside the verifiers' iat window (accounts accepts 300 s back and 60 s ahead).
+   * Persist it with the token.
    */
   clockOffsetMs?: number;
 }
@@ -96,18 +97,25 @@ const SCOPE_ORDER = ["read", "write", "approve"];
 
 /** Below this, a measured offset is the challenge time's whole-second rounding and latency. */
 const CLOCK_SKEW_TOLERANCE_MS = 5000;
+/** Above this, the clocks are too far apart to correct: ClockSkewError. */
+const MAX_CLOCK_SKEW_MS = 24 * 60 * 60 * 1000;
+/** RFC 3339 date-time with an explicit zone, as Go's time.RFC3339 writes it (fractions allowed). */
+const RFC3339 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 
 /**
  * dauth's clock minus the device's, from the challenge's `Issued At` line (dauth writes
- * RFC 3339, whole seconds), or undefined when it is unreadable or within tolerance. The
- * challenge is read rather than the Date header: browsers hide Date from cross-origin
- * callers unless dauth exposes it, and dauth exposes only Retry-After.
+ * RFC 3339, whole seconds), or undefined when it is not strict RFC 3339 or is within
+ * tolerance. Throws ClockSkewError above 24 h. The challenge is read rather than the Date
+ * header: browsers hide Date from cross-origin callers unless dauth exposes it, and dauth
+ * exposes only Retry-After.
  */
 function clockOffset(challenge: string, receivedAt: number): number | undefined {
-  const issued = /\nIssued At: ([^\n]+)/.exec(challenge)?.[1];
-  const at = issued === undefined ? NaN : Date.parse(issued);
+  const issued = /\nIssued At: ([^\n]*)/.exec(challenge)?.[1];
+  if (issued === undefined || !RFC3339.test(issued)) return undefined;
+  const at = Date.parse(issued);
   if (!Number.isFinite(at)) return undefined;
   const offset = at - receivedAt;
+  if (Math.abs(offset) > MAX_CLOCK_SKEW_MS) throw new ClockSkewError(offset);
   return Math.abs(offset) >= CLOCK_SKEW_TOLERANCE_MS ? offset : undefined;
 }
 
@@ -147,7 +155,8 @@ function validateChallenge(
  * (a person signs in with `#wallet`, an org with `#signing`); otherwise dauth answers 403
  * `key_not_allowed` and signIn throws KeyNotAllowedError. Other dauth refusals are
  * SigninError. A device clock that is off by 5 s or more is measured against the
- * challenge's `Issued At` and corrected in every DPoP proof (Session.clockOffsetMs).
+ * challenge's `Issued At` (strict RFC 3339 only) and corrected in every DPoP proof
+ * (Session.clockOffsetMs); more than 24 h off is ClockSkewError, before anything is signed.
  */
 export async function signIn(cfg: SdkConfig, args: SignInOptions): Promise<Session> {
   if (args.scope.length === 0) {

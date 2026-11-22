@@ -5,6 +5,7 @@ export { normalizeUrl, type SdkConfig } from "../config.js";
 export {
   AccountSdkError,
   AccountsError,
+  ClockSkewError,
   KeyNotAllowedError,
   NetworkError,
   type SdkService,

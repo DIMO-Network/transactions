@@ -55,6 +55,7 @@ export { verifyAuditLog } from "./directory/verify.js";
 export {
   AccountSdkError,
   AccountsError,
+  ClockSkewError,
   DeactivatedError,
   DidExistsError,
   DidNotFoundError,

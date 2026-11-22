@@ -4,7 +4,14 @@ import { generateDpopKey } from "../../../src/accounts/auth/dpop.js";
 import { authedFetch } from "../../../src/accounts/auth/fetch.js";
 import { signIn } from "../../../src/accounts/auth/signin.js";
 import { verifyOpSignature } from "../../../src/accounts/core/index.js";
-import { KeyNotAllowedError, NetworkError, SigninError, UsageError } from "../../../src/accounts/errors.js";
+import {
+  AccountSdkError,
+  ClockSkewError,
+  KeyNotAllowedError,
+  NetworkError,
+  SigninError,
+  UsageError,
+} from "../../../src/accounts/errors.js";
 import { WebCryptoP256Signer } from "../../../src/accounts/signers/webcrypto.js";
 import { cfgFor, fakeDauth, type Handler, json, router } from "../helpers.js";
 
@@ -530,5 +537,68 @@ describe("DPoP iat follows dauth's clock, not the device's (R6-F6)", () => {
     const f = router({ "https://dauth.test": fakeDauth() });
     const session = await run(f);
     expect(session.clockOffsetMs).toBeUndefined();
+  });
+});
+
+describe("Issued At is parsed strictly, and a skew above 24 h is refused (R6-F6, fix round 1)", () => {
+  const dauthWith = (issuedAt: string) => {
+    const tokens: string[] = [];
+    const handler: Handler = async (url, init) => {
+      if (url.endsWith("/signin/token")) tokens.push(new Headers(init.headers).get("DPoP")!);
+      const res = await fakeDauth()(url, init);
+      if (!url.endsWith("/signin/challenge")) return res;
+      const body = await res.json();
+      body.challenge = body.challenge.replace("Issued At: a", `Issued At: ${issuedAt}`);
+      return json(body);
+    };
+    return { f: router({ "https://dauth.test": handler }), tokens };
+  };
+  const signInWith = async (f: unknown, signer?: WebCryptoP256Signer) =>
+    signIn(cfgFor({ fetchImpl: f as unknown as typeof fetch }), {
+      did: "did:dimo:x",
+      signer: signer ?? (await WebCryptoP256Signer.generate()),
+      fragment: "wallet",
+      scope: ["read"],
+      dpopKey: await generateDpopKey(),
+    });
+  const rfc3339 = (ms: number) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z");
+
+  it.each([
+    ["an RFC 2822 date", (ms: number) => new Date(ms).toUTCString()],
+    ["no time zone", (ms: number) => rfc3339(ms).replace("Z", "")],
+    ["a space instead of T", (ms: number) => rfc3339(ms).replace("T", " ")],
+    ["trailing text", (ms: number) => `${rfc3339(ms)} UTC`],
+  ])("%s is not read as dauth's clock", async (_n, format) => {
+    const { f, tokens } = dauthWith(format(Date.now() + 120_000));
+    const session = await signInWith(f);
+    expect(session.clockOffsetMs).toBeUndefined();
+    expect(Math.abs(claims(tokens[0]!).iat - Date.now() / 1000)).toBeLessThan(2);
+  });
+
+  it("accepts fractional seconds and a numeric offset", async () => {
+    const at = new Date(Date.now() + 120_000);
+    const plusOne = new Date(at.getTime() + 3_600_000).toISOString().replace("Z", "+01:00");
+    const { f } = dauthWith(plusOne);
+    const session = await signInWith(f);
+    expect(Math.abs(session.clockOffsetMs! - 120_000)).toBeLessThan(2000);
+  });
+
+  it("an offset above 24 h is ClockSkewError, before signing, and is not applied", async () => {
+    const signer = await WebCryptoP256Signer.generate();
+    const sign = vi.spyOn(signer, "sign");
+    const { f, tokens } = dauthWith(rfc3339(Date.now() + 2 * 86_400_000));
+    const err = await signInWith(f, signer).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ClockSkewError);
+    expect(err).toBeInstanceOf(AccountSdkError);
+    expect(err).toMatchObject({ name: "ClockSkewError", code: "clock_skew" });
+    expect(Math.abs((err as ClockSkewError).offsetMs - 2 * 86_400_000)).toBeLessThan(2000);
+    expect(sign).not.toHaveBeenCalled();
+    expect(tokens).toHaveLength(0);
+  });
+
+  it("24 h or less is still applied", async () => {
+    const { f } = dauthWith(rfc3339(Date.now() - 23 * 3_600_000));
+    const session = await signInWith(f);
+    expect(Math.abs(session.clockOffsetMs! + 23 * 3_600_000)).toBeLessThan(2000);
   });
 });

@@ -180,6 +180,25 @@ export class KeyNotAllowedError extends SigninError {
   }
 }
 
+/**
+ * The device clock and dauth's (the challenge's `Issued At`) differ by more than 24 hours.
+ * signIn refuses before signing rather than stamp every DPoP proof with a clock that far
+ * off: fix the device clock and sign in again. `offsetMs` is dauth's clock minus the
+ * device's, as measured.
+ */
+export class ClockSkewError extends AccountSdkError {
+  declare readonly code: "clock_skew";
+  readonly offsetMs: number;
+  constructor(offsetMs: number) {
+    super(
+      "clock_skew",
+      `the device clock and dauth's differ by ${Math.round(Math.abs(offsetMs) / 1000)} s (more than 24 h); fix the device clock and sign in again`
+    );
+    this.name = "ClockSkewError";
+    this.offsetMs = offsetMs;
+  }
+}
+
 /** Retry-After as whole seconds. An HTTP-date, a negative or any other value is ignored (undefined). */
 export function parseRetryAfter(header: string | null | undefined): number | undefined {
   const h = header?.trim();

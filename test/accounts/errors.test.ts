@@ -24,6 +24,7 @@ describe("error hierarchy", () => {
       [
         "AccountSdkError",
         "AccountsError",
+        "ClockSkewError",
         "DeactivatedError",
         "DeleteHeadMovedError",
         "DeleteIncompleteError",
@@ -78,6 +79,7 @@ describe("error hierarchy", () => {
       [new sdk.UsageError("scope_missing", "x"), "UsageError", "scope_missing"],
       [new sdk.TurnkeyError("no_signature", "x"), "TurnkeyError", "no_signature"],
       [new sdk.SignerError("x"), "SignerError", "signer_failed"],
+      [new sdk.ClockSkewError(2 * 86_400_000), "ClockSkewError", "clock_skew"],
       [
         new sdk.UnexpectedDidStateError("d", { unexpectedKeys: {}, rotationKeys: [], operations: 2 }),
         "UnexpectedDidStateError",

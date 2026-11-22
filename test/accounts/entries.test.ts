@@ -41,6 +41,7 @@ describe.each([
     [
       "AccountSdkError",
       "AccountsError",
+      "ClockSkewError",
       "KeyNotAllowedError",
       "NetworkError",
       "SigninError",
