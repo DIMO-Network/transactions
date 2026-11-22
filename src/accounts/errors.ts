@@ -293,11 +293,11 @@ export class RemovePhoneFirstError extends AccountsError {
 /**
  * DELETE /api/v2/me answered 409 `sole_org_admin` (cross-repo contract 3): the account is
  * the only admin of one or more orgs, and deleting it would leave them with no admin, so
- * accounts kept it. deleteAccount (or resumeDelete) stops there: the tombstone it signed is
- * dropped, and neither the Turnkey sub-org nor the DID is touched. `orgs` holds those orgs'
- * DIDs, from the body's `orgs` field (in the error object or beside it) or, without one, the
- * `did:dimo:` DIDs the message names; it can be empty. Give each listed org another admin,
- * then call deleteAccount again.
+ * accounts kept it. deleteAccount stops there and drops the tombstone it signed (resumeDelete
+ * leaves the caller's `pending` as it was); neither touches the Turnkey sub-org or the DID.
+ * `orgs` holds those orgs' DIDs, from the body's `orgs` field (in the error object or beside
+ * it) or, without one, the `did:dimo:` DIDs the message names; it can be empty. Give each
+ * listed org another admin, then call deleteAccount again.
  */
 export class SoleOrgAdminError extends AccountsError {
   declare readonly code: "sole_org_admin";
