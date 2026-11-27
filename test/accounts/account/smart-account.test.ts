@@ -22,7 +22,11 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { describe, expect, it, vi } from "vitest";
 
-import { deploySmartAccount, sendUserOperation } from "../../../src/accounts/account/smart-account.js";
+import {
+  deploySmartAccount,
+  sendUserOperation,
+  smartAccountAddress,
+} from "../../../src/accounts/account/smart-account.js";
 import { generateDpopKey } from "../../../src/accounts/auth/dpop.js";
 import type { Session } from "../../../src/accounts/auth/signin.js";
 import type { SdkConfig } from "../../../src/accounts/config.js";
@@ -598,6 +602,19 @@ describe("smart account through the gas proxy", () => {
       "zd_getUserOperationGasPrice",
       "zd_sponsorUserOperation",
     ]);
+  });
+
+  it("smartAccountAddress is the address deploySmartAccount reports, with no UserOp sent", async () => {
+    const { cfg, calls } = harness();
+    const { account } = spySigner();
+    const address = await smartAccountAddress(cfg, { walletViemAccount: account, chainId: CHAIN_ID });
+    expect(calls.filter(isProxy)).toHaveLength(0);
+    const r = await deploySmartAccount(cfg, {
+      session: await session(),
+      walletViemAccount: account,
+      chainId: CHAIN_ID,
+    });
+    expect(address).toBe(r.address);
   });
 
   it("deploySmartAccount skips the UserOp when code already exists", async () => {

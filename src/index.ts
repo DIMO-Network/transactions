@@ -25,6 +25,12 @@ export {
 } from "./core/actions/mintVehicleWithDeviceDefinition.js";
 export { setVehiclePermissions, setPermissionsSACD } from "./core/actions/setPermissionsSACD.js";
 export {
+  accountPermissionsCalls,
+  type PermissionCall,
+  vehiclePermissionsBulkCalls,
+  vehiclePermissionsCalls,
+} from "./core/actions/permissionCalls.js";
+export {
   setAccountPermissions,
   setAccountPermissionsCallData,
   setAccountPermissionsBatch,

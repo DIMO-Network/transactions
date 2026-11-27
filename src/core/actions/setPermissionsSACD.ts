@@ -11,26 +11,14 @@ import {
   SetVehiclePermissionsBulk,
 } from ":core/types/args.js";
 import { getPermissionsValue } from ":core/utils/utils.js";
+import { vehiclePermissionsBulkCalls, vehiclePermissionsCalls } from "./permissionCalls.js";
 
 export async function setVehiclePermissions(
   args: SetVehiclePermissions,
   client: KernelAccountClient,
   environment: string = "prod"
 ): Promise<`0x${string}`> {
-  const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
-  return await setPermissionsSACD(
-    {
-      asset: contracts[ContractType.DIMO_VEHICLE_ID].address,
-      tokenId: args.tokenId,
-      grantee: args.grantee,
-      permissions: args.permissions,
-      expiration: args.expiration,
-      templateId: args.templateId,
-      source: args.source,
-    },
-    client,
-    contracts
-  );
+  return await client.account!.encodeCalls(vehiclePermissionsCalls(args, environment));
 }
 
 export async function setVehiclePermissionsBulk(
@@ -38,31 +26,7 @@ export async function setVehiclePermissionsBulk(
   client: KernelAccountClient,
   environment: string = "prod"
 ): Promise<`0x${string}`> {
-  const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
-  const permissionValue = getPermissionsValue(arg.permissions);
-  const templateId = arg.templateId ?? BigInt(0);
-
-  const callData = arg.tokenIds.map((tokenId) => {
-    return {
-      to: contracts[ContractType.DIMO_SACD].address,
-      value: BigInt(0),
-      data: encodeFunctionData({
-        abi: contracts[ContractType.DIMO_SACD].abi,
-        functionName: SET_PERMISSIONS_SACD,
-        args: [
-          contracts[ContractType.DIMO_VEHICLE_ID].address,
-          tokenId,
-          arg.grantee,
-          permissionValue,
-          arg.expiration,
-          templateId,
-          arg.source,
-        ],
-      }),
-    };
-  });
-
-  return await client.account!.encodeCalls(callData);
+  return await client.account!.encodeCalls(vehiclePermissionsBulkCalls(arg, environment));
 }
 
 export async function setVehiclePermissionsBatch(
@@ -70,31 +34,7 @@ export async function setVehiclePermissionsBatch(
   client: KernelAccountClient,
   environment: string = "prod"
 ): Promise<`0x${string}`> {
-  const contracts = CHAIN_ABI_MAPPING[ENV_MAPPING.get(environment) ?? ENVIRONMENT.PROD].contracts;
-  const callData = args.map((arg) => {
-    const permissionValue = getPermissionsValue(arg.permissions);
-    const templateId = arg.templateId ?? BigInt(0);
-
-    return {
-      to: contracts[ContractType.DIMO_SACD].address,
-      value: BigInt(0),
-      data: encodeFunctionData({
-        abi: contracts[ContractType.DIMO_SACD].abi,
-        functionName: SET_PERMISSIONS_SACD,
-        args: [
-          contracts[ContractType.DIMO_VEHICLE_ID].address,
-          arg.tokenId,
-          arg.grantee,
-          permissionValue,
-          arg.expiration,
-          templateId,
-          arg.source,
-        ],
-      }),
-    };
-  });
-
-  return await client.account!.encodeCalls(callData);
+  return await client.account!.encodeCalls(vehiclePermissionsCalls(args, environment));
 }
 
 export async function setPermissionsSACD(

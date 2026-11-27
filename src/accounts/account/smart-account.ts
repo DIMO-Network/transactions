@@ -42,6 +42,7 @@ import {
   UserOperationRevertedError,
   UserOperationUnknownError,
 } from "../errors.js";
+import { confirmUserOperation } from "./receipt.js";
 
 export type GasProvider = "alchemy" | "gelato" | "pimlico";
 
@@ -301,14 +302,14 @@ function findFatal(e: unknown, provider: GasProvider): Error | undefined {
 type ProxyClients = ReturnType<typeof buildClients>;
 type ProxyClient = ProxyClients["client"];
 
-async function withProviders<T>(
+async function withProviders<T, Early extends string = never>(
   cfg: SdkConfig,
   opts: SmartAccountOptions,
   kernel: Kernel,
   run: (clients: ProxyClients, provider: GasProvider) => Promise<T>,
   /** Runs before each attempt; a defined result short-circuits (e.g. already deployed). */
-  precheck?: () => Promise<{ result: T; provider: string } | undefined>
-): Promise<{ result: T; provider: string }> {
+  precheck?: () => Promise<{ result: T; provider: Early } | undefined>
+): Promise<{ result: T; provider: GasProvider | Early }> {
   const providers = opts.providers?.length ? opts.providers : DEFAULT_PROVIDERS;
   const errors: unknown[] = [];
   for (const provider of providers) {
@@ -432,6 +433,23 @@ async function submitUserOperation(
 }
 
 /**
+ * The address of the plain kernel the wallet's UserOps are sent from (the one
+ * deploySmartAccount deploys and sendUserOperation sends from), deployed or not.
+ * Reads the configured RPC only; nothing is sent or signed.
+ */
+export async function smartAccountAddress(
+  cfg: SdkConfig,
+  opts: { walletViemAccount: LocalAccount; chainId: number }
+): Promise<Hex> {
+  const { publicClient } = publicClientFor(cfg, opts.chainId);
+  const served = await publicClient.getChainId();
+  if (served !== opts.chainId) {
+    throw new UsageError("chain_mismatch", `cfg.rpcUrls[${opts.chainId}] serves chain ${served}`);
+  }
+  return (await plainKernelAccount(publicClient, opts.walletViemAccount)).address;
+}
+
+/**
  * Deploy the plain kernel for the wallet by sending a no-op UserOp, and wait for it
  * to be included. Returns without sending anything when the account already has code
  * (checked before every provider attempt). Sends the way sendUserOperation does, so a
@@ -448,7 +466,7 @@ export async function deploySmartAccount(
   // Runs before every attempt, the first included: existing code means nothing is sent.
   const deployed = async () => {
     const c = await publicClient.getCode({ address: account.address });
-    return c && c !== "0x" ? { result: account.address, provider: "none" } : undefined;
+    return c && c !== "0x" ? { result: account.address, provider: "none" as const } : undefined;
   };
   const { result, provider } = await withProviders(
     cfg,
@@ -464,19 +482,7 @@ export async function deploySmartAccount(
         [{ to: zeroAddress, value: 0n, data: "0x" }],
         kernel.nonce
       );
-      let receipt: Awaited<ReturnType<typeof client.waitForUserOperationReceipt>>;
-      try {
-        receipt = await client.waitForUserOperationReceipt({
-          hash,
-          timeout: opts.receiptTimeoutMs ?? 120_000,
-          pollingInterval: 1_000,
-        });
-      } catch (e) {
-        throw new UserOperationPendingError(hash, provider, e);
-      }
-      if (!receipt.success) {
-        throw new UserOperationRevertedError(hash, provider, receipt.reason);
-      }
+      await confirmUserOperation(client, hash, provider, opts.receiptTimeoutMs ?? 120_000);
       return client.account.address;
     },
     deployed
@@ -503,7 +509,7 @@ export async function deploySmartAccount(
 export async function sendUserOperation(
   cfg: SdkConfig,
   opts: SendUserOperationOptions
-): Promise<{ userOpHash: `0x${string}`; provider: string }> {
+): Promise<{ userOpHash: Hex; provider: GasProvider }> {
   requireScopes(opts.session, ["write"], "sending a UserOperation");
   const kernel = await kernelFor(cfg, opts);
   const { result, provider } = await withProviders(cfg, opts, kernel, (clients, provider) =>

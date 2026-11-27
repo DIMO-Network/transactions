@@ -31,11 +31,13 @@ export {
 } from "./account/login.js";
 export { addPasskey, type PasskeyAttestation, type PasskeyTransport, removePasskey } from "./account/passkeys.js";
 export { removePhone } from "./account/phone.js";
+export { waitForUserOperationReceipt, type WaitForUserOperationReceiptOptions } from "./account/receipt.js";
 export {
   deploySmartAccount,
   type GasProvider,
   sendUserOperation,
   type SendUserOperationOptions,
+  smartAccountAddress,
   type SmartAccountOptions,
 } from "./account/smart-account.js";
 export {
