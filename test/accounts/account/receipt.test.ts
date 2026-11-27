@@ -51,12 +51,14 @@ const receipt = (success: boolean) => ({
 });
 
 /** A proxy answering eth_getUserOperationReceipt with `answers(n)` on the n-th request. */
-function proxy(answers: (n: number) => unknown) {
+function proxy(answers: (n: number) => unknown | Response) {
   const requests: { url: string; headers: Headers; body: { method: string; params: unknown[] } }[] = [];
   const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const body = JSON.parse(String(init?.body));
     requests.push({ url: String(input), headers: new Headers(init?.headers), body });
-    return new Response(JSON.stringify({ jsonrpc: "2.0", id: body.id, result: answers(requests.length) }), {
+    const answer = answers(requests.length);
+    if (answer instanceof Response) return answer;
+    return new Response(JSON.stringify({ jsonrpc: "2.0", id: body.id, result: answer }), {
       status: 200,
       headers: { "content-type": "application/json" },
     });
@@ -149,6 +151,90 @@ describe("waitForUserOperationReceipt", () => {
     }).catch((x: unknown) => x);
     expect(e).toBeInstanceOf(UsageError);
     expect(e).toMatchObject({ code: "scope_missing" });
+    expect(requests).toHaveLength(0);
+  });
+
+  it("keeps polling through a transient failure: 502, then no receipt, then success", async () => {
+    const { cfg, requests } = proxy((n) =>
+      n === 1 ? new Response("bad gateway", { status: 502 }) : n === 2 ? null : receipt(true)
+    );
+    const r = await waitForUserOperationReceipt(cfg, {
+      session: await session(),
+      chainId: CHAIN_ID,
+      provider: "alchemy",
+      userOpHash: HASH,
+    });
+    expect(r).toEqual({ transactionHash: TX });
+    expect(requests).toHaveLength(3);
+  });
+
+  it("ends at once as Pending, with the cause, on a 401", async () => {
+    const { cfg, requests } = proxy(() => new Response('{"error":{"code":"x"}}', { status: 401 }));
+    const e = await waitForUserOperationReceipt(cfg, {
+      session: await session(),
+      chainId: CHAIN_ID,
+      provider: "alchemy",
+      userOpHash: HASH,
+    }).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(UserOperationPendingError);
+    expect((e as Error).cause).toBeInstanceOf(Error);
+    expect(requests).toHaveLength(1);
+  });
+
+  it("ends at once as Pending on a 403", async () => {
+    const { cfg, requests } = proxy(() => new Response("{}", { status: 403 }));
+    const e = await waitForUserOperationReceipt(cfg, {
+      session: await session(),
+      chainId: CHAIN_ID,
+      provider: "alchemy",
+      userOpHash: HASH,
+    }).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(UserOperationPendingError);
+    expect(requests).toHaveLength(1);
+  });
+
+  it("throws Pending with the last error as cause when 5xx lasts past timeoutMs", async () => {
+    const { cfg, requests } = proxy(() => new Response("down", { status: 503 }));
+    const e = await waitForUserOperationReceipt(cfg, {
+      session: await session(),
+      chainId: CHAIN_ID,
+      provider: "alchemy",
+      userOpHash: HASH,
+      timeoutMs: 50,
+    }).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(UserOperationPendingError);
+    expect((e as Error).cause).toBeInstanceOf(Error);
+    expect(requests.length).toBeGreaterThan(0);
+  });
+
+  it("keeps polling through a JSON-RPC error answer", async () => {
+    const { cfg } = proxy((n) =>
+      n === 1
+        ? new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, error: { code: -32603, message: "internal" } }), {
+            status: 200,
+          })
+        : receipt(true)
+    );
+    const r = await waitForUserOperationReceipt(cfg, {
+      session: await session(),
+      chainId: CHAIN_ID,
+      provider: "alchemy",
+      userOpHash: HASH,
+    });
+    expect(r.transactionHash).toBe(TX);
+  });
+
+  it.each([0, -1, Number.NaN])("rejects timeoutMs %s with UsageError before any request", async (timeoutMs) => {
+    const { cfg, requests } = proxy(() => receipt(true));
+    const e = await waitForUserOperationReceipt(cfg, {
+      session: await session(),
+      chainId: CHAIN_ID,
+      provider: "alchemy",
+      userOpHash: HASH,
+      timeoutMs,
+    }).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(UsageError);
+    expect(e).toMatchObject({ code: "timeout_invalid" });
     expect(requests).toHaveLength(0);
   });
 });

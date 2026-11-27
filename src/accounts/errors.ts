@@ -319,7 +319,8 @@ export type UsageErrorCode =
   | "dpop_key_invalid"
   | "key_pair_invalid"
   | "last_passkey"
-  | "address_invalid";
+  | "address_invalid"
+  | "timeout_invalid";
 
 /** The SDK was called in a way it refuses: a missing scope or config, a misbehaving DpopKey, or a guarded action. */
 export class UsageError extends AccountSdkError {

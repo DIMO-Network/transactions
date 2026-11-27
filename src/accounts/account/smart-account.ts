@@ -482,7 +482,12 @@ export async function deploySmartAccount(
         [{ to: zeroAddress, value: 0n, data: "0x" }],
         kernel.nonce
       );
-      await confirmUserOperation(client, hash, provider, opts.receiptTimeoutMs ?? 120_000);
+      await confirmUserOperation(
+        (h) => client.request({ method: "eth_getUserOperationReceipt", params: [h] }, { retryCount: 0 }),
+        hash,
+        provider,
+        opts.receiptTimeoutMs ?? 120_000
+      );
       return client.account.address;
     },
     deployed
