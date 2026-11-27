@@ -676,6 +676,25 @@ describe("smart account through the gas proxy", () => {
     expect(calls.filter((c) => c.method === "eth_sendUserOperation")).toHaveLength(1);
   });
 
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
+    "deploySmartAccount: receiptTimeoutMs %s is UsageError timeout_invalid before anything is sent",
+    async (receiptTimeoutMs) => {
+      const h = harness();
+      const { account, signMessage } = spySigner();
+      const err = await deploySmartAccount(h.cfg, {
+        session: await session(),
+        walletViemAccount: account,
+        chainId: CHAIN_ID,
+        receiptTimeoutMs,
+      }).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(UsageError);
+      expect(err).toMatchObject({ code: "timeout_invalid" });
+      expect(h.calls.filter(isProxy)).toHaveLength(0);
+      expect(h.fetchImpl).not.toHaveBeenCalled();
+      expect(signMessage).not.toHaveBeenCalled();
+    }
+  );
+
   it("returns early when code appears between provider attempts", async () => {
     const { cfg, calls } = harness({ failProviders: ["alchemy"] });
     const base = cfg.fetchImpl!;

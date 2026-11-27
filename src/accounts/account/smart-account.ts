@@ -56,7 +56,10 @@ export interface SmartAccountOptions {
   chainId: number;
   /** One provider per attempt, in order. Defaults to alchemy, gelato, pimlico. */
   providers?: GasProvider[];
-  /** How long deploy waits for the receipt after submission. Defaults to 120s. */
+  /**
+   * How long deploy waits for the receipt after submission. Defaults to 120s. When given,
+   * a finite number > 0 (else UsageError `timeout_invalid`, before anything is sent).
+   */
   receiptTimeoutMs?: number;
 }
 
@@ -461,6 +464,14 @@ export async function deploySmartAccount(
   opts: SmartAccountOptions
 ): Promise<{ address: `0x${string}`; provider: string }> {
   requireScopes(opts.session, ["write"], "deploying the smart account");
+  const receiptTimeoutMs = opts.receiptTimeoutMs ?? 120_000;
+  // Checked before anything is sent: after the send, a UsageError would hide a submitted op.
+  if (!(Number.isFinite(receiptTimeoutMs) && receiptTimeoutMs > 0)) {
+    throw new UsageError(
+      "timeout_invalid",
+      `receiptTimeoutMs must be a finite number greater than 0, got ${receiptTimeoutMs}`
+    );
+  }
   const kernel = await kernelFor(cfg, opts);
   const { publicClient, account } = kernel;
   // Runs before every attempt, the first included: existing code means nothing is sent.
@@ -486,7 +497,7 @@ export async function deploySmartAccount(
         (h) => client.request({ method: "eth_getUserOperationReceipt", params: [h] }, { retryCount: 0 }),
         hash,
         provider,
-        opts.receiptTimeoutMs ?? 120_000
+        receiptTimeoutMs
       );
       return client.account.address;
     },
