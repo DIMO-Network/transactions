@@ -1,6 +1,6 @@
 {
   "name": "@dimo-network/transactions",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "DIMO Transactions SDK",
   "keywords": [
     "DIMO",
@@ -9,16 +9,89 @@
   ],
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./accounts": {
+      "import": {
+        "types": "./dist/accounts/index.d.ts",
+        "default": "./dist/accounts/index.js"
+      },
+      "require": {
+        "types": "./dist/accounts/index.d.cts",
+        "default": "./dist/accounts/index.cjs"
+      }
+    },
+    "./accounts/core": {
+      "import": {
+        "types": "./dist/accounts/core/index.d.ts",
+        "default": "./dist/accounts/core/index.js"
+      },
+      "require": {
+        "types": "./dist/accounts/core/index.d.cts",
+        "default": "./dist/accounts/core/index.cjs"
+      }
+    },
+    "./accounts/auth": {
+      "import": {
+        "types": "./dist/accounts/auth/index.d.ts",
+        "default": "./dist/accounts/auth/index.js"
+      },
+      "require": {
+        "types": "./dist/accounts/auth/index.d.cts",
+        "default": "./dist/accounts/auth/index.cjs"
+      }
+    },
+    "./accounts/directory": {
+      "import": {
+        "types": "./dist/accounts/directory/index.d.ts",
+        "default": "./dist/accounts/directory/index.js"
+      },
+      "require": {
+        "types": "./dist/accounts/directory/index.d.cts",
+        "default": "./dist/accounts/directory/index.cjs"
+      }
+    },
+    "./dist/*.js": "./dist/*.js",
+    "./dist/*.cjs": "./dist/*.cjs",
+    "./dist/*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "accounts": [
+        "./dist/accounts/index.d.ts"
+      ],
+      "accounts/core": [
+        "./dist/accounts/core/index.d.ts"
+      ],
+      "accounts/auth": [
+        "./dist/accounts/auth/index.d.ts"
+      ],
+      "accounts/directory": [
+        "./dist/accounts/directory/index.d.ts"
+      ]
+    }
+  },
   "sideEffects": false,
   "type": "module",
   "scripts": {
     "format": "prettier --write .",
     "prebuild": "rm -rf ./dist && node -p \"'export const LIB_VERSION = \\'' + require('./package.json').version + '\\';'\" > src/version.ts && npm i --package-lock-only",
-    "build": "tsc -p ./tsconfig.build.json && tsc-alias",
+    "build": "tsc -p ./tsconfig.build.json && tsc-alias && tsup && node scripts/check-dist.mjs",
     "dev": "tsc --watch & nodemon --watch dist --delay 1 --exec tsc-alias",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.accounts.json",
     "lint": "eslint . --ext .ts,.tsx --fix",
-    "test": "vitest"
+    "lint:accounts": "ESLINT_USE_FLAT_CONFIG=false eslint --ext .ts src/accounts test/accounts e2e/accounts",
+    "test": "vitest",
+    "check:dist": "node scripts/check-dist.mjs",
+    "vectors:sync": "git -C ../did-directory show origin/main:testdata/vectors/did-ops.json > test/accounts/fixtures/did-ops.json.tmp && mv test/accounts/fixtures/did-ops.json.tmp test/accounts/fixtures/did-ops.json || (rm -f test/accounts/fixtures/did-ops.json.tmp; exit 1)",
+    "e2e:accounts": "tsx e2e/accounts/run.ts"
   },
   "dependencies": {
     "@turnkey/api-key-stamper": "^0.6.17",
@@ -29,12 +102,17 @@
     "@uniswap/sdk-core": "^7.8.0",
     "@zerodev/ecdsa-validator": "^5.4.9",
     "@zerodev/sdk": "5.5.6",
-    "viem": "^2.38.6"
+    "viem": "^2.56.8"
   },
   "devDependencies": {
+    "@ipld/dag-cbor": "^11.0.0",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@scure/base": "^2.4.0",
     "@types/node": "^24.10.0",
     "@typescript-eslint/eslint-plugin": "^8.46.3",
     "@typescript-eslint/parser": "^8.46.3",
+    "esbuild": "^0.27.7",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.4.0",
@@ -43,6 +121,8 @@
     "nodemon": "^3.1.10",
     "prettier": "^3.5.3",
     "tsc-alias": "^1.8.16",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^4.0.7"
   },

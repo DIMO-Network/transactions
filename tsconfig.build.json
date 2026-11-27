@@ -7,5 +7,5 @@
     "sourceMap": true
   },
   "include": ["src"],
-  "exclude": ["dist", "build", "**/*.test.*", "mocks", "node_modules"]
+  "exclude": ["dist", "build", "**/*.test.*", "mocks", "node_modules", "src/accounts"]
 }

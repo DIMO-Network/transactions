@@ -10,6 +10,17 @@ Use [npm](https://www.npmjs.com/package/@dimo-network/transactions):
 npm install @dimo-network/transactions
 ```
 
+## Accounts v2
+
+The non-custodial DIMO accounts SDK (sign-in, device keys, account helpers, smart accounts) ships in this package as subpath modules:
+
+- `@dimo-network/transactions/accounts`: signers and account flows.
+- `@dimo-network/transactions/accounts/auth`: sign-in, DPoP and authenticated fetch only. It loads no `viem`, ZeroDev or Turnkey code.
+- `@dimo-network/transactions/accounts/directory`: the verifying did-directory client only. It loads no `viem`, ZeroDev or Turnkey code.
+- `@dimo-network/transactions/accounts/core`: encoding and verification only. It loads no `viem`, ZeroDev or Turnkey code.
+
+All are ESM and CommonJS. The main entry does not re-export them. See [docs/accounts.md](docs/accounts.md).
+
 ## How to Use the SDK
 
 If you're a developer interested in using the DIMO Transactions SDK for **multi-user** or **corporate** purposes, where you will want to prompt **DIMO users** to take actions on their own accounts, the **Kernel Client** is for you. Kernel Clients are intended to work with **DIMOs Global Accounts**, security-improved wallets that reduce fees for users, enable account recorvery options, and create a more flexible ecosystem for developers to build on DIMO. See below for an example:
